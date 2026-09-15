@@ -120,7 +120,7 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 		m.event("adoption_inventory", "package", pkg.ID, "files", fmt.Sprint(len(existing)), "bytes", fmt.Sprint(existingBytes))
 	}
 	if operation == "install" && len(existing) > 0 {
-		return fmt.Errorf("an external installation exists; use Manage existing install")
+		return fmt.Errorf("an external installation exists; use Manage existing")
 	}
 	if operation == "adopt" && len(existing) == 0 {
 		return fmt.Errorf("no external installation was found; use Install")

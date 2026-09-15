@@ -30,7 +30,7 @@ Upstream package code runs later when the user launches it. The installer does n
 - Atomically replace regular files and installed state.
 - Snapshot every changed file and roll back a failed operation in reverse order.
 - Keep a persistent backup when installation overwrites a file the package did not own.
-- Show a detected external copy as **Manage existing install**, then inventory it before adoption. Exact release-hash matches can become manager-owned; changed and unknown files are marked unmanaged and backed up because ownership is not proven.
+- Show a detected external copy as the row state **EXTERNAL** with the action **Manage existing**, then inventory it before adoption. Exact release-hash matches can become manager-owned; changed and unknown files are marked unmanaged and backed up because ownership is not proven.
 - Preserve declared configuration during repair, update, and uninstall.
 - Track installed paths, hashes, modes, and original-file backups.
 - Redact URL credentials, query strings, fragments, and common secret fields from diagnostic logs. Cap the active log at 512 KiB and retain one rotated copy.
@@ -45,7 +45,7 @@ Upstream package code runs later when the user launches it. The installer does n
 - Path checks do not defend against a hostile local process that races a checked directory into a symlink.
 - Power loss is not yet journal-recovered across process restarts. Atomic file replacement limits corruption, and synchronous failures roll back.
 - Empty directories can remain after rollback or uninstall.
-- H700 detection file names need validation against real Knulli images. Operators must supply explicit flags when detection is incomplete.
+- Device detection reads the Knulli board identifier (`/boot/boot/knulli.board`), then `/etc/knulli-device`, then Batocera's board file. An unrecognized board shows `UNKNOWN DEVICE` and is blocked until the operator supplies explicit flags.
 - The GUI has one community-reported TrimUI Smart Pro test. Grout 5.1.0.0 is verified only for that declared device matrix. The report did not itemize lifecycle steps.
 - PlayTime is experimental on Smart Pro and MagicX Zero 28. Its Smart Pro test does not verify its untested MagicX matrix. Grout's built-in updater is outside manager transactions and must not be used.
 - Diagnostic export contains detected platform metadata, public catalogue package status, and redacted App Store logs. It does not scan or copy package configuration, credentials, ROMs, or user data.

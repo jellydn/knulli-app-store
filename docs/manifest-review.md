@@ -20,7 +20,7 @@
 5. Inspect the complete archive. It must contain regular files only and one declared launcher.
 6. Review source or packaged behavior for network use and filesystem writes.
 7. List the narrowest `/userdata` destination, menu file, preserved configuration, and allowed write paths.
-8. Establish the minimum Knulli version and test `aarch64`, H700, and each listed resolution.
+8. Establish the minimum Knulli version and test `aarch64`, every declared device ID, and each listed resolution.
 9. Have a second reviewer reproduce the checksum, archive inspection, and manifest validation.
 10. Use `experimental` for an authorized, clearly warned hardware test when mandatory release and path controls pass but compatibility evidence is incomplete. Promote to `installable` after review. Add `real-device-test` evidence and promote to `verified` only after the exact matrix passes on hardware.
 

@@ -507,6 +507,18 @@ func TestAdoptionRejectsNonRegularExistingPaths(t *testing.T) {
 	}
 }
 
+func TestInstallRejectsAnExternalCopyAndNamesTheOnScreenAction(t *testing.T) {
+	root := t.TempDir()
+	writeRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "external copy")
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	err := (Manager{Root: root, Platform: testPlatform()}).Install(context.Background(), pkg)
+	want := "an external installation exists; use Manage existing"
+	if err == nil || err.Error() != want {
+		t.Fatalf("external copy error = %v, want %q", err, want)
+	}
+}
+
 func TestCandidateCannotBeInstalled(t *testing.T) {
 	pkg := testPackage("https://example.com/releases/download/v1/demo.zip", []byte("x"), "1.0.0")
 	pkg.Review.Status = "candidate"

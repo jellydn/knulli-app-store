@@ -41,14 +41,16 @@ CURRENT SAFETY STATE
 Grout 5.1.0.0 is verified only for TrimUI Smart Pro. PlayTime 1.0.0 has a
 successful Smart Pro report but remains experimental because MagicX is not
 package-tested. Package notices still apply.
-Existing copies show ADOPT; adoption inventories and backs up uncertain files
-before installing the reviewed release. The other three packages are read-only.
+An existing copy shows EXTERNAL and offers Manage existing; that inventories
+and backs up uncertain files without reinstalling the reviewed release. The
+other two packages are read-only.
 
 Do not use Grout's built-in updater. Use App Store Repair and future reviewed
 updates only. Grout config stays under /userdata/roms/tools/Grout. PlayTime
 statistics stay under /userdata/system/configs/playtime. Manager state and
-adoption backups are under /userdata/system/knulli-app-store. Refresh game
-lists or reboot after package install or uninstall.
+adoption backups are under /userdata/system/knulli-app-store. The app asks
+Knulli to reload game lists when it changes the menu; if it reports that a
+restart is required, reboot to see the new entry. Manual refresh still works.
 
 Health checks cover immutable managed release files. PlayTime runtime data does
 not cause Repair. If Repair appears, package details and the application log
