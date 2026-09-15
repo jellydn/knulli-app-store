@@ -55,10 +55,10 @@ jobs:
         run: go run ./cmd/knulli-app catalogue -output build/catalog-index.json
       - name: Build Linux aarch64 binaries
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o build/knulli-app ./cmd/knulli-app
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags="-s -w" -o build/knulli-app ./cmd/knulli-app
           PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig \
             CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc \
-            go build -tags sdl -trimpath -ldflags="-s -w" -o build/knulli-app-ui ./cmd/knulli-app-ui
+            go build -buildvcs=false -tags sdl -trimpath -ldflags="-s -w" -o build/knulli-app-ui ./cmd/knulli-app-ui
       - name: Verify target ABI
         run: |
           file build/knulli-app build/knulli-app-ui
