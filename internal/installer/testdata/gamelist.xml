@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<gameList>
+  <game>
+    <path>./existing.sh</path>
+    <name>Existing Tool</name>
+    <image>./images/existing.png</image>
+  </game>
+  <folder>
+    <path>./utilities</path>
+    <name>Utilities</name>
+  </folder>
+</gameList>

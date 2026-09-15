@@ -1,0 +1,143 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"os"
+	"runtime"
+
+	"github.com/jellydn/knulli-app-store/internal/catalog"
+	"github.com/jellydn/knulli-app-store/internal/installer"
+	"github.com/jellydn/knulli-app-store/internal/manifest"
+	"github.com/jellydn/knulli-app-store/internal/platform"
+)
+
+const usage = `Knulli App Store installer core
+
+Usage:
+  knulli-app validate MANIFEST
+  knulli-app catalogue [-dir catalogue/packages] [-output build/catalog-index.json]
+  knulli-app install [platform flags] MANIFEST
+  knulli-app update [platform flags] MANIFEST
+  knulli-app repair [platform flags] MANIFEST
+  knulli-app uninstall [-root /] PACKAGE_ID
+
+Platform flags override detected values:
+  -root, -firmware, -firmware-version, -arch, -device, -resolution
+`
+
+func main() {
+	if err := run(os.Args[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
+	}
+}
+
+func run(arguments []string) error {
+	if len(arguments) == 0 {
+		fmt.Print(usage)
+		return nil
+	}
+	switch arguments[0] {
+	case "help", "-h", "--help":
+		fmt.Print(usage)
+		return nil
+	case "validate":
+		if len(arguments) != 2 {
+			return fmt.Errorf("validate requires one manifest path")
+		}
+		pkg, err := manifest.Load(arguments[1])
+		if err != nil {
+			return err
+		}
+		fmt.Printf("valid %s (%s)\n", pkg.ID, pkg.Review.Status)
+		return nil
+	case "catalogue":
+		flags := flag.NewFlagSet("catalogue", flag.ContinueOnError)
+		directory := flags.String("dir", "catalogue/packages", "manifest directory")
+		output := flags.String("output", "build/catalog-index.json", "index output path or -")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		index, err := catalog.Build(*directory)
+		if err != nil {
+			return err
+		}
+		if err := catalog.Write(index, *output); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "wrote %d packages to %s\n", len(index.Packages), *output)
+		return nil
+	case "install", "update", "repair":
+		return runApply(arguments[0], arguments[1:])
+	case "uninstall":
+		flags := flag.NewFlagSet("uninstall", flag.ContinueOnError)
+		root := flags.String("root", "/", "filesystem root")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 1 {
+			return fmt.Errorf("uninstall requires one package id")
+		}
+		if err := (installer.Manager{Root: *root}).Uninstall(flags.Arg(0)); err != nil {
+			return err
+		}
+		fmt.Printf("uninstalled %s\n", flags.Arg(0))
+		return nil
+	default:
+		return fmt.Errorf("unknown command %q", arguments[0])
+	}
+}
+
+func runApply(operation string, arguments []string) error {
+	flags := flag.NewFlagSet(operation, flag.ContinueOnError)
+	root := flags.String("root", "/", "filesystem root")
+	firmware := flags.String("firmware", "", "firmware id")
+	version := flags.String("firmware-version", "", "firmware version")
+	arch := flags.String("arch", "", "CPU architecture")
+	device := flags.String("device", "", "device family")
+	resolution := flags.String("resolution", "", "display resolution")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if flags.NArg() != 1 {
+		return fmt.Errorf("%s requires one manifest path", operation)
+	}
+	current := platform.Detect(*root)
+	override(&current.Firmware, *firmware)
+	override(&current.Version, *version)
+	override(&current.Arch, *arch)
+	override(&current.Device, *device)
+	override(&current.Resolution, *resolution)
+	if current.Arch == "" {
+		current.Arch = runtime.GOARCH
+	}
+	if current.Firmware == "" || current.Version == "" || current.Device == "" || current.Resolution == "" {
+		return fmt.Errorf("platform detection is incomplete; supply firmware, firmware-version, device, and resolution flags")
+	}
+	pkg, err := manifest.Load(flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	manager := installer.Manager{Root: *root, Platform: current}
+	switch operation {
+	case "install":
+		err = manager.Install(context.Background(), pkg)
+	case "update":
+		err = manager.Update(context.Background(), pkg)
+	case "repair":
+		err = manager.Repair(context.Background(), pkg)
+	}
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s completed for %s %s\n", operation, pkg.ID, pkg.Version)
+	return nil
+}
+
+func override(target *string, value string) {
+	if value != "" {
+		*target = value
+	}
+}
