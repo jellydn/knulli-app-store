@@ -73,7 +73,7 @@ jobs:
         run: |
           VERSION=$(printf '%.7s' "$GITHUB_SHA")
           scripts/package-device.sh build/knulli-app build/knulli-app-ui build/catalog-index.json dist "$VERSION" "${{ matrix.target }}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: knulli-app-store-${{ matrix.target }}-experimental
           path: dist/
