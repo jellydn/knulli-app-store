@@ -1,12 +1,12 @@
 # Knulli App Store
 
-Knulli App Store is an early, safety-focused package manager for community Knulli utilities, themes, and integrations. The first milestone is a reviewable catalogue format and a headless installer. A device UI will come only after the package and transaction contracts are stable.
+Knulli App Store is an early, safety-focused package manager for community Knulli utilities, themes, and integrations. It combines a reviewable catalogue, a transactional headless installer, and an experimental controller UI that uses the same installer interface.
 
 ## Current scope
 
-- Knulli devices in the H700 family
-- `aarch64`
-- One resolution per approved manifest; no resolution is assumed
+- Manifest-driven packages for reviewed Knulli `aarch64` devices; the original installer test matrix is H700
+- An experimental TrimUI Smart Pro GUI artifact targeting Allwinner A133 and 1280×720
+- One or more explicit resolutions per approved manifest; no resolution is assumed
 - ZIP and `tar.gz` release archives, up to 512 MiB compressed and installed
 - Writes below `/userdata` only
 
@@ -72,6 +72,8 @@ The five requested projects are present as non-actionable candidates:
 
 These notes record evidence reviewed on 2026-09-15. Upstream facts can change. Follow the [manifest review workflow](docs/manifest-review.md) before promotion.
 
-## UI status
+## Experimental TrimUI Smart Pro GUI
 
-An SDL2 UI is intentionally deferred. The current catalogue has no installable package, and the exact H700 controller mapping and SDL2 runtime supplied by Knulli have not been verified. Adding an untested UI now would add a second portability surface without a safe operation to expose. The future UI boundary is documented in [Architecture](docs/architecture.md).
+The controller-native SDL2 GUI browses the catalogue, shows package details and trust state, and presents only actions allowed by the installer service. All current candidates are read-only. The artifact uses Knulli's `SDL_GAMECONTROLLERCONFIG` instead of raw device numbers.
+
+GitHub Actions publishes `knulli-app-store-trimui-smart-pro-experimental` after all checks pass. See the [TrimUI Smart Pro test guide](docs/trimui-smart-pro.md) for authoritative runtime evidence, installation steps, controls, and the device test checklist. This is not a compatibility claim: the exact Knulli SDL2 version is not documented, and the artifact needs a real-device test.

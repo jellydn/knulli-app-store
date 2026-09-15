@@ -6,5 +6,10 @@ if ! command -v go >/dev/null 2>&1; then
   sudo apt-get install -y -qq golang-go
 fi
 
+if ! pkg-config --exists sdl2 2>/dev/null; then
+  sudo apt-get update -qq
+  sudo apt-get install -y -qq libsdl2-dev
+fi
+
 go version
 go mod download

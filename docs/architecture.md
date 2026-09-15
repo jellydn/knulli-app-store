@@ -38,8 +38,8 @@ An archive is fully downloaded, hashed, and staged before a destination file cha
 
 Update and repair share the same safe application path. Update can replace the manifest version and remove stale owned files. Repair reinstalls the declared release. Both leave existing declared configuration unchanged. Uninstall removes owned files, leaves preserved configuration, and restores files that existed before first ownership.
 
-## Future SDL2 boundary
+## SDL2 boundary
 
-The first UI target is one H700 reference resolution and controller-only input. The UI should be a separate command that depends on an interface with list, install, update, repair, and uninstall methods. The production adapter will use `installer.Manager`; tests will use an in-memory fake. SDL2 and controller mappings must stay behind that adapter so the CLI can remain a static, CGO-free recovery tool.
+The first GUI artifact targets the TrimUI Smart Pro 1280×720 display and controller-only input. `internal/ui` is a pure-Go state machine that depends on the `appstore.Backend` interface. `internal/appstore` validates the catalogue and calls `installer.Manager`. `internal/sdlui` only owns rendering and SDL events. Tests use an in-memory fake, while the production adapter keeps every package side effect in the installer.
 
-The SDL2 scaffold is deferred until the Knulli-provided SDL ABI and H700 controller mapping are confirmed on hardware. This avoids selecting a binding that weakens the current static build.
+The SDL adapter is behind the `sdl` build tag, so the CLI stays static and CGO-free. A small local cgo wrapper imports only the SDL 2.0 functions in use. It avoids a general binding that would import newer SDL symbols not proven to exist on Knulli. The GUI discovers SDL GameControllers and consumes Knulli's generated mapping; it does not read raw evdev nodes or assume button indices.

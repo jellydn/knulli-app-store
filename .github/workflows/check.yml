@@ -16,12 +16,21 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.19.x"
+          cache: true
+      - name: Install SDL2 development files
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-dev
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
       - name: Static checks
-        run: go vet ./...
+        run: |
+          go vet ./...
+          go install honnef.co/go/tools/cmd/staticcheck@v0.3.3
+          staticcheck ./...
+          staticcheck -tags sdl ./...
       - name: Unit and integration tests
         run: go test -race ./...
+      - name: Compile SDL2 GUI and tests
+        run: go test -tags sdl ./...
       - name: Build static aarch64 CLI
         run: GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o /tmp/knulli-app ./cmd/knulli-app
       - name: Validate catalogue and deterministic output
@@ -29,3 +38,39 @@ jobs:
           go run ./cmd/knulli-app catalogue -output /tmp/index-one.json
           go run ./cmd/knulli-app catalogue -output /tmp/index-two.json
           cmp /tmp/index-one.json /tmp/index-two.json
+
+  trimui-smart-pro-artifact:
+    needs: test
+    runs-on: ubuntu-latest
+    container: golang:1.19-bullseye
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install aarch64 cross compiler and SDL2 headers
+        run: |
+          dpkg --add-architecture arm64
+          apt-get update -qq
+          apt-get install -y -qq binutils file gcc-aarch64-linux-gnu libc6-dev-arm64-cross libsdl2-dev:arm64 pkg-config zip
+      - name: Build deterministic catalogue
+        run: go run ./cmd/knulli-app catalogue -output build/catalog-index.json
+      - name: Build Linux aarch64 binaries
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o build/knulli-app ./cmd/knulli-app
+          PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig \
+            CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc \
+            go build -tags sdl -trimpath -ldflags="-s -w" -o build/knulli-app-ui ./cmd/knulli-app-ui
+      - name: Verify target ABI
+        run: |
+          file build/knulli-app build/knulli-app-ui
+          readelf -d build/knulli-app-ui | grep -F 'Shared library: [libSDL2-2.0.so.0]'
+          test "$(readelf -d build/knulli-app-ui | grep -c '(NEEDED)')" -eq 2
+          ! readelf --version-info build/knulli-app-ui | grep -E 'GLIBC_2\.(3[2-9]|[4-9][0-9])'
+      - name: Package experimental Ports artifact
+        run: |
+          VERSION=$(printf '%.7s' "$GITHUB_SHA")
+          scripts/package-trimui-smart-pro.sh build/knulli-app build/knulli-app-ui build/catalog-index.json dist "$VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: knulli-app-store-trimui-smart-pro-experimental
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
