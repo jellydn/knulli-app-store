@@ -41,6 +41,42 @@ func TestExtractZIPStripsOneDirectoryAndChecksExpandedSize(t *testing.T) {
 	}
 }
 
+func TestExtractZIPAcceptsValidatedDirectoryEntries(t *testing.T) {
+	archivePath := filepath.Join(t.TempDir(), "fixture.zip")
+	file, err := os.Create(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := zip.NewWriter(file)
+	directory := &zip.FileHeader{Name: "release/"}
+	directory.SetMode(os.ModeDir | 0755)
+	if _, err := writer.CreateHeader(directory); err != nil {
+		t.Fatal(err)
+	}
+	header := &zip.FileHeader{Name: "release/launch.sh", Method: zip.Store}
+	header.SetMode(0644)
+	entry, err := writer.CreateHeader(header)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := entry.Write([]byte("run")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	files, err := Extract(archivePath, "zip", t.TempDir(), 1, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || files[0].Relative != "launch.sh" {
+		t.Fatalf("unexpected extracted files: %#v", files)
+	}
+}
+
 func TestExtractTarGZRejectsLinksAndExtractsRegularFiles(t *testing.T) {
 	regular := makeTarGZ(t, &tar.Header{Name: "release/launch.sh", Mode: 0755, Size: 3, Typeflag: tar.TypeReg}, "run")
 	files, err := Extract(regular, "tar.gz", t.TempDir(), 1, 3)
@@ -53,6 +89,10 @@ func TestExtractTarGZRejectsLinksAndExtractsRegularFiles(t *testing.T) {
 	link := makeTarGZ(t, &tar.Header{Name: "link", Linkname: "../outside", Mode: 0777, Typeflag: tar.TypeSymlink}, "")
 	if _, err := Extract(link, "tar.gz", t.TempDir(), 0, 100); err == nil {
 		t.Fatal("expected tar symlink to be rejected")
+	}
+	traversalDirectory := makeTarGZ(t, &tar.Header{Name: "../outside/", Mode: 0755, Typeflag: tar.TypeDir}, "")
+	if _, err := Extract(traversalDirectory, "tar.gz", t.TempDir(), 0, 100); err == nil {
+		t.Fatal("expected tar traversal directory to be rejected")
 	}
 }
 

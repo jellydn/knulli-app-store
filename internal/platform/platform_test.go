@@ -69,3 +69,13 @@ func TestCheckRejectsOlderVersionAndWrongResolution(t *testing.T) {
 		t.Fatal("expected unsupported resolution to fail")
 	}
 }
+
+func TestCheckAllowsExperimentalCompatibilityWithoutInventedMinimum(t *testing.T) {
+	pkg := manifest.Package{Compatibility: &manifest.Compatibility{
+		Firmware: "knulli", Architectures: []string{"aarch64"}, Devices: []string{"trimui-smart-pro"}, Resolutions: []string{"1280x720"},
+	}}
+	current := Info{Firmware: "knulli", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720"}
+	if err := Check(pkg, current); err != nil {
+		t.Fatalf("experimental compatibility should not invent a minimum version: %v", err)
+	}
+}

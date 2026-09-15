@@ -24,6 +24,14 @@
       "if": { "properties": { "review": { "properties": { "status": { "const": "candidate" } } } } },
       "then": { "not": { "anyOf": [{ "required": ["release"] }, { "required": ["compatibility"] }, { "required": ["install"] }] } },
       "else": { "required": ["version", "repository", "license", "release", "compatibility", "install"] }
+    },
+    {
+      "if": { "properties": { "review": { "properties": { "status": { "const": "experimental" } } } } },
+      "then": { "properties": { "install": { "required": ["warning"] } } }
+    },
+    {
+      "if": { "properties": { "review": { "properties": { "status": { "enum": ["installable", "verified"] } } } } },
+      "then": { "properties": { "compatibility": { "required": ["minimum_version"] } } }
     }
   ],
   "$defs": {
@@ -32,7 +40,7 @@
       "additionalProperties": false,
       "required": ["status"],
       "properties": {
-        "status": { "enum": ["candidate", "installable", "verified"] },
+        "status": { "enum": ["candidate", "experimental", "installable", "verified"] },
         "approval": { "$ref": "#/$defs/approval" },
         "notes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
         "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
@@ -72,7 +80,7 @@
     "compatibility": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["firmware", "minimum_version", "architectures", "devices", "resolutions"],
+      "required": ["firmware", "architectures", "devices", "resolutions"],
       "properties": {
         "firmware": { "const": "knulli" },
         "minimum_version": { "type": "string", "minLength": 1 },
@@ -89,6 +97,8 @@
         "destination": { "type": "string", "pattern": "^/userdata/" },
         "strip_components": { "type": "integer", "minimum": 0 },
         "launcher": { "type": "string", "minLength": 1 },
+        "executables": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "warning": { "type": "string", "minLength": 1 },
         "menu": { "$ref": "#/$defs/menu" },
         "preserve": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "network": { "type": "boolean" },

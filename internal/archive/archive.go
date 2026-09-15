@@ -49,7 +49,11 @@ func extractZIP(archivePath, destination string, stripComponents int, maximumByt
 		if item.Mode()&os.ModeSymlink != 0 || (!item.Mode().IsRegular() && !item.FileInfo().IsDir()) {
 			return nil, fmt.Errorf("archive contains unsupported entry %q", item.Name)
 		}
-		relative, skip, err := safeName(item.Name, stripComponents)
+		name := item.Name
+		if item.FileInfo().IsDir() {
+			name = strings.TrimSuffix(name, "/")
+		}
+		relative, skip, err := safeName(name, stripComponents)
 		if err != nil {
 			return nil, err
 		}
@@ -102,6 +106,9 @@ func extractTarGZ(archivePath, destination string, stripComponents int, maximumB
 			return nil, err
 		}
 		if header.Typeflag == tar.TypeDir {
+			if _, _, err := safeName(strings.TrimSuffix(header.Name, "/"), stripComponents); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeRegA {

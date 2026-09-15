@@ -44,6 +44,20 @@ The launcher appends diagnostics to `/userdata/system/logs/knulli-app-store.log`
 2. Extract the new versioned ZIP into `/userdata/roms/ports` and allow it to replace the old launcher and `knulli-app-store` files.
 3. Safely eject, boot, and launch the app again. Installed-package state under `/userdata/system/knulli-app-store` is not part of the artifact and remains in place.
 
+## Experimental package operations
+
+Only Grout 5.1.0.0 and PlayTime 1.0.0 are actionable. Select **Install** for a new copy or **Adopt** when the destination already exists, then read and confirm the experimental warning. Adoption inventories all regular files before download. Files that match the reviewed release hash become manager-owned. Changed and unknown files are backed up under `/userdata/system/knulli-app-store/originals/<package-id>/` before replacement. State is stored under `/userdata/system/knulli-app-store/installed/`.
+
+The manager restores execute mode only on reviewed paths. PlayTime needs `playtime` and `playtime.sh` to be executable so Knulli can start the launcher and its local binary. Grout needs `Grout.sh` and `grout` for the same reason. No downloaded script is executed during installation.
+
+Use **Repair** to re-download, verify, and restore managed files. Use **Uninstall** to remove manager-owned files while preserving declared data. Exact pre-existing release files are removed after adoption; changed package files are restored because their ownership is uncertain. If an operation fails, the transaction rolls back. A retained backup can be restored by copying it back to the path recorded in the installed-state JSON. Do not edit that state by hand while the app is running.
+
+- Grout configuration: `/userdata/roms/tools/Grout/config.json`, `save_slots.json`, `.cache/`, and `logs/`.
+- PlayTime statistics and configuration: `/userdata/system/configs/playtime/`.
+- App Store log: `/userdata/system/logs/knulli-app-store.log`.
+
+Do not use Grout's built-in updater during this test. It has no supported disable setting and operates outside App Store rollback. Future Grout updates must use a newly reviewed manifest. These manifests do not edit `gamelist.xml`: after install or uninstall, refresh game lists or reboot. This avoids deleting or replacing an entry that may belong to a pre-existing manual installation.
+
 ## Controls
 
 - D-pad: move through packages or available actions.
@@ -60,10 +74,28 @@ With Knulli's default Ports layout, physical B (south) maps to SDL A and physica
 - Confirm D-pad navigation, select, back, and exit with Knulli's default Ports layout.
 - Confirm the footer says `CONTROLLER: READY`; record the log if it does not.
 - Confirm the header shows `TRIMUI SMART PRO / 1280X720`. Unknown boards must show `UNKNOWN DEVICE`, and failed runtime-size detection must identify its fallback.
-- Confirm all six candidates show `READ ONLY - REVIEW REQUIRED` and cannot start an install.
-- Confirm EmuDrop shows the ROM copyright warning and EmuDrop, PlayTime, and Grout show `APPROVED / CANDIDATE`.
+- Confirm Grout and PlayTime show `APPROVED / EXPERIMENTAL`; the other four packages remain read-only.
+- Confirm EmuDrop shows the ROM copyright warning and remains `APPROVED / CANDIDATE`.
 - Confirm returning to EmulationStation works and a second launch also works.
 - Confirm Wi-Fi disabled and enabled produce the same catalogue because this artifact reads its bundled index.
 - Send the log, firmware version, observed controls, and a photo or screenshot with the result. Do not include credentials or private network data.
 
 After this checklist passes, add linked `real-device-test` evidence for the GUI target. Package manifests still need their own package-specific hardware tests before any verified badge.
+
+### PlayTime 1.0.0
+
+1. Install, refresh game lists or reboot, and launch PlayTime.
+2. Confirm the launcher and statistics function, then close and reopen it.
+3. Change one statistic, run Repair, and confirm the statistic remains.
+4. Run Uninstall and confirm managed files are gone while `/userdata/system/configs/playtime/` remains.
+5. If PlayTime existed before this test, repeat through Adopt and confirm its statistics remain.
+
+### Grout 5.1.0.0
+
+1. Install, refresh game lists or reboot, and launch Grout without using its updater.
+2. Connect to a test RomM server and confirm one core browse or sync operation. Do not include credentials in the report.
+3. Run Repair and confirm `config.json`, `save_slots.json`, `.cache/`, and `logs/` remain.
+4. Run Uninstall and confirm managed files are gone while the preserved paths remain.
+5. If Grout existed before this test, repeat through Adopt and confirm credentials and configuration remain.
+
+Report install, launch, core function, Repair, Uninstall, and adoption results separately for each package. Until all relevant checks pass on hardware, both packages remain unverified.

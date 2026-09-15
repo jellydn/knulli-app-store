@@ -51,6 +51,10 @@ func Copy(source, destination string, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
+	if err := output.Chmod(mode.Perm()); err != nil {
+		output.Close()
+		return err
+	}
 	_, copyErr := io.Copy(output, input)
 	syncErr := output.Sync()
 	closeErr := output.Close()

@@ -25,17 +25,23 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 		"io.github.ahmadteeb.emudrop":  true,
 		"io.github.unitreign.playtime": true,
 	}
+	experimental := 0
 	for index := range first.Packages {
 		if first.Packages[index].ID != second.Packages[index].ID || first.Packages[index].ManifestSHA256 != second.Packages[index].ManifestSHA256 {
 			t.Fatal("catalogue build is not deterministic")
 		}
-		if first.Packages[index].Package.Installable() {
-			t.Fatalf("candidate unexpectedly installable: %s", first.Packages[index].ID)
+		if first.Packages[index].Package.Experimental() {
+			experimental++
+		} else if first.Packages[index].Package.Installable() {
+			t.Fatalf("non-experimental package unexpectedly installable: %s", first.Packages[index].ID)
 		}
 		approval := first.Packages[index].Package.Review.Approval
 		if approved[first.Packages[index].ID] != (approval != nil && approval.Provenance == "community") {
 			t.Fatalf("unexpected approval state: %s", first.Packages[index].ID)
 		}
+	}
+	if experimental != 2 {
+		t.Fatalf("expected two experimental packages, got %d", experimental)
 	}
 }
 

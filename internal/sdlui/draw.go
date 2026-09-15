@@ -108,6 +108,10 @@ func drawDetails(frame *image.RGBA, model *storeui.Model) {
 	y := 101
 	installed := "NOT INSTALLED"
 	installedColor := palette.muted
+	if item.PreExisting {
+		installed = "EXISTING COPY / NOT MANAGED"
+		installedColor = palette.warning
+	}
 	if item.Installed {
 		installed = "INSTALLED " + strings.ToUpper(item.InstalledVersion)
 		installedColor = palette.accent
@@ -175,10 +179,25 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item) {
 		x += width + 8
 	}
 	if model.Focus == storeui.Confirm {
-		fill(frame, image.Rect(286, 126, 580, 214), color.RGBA{R: 35, G: 46, B: 64, A: 255})
-		text(frame, 304, 153, palette.warning, "CONFIRM PACKAGE CHANGE")
-		text(frame, 304, 176, palette.text, strings.ToUpper(string(item.Actions[model.Action]))+" "+shorten(strings.ToUpper(item.Package.Name), 24)+"?")
-		text(frame, 304, 199, palette.muted, "B CONFIRM   A CANCEL")
+		action := item.Actions[model.Action]
+		if item.Package.Experimental() && (action == appstore.Install || action == appstore.Adopt) {
+			fill(frame, image.Rect(250, 108, 616, 232), color.RGBA{R: 35, G: 46, B: 64, A: 255})
+			text(frame, 266, 132, palette.warning, "EXPERIMENTAL PACKAGE TEST")
+			text(frame, 266, 151, palette.text, strings.ToUpper(string(action))+" "+shorten(strings.ToUpper(item.Package.Name), 24)+"?")
+			warning := strings.ToUpper(item.Package.Install.Warning)
+			for index, line := range wrapText(warning, 40) {
+				if index == 2 {
+					break
+				}
+				text(frame, 266, 171+index*15, palette.warning, line)
+			}
+			text(frame, 266, 220, palette.muted, "B CONFIRM   A CANCEL")
+		} else {
+			fill(frame, image.Rect(286, 126, 580, 214), color.RGBA{R: 35, G: 46, B: 64, A: 255})
+			text(frame, 304, 153, palette.warning, "CONFIRM PACKAGE CHANGE")
+			text(frame, 304, 176, palette.text, strings.ToUpper(string(action))+" "+shorten(strings.ToUpper(item.Package.Name), 24)+"?")
+			text(frame, 304, 199, palette.muted, "B CONFIRM   A CANCEL")
+		}
 	}
 }
 

@@ -3,6 +3,7 @@ package appstore
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 
 	"github.com/jellydn/knulli-app-store/internal/catalog"
@@ -15,6 +16,7 @@ type Action string
 
 const (
 	Install   Action = "install"
+	Adopt     Action = "adopt"
 	Update    Action = "update"
 	Repair    Action = "repair"
 	Uninstall Action = "uninstall"
@@ -25,6 +27,7 @@ type Item struct {
 	Installed        bool
 	InstalledVersion string
 	Healthy          bool
+	PreExisting      bool
 	Compatible       bool
 	Compatibility    string
 	Actions          []Action
@@ -59,6 +62,12 @@ func (s *Service) Items(ctx context.Context) ([]Item, error) {
 			return nil, fmt.Errorf("read %s status: %w", entry.ID, err)
 		}
 		item := Item{Package: entry.Package, Installed: status.Installed, InstalledVersion: status.Version, Healthy: status.Healthy}
+		if !item.Installed {
+			item.PreExisting, err = s.manager.PreExisting(entry.Package)
+			if err != nil {
+				return nil, fmt.Errorf("inspect %s destination: %w", entry.ID, err)
+			}
+		}
 		item.Compatible, item.Compatibility = compatibility(entry.Package, s.manager.Platform)
 		item.Actions = actions(item)
 		items = append(items, item)
@@ -86,9 +95,13 @@ func (s *Service) Execute(ctx context.Context, id string, action Action, progres
 	if selected == nil || !containsAction(selected.Actions, action) {
 		return fmt.Errorf("%s is not available for %s", action, id)
 	}
-	progress("Starting " + string(action))
+	message := operationMessage(action, entry.Package.Name)
+	progress(message)
+	log.Printf("package operation started: id=%s action=%s", id, action)
 	switch action {
 	case Install:
+		err = s.manager.Install(ctx, entry.Package)
+	case Adopt:
 		err = s.manager.Install(ctx, entry.Package)
 	case Update:
 		err = s.manager.Update(ctx, entry.Package)
@@ -100,8 +113,10 @@ func (s *Service) Execute(ctx context.Context, id string, action Action, progres
 		return fmt.Errorf("unknown action %q", action)
 	}
 	if err != nil {
+		log.Printf("package operation failed: id=%s action=%s error=%v", id, action, err)
 		return err
 	}
+	log.Printf("package operation completed: id=%s action=%s", id, action)
 	progress("Completed " + string(action))
 	return nil
 }
@@ -125,6 +140,9 @@ func compatibility(pkg manifest.Package, current platform.Info) (bool, string) {
 	if err := platform.Check(pkg, current); err != nil {
 		return false, err.Error()
 	}
+	if pkg.Experimental() {
+		return true, "Experimental test for detected platform"
+	}
 	return true, "Compatible with detected platform"
 }
 
@@ -140,9 +158,22 @@ func actions(item Item) []Action {
 		return result
 	}
 	if item.Package.Installable() && item.Compatible {
+		if item.PreExisting {
+			return []Action{Adopt}
+		}
 		return []Action{Install}
 	}
 	return nil
+}
+
+func operationMessage(action Action, name string) string {
+	if action == Adopt {
+		return "Backing up existing " + name + " and installing reviewed release"
+	}
+	if action == Install || action == Update || action == Repair {
+		return "Downloading, verifying, and applying " + name
+	}
+	return "Removing managed files and restoring backups for " + name
 }
 
 func containsAction(actions []Action, wanted Action) bool {

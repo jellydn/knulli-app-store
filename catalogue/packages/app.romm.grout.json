@@ -8,14 +8,14 @@
   "repository": "https://github.com/rommapp/grout",
   "license": "MIT",
   "review": {
-    "status": "candidate",
+    "status": "experimental",
     "approval": {
       "provenance": "community"
     },
     "notes": [
-      "Installation is blocked: upstream says TrimUI Smart Pro on Knulli was tested but does not identify the minimum Knulli version required by the manifest.",
-      "The package self-updater stages hash-checked code outside app-manager transactions; repair can restore catalogue files, but this remains a trust limitation.",
-      "Community approval permits catalogue inclusion but is not a real-device package verification."
+      "Experimental TrimUI Smart Pro test package; upstream names this device but no minimum Knulli version or linked test report is claimed.",
+      "Do not use Grout's built-in updater during this test. It cannot be disabled through a supported setting; use Knulli App Store for repair or future updates.",
+      "The manager preserves and backs up pre-existing config.json, save_slots.json, cache, logs, and unknown files before adoption."
     ],
     "evidence": [
       {
@@ -42,6 +42,37 @@
         "url": "https://github.com/rommapp/grout/blob/v5.1.0.0/cfw/knulli/knulli.go",
         "note": "Reviewed paths are /userdata/roms/tools/Grout, /userdata/roms/tools/.update, /userdata/roms/tools/gamelist.xml, /userdata/roms, /userdata/bios, and /userdata/saves. Network access is required for RomM and updates. The launcher executes local files; the binary updater checks a supplied SHA-256 before staging release code."
       }
+    ]
+  },
+  "release": {
+    "url": "https://github.com/rommapp/grout/releases/download/v5.1.0.0/Grout-Knulli.zip",
+    "sha256": "1af9924fc42dd7213c45f09c1a8d93726c7ade5cdac8394a020a433260cbb356",
+    "size": 24279213,
+    "installed_size": 95180746,
+    "format": "zip",
+    "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "devices": ["trimui-smart-pro"],
+    "resolutions": ["1280x720"]
+  },
+  "install": {
+    "destination": "/userdata/roms/tools/Grout",
+    "strip_components": 1,
+    "launcher": "Grout.sh",
+    "executables": ["Grout.sh", "grout"],
+    "warning": "Unverified. Do not use Grout updater. Update only through Knulli App Store.",
+    "preserve": ["config.json", "save_slots.json", ".cache", "logs"],
+    "network": true,
+    "allowed_write_paths": [
+      "/userdata/roms/tools/Grout",
+      "/userdata/roms/tools/.update",
+      "/userdata/roms/tools/gamelist.xml",
+      "/userdata/roms",
+      "/userdata/bios",
+      "/userdata/saves"
     ]
   }
 }

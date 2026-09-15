@@ -17,6 +17,7 @@ import (
 
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/platform"
+	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
 
 func TestInstallRepairUpdateAndUninstallEndToEnd(t *testing.T) {
@@ -110,6 +111,7 @@ func TestFailedGamelistUpdateRollsBackFiles(t *testing.T) {
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "original")
 	assertMissing(t, root, "userdata/system/knulli-app-store/installed/org.example.demo.json")
+	assertMissing(t, root, strings.TrimPrefix(originalPath(pkg.ID, "/userdata/roms/tools/demo/launch.sh"), "/"))
 }
 
 func TestChecksumFailureWritesNoPackageFiles(t *testing.T) {
@@ -124,6 +126,119 @@ func TestChecksumFailureWritesNoPackageFiles(t *testing.T) {
 		t.Fatalf("expected checksum failure, got %v", err)
 	}
 	assertMissing(t, root, "userdata/roms/tools/demo/launch.sh")
+}
+
+func TestDeclarativeExecutablesAreRestoredAndRepaired(t *testing.T) {
+	root := t.TempDir()
+	asset := zipBytesWithModes(t, map[string]zipFixture{
+		"launch.sh": {body: "launcher", mode: 0644},
+		"tool":      {body: "binary", mode: 0644},
+	})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	pkg.Install.Executables = []string{"launch.sh", "tool"}
+	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
+	if err := manager.Install(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"launch.sh", "tool"} {
+		path := filepath.Join(root, "userdata/roms/tools/demo", name)
+		if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0755 {
+			t.Fatalf("%s mode was not restored: %v, %v", name, info, err)
+		}
+	}
+	tool := filepath.Join(root, "userdata/roms/tools/demo/tool")
+	if err := os.Chmod(tool, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if status, err := manager.Status(pkg.ID); err != nil || status.Healthy {
+		t.Fatalf("changed executable mode was not detected: %#v, %v", status, err)
+	}
+	if err := manager.Repair(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Stat(tool); err != nil || info.Mode().Perm() != 0755 {
+		t.Fatalf("repair did not restore executable mode: %v, %v", info, err)
+	}
+}
+
+func TestAdoptBacksUpExistingFilesAndUninstallRestoresThem(t *testing.T) {
+	root := t.TempDir()
+	writeRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "old launcher")
+	writeRootFile(t, root, "userdata/roms/tools/demo/config.ini", "old credentials")
+	writeRootFile(t, root, "userdata/roms/tools/demo/local-config.ini", "local credentials")
+	writeRootFile(t, root, "userdata/roms/tools/demo/tool", "reviewed binary")
+	writeRootFile(t, root, "userdata/roms/tools/demo/unknown/cache.db", "old cache")
+	writeRootFile(t, root, "userdata/roms/tools/demo/logs/session.log", "old log")
+	writeRootFile(t, root, "userdata/system/configs/playtime/playtime.db", "statistics")
+	asset := zipBytes(t, map[string]string{
+		"launch.sh":  "reviewed launcher",
+		"config.ini": "default configuration",
+		"tool":       "reviewed binary",
+	})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	pkg.Install.Preserve = append(pkg.Install.Preserve, "local-config.ini", "logs")
+	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
+	preExisting, err := manager.PreExisting(pkg)
+	if err != nil || !preExisting {
+		t.Fatalf("existing package was not detected: %v, %v", preExisting, err)
+	}
+	if err := manager.Install(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.Install(context.Background(), pkg); err == nil || !strings.Contains(err.Error(), "already installed") {
+		t.Fatalf("repeated install was not rejected: %v", err)
+	}
+	baseGuard, err := safefs.NewGuard(root, []string{managerPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := loadState(baseGuard, pkg.ID)
+	if err != nil || len(state.Originals) != 5 {
+		t.Fatalf("pre-existing inventory was not saved: %#v, %v", state, err)
+	}
+	for _, backup := range state.Originals {
+		if host, err := baseGuard.Resolve(backup); err != nil {
+			t.Fatal(err)
+		} else if info, err := os.Stat(host); err != nil || !info.Mode().IsRegular() {
+			t.Fatalf("missing adoption backup %s: %v", backup, err)
+		}
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "reviewed launcher")
+	assertRootFile(t, root, "userdata/roms/tools/demo/config.ini", "old credentials")
+	writeRootFile(t, root, "userdata/roms/tools/demo/config.ini", "updated credentials")
+	writeRootFile(t, root, "userdata/roms/tools/demo/local-config.ini", "updated local credentials")
+	writeRootFile(t, root, "userdata/roms/tools/demo/unknown/cache.db", "changed cache")
+	writeRootFile(t, root, "userdata/roms/tools/demo/logs/session.log", "new log")
+	if err := manager.Uninstall(pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "old launcher")
+	assertRootFile(t, root, "userdata/roms/tools/demo/config.ini", "updated credentials")
+	assertRootFile(t, root, "userdata/roms/tools/demo/local-config.ini", "updated local credentials")
+	assertRootFile(t, root, "userdata/roms/tools/demo/unknown/cache.db", "old cache")
+	assertRootFile(t, root, "userdata/roms/tools/demo/logs/session.log", "new log")
+	assertRootFile(t, root, "userdata/system/configs/playtime/playtime.db", "statistics")
+	assertMissing(t, root, "userdata/roms/tools/demo/tool")
+}
+
+func TestAdoptionRejectsNonRegularExistingPaths(t *testing.T) {
+	root := t.TempDir()
+	destination := filepath.Join(root, "userdata/roms/tools/demo")
+	if err := os.MkdirAll(destination, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("missing", filepath.Join(destination, "unsafe-link")); err != nil {
+		t.Fatal(err)
+	}
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed"})
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	if err := (Manager{Root: root, Platform: testPlatform()}).Install(context.Background(), pkg); err == nil || !strings.Contains(err.Error(), "non-regular") {
+		t.Fatalf("expected unsafe adoption rejection, got %v", err)
+	}
 }
 
 func TestCandidateCannotBeInstalled(t *testing.T) {
@@ -209,6 +324,32 @@ func zipBytes(t *testing.T, files map[string]string) []byte {
 			t.Fatal(err)
 		}
 		if _, err := io.WriteString(entry, body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buffer.Bytes()
+}
+
+type zipFixture struct {
+	body string
+	mode os.FileMode
+}
+
+func zipBytesWithModes(t *testing.T, files map[string]zipFixture) []byte {
+	t.Helper()
+	var buffer bytes.Buffer
+	writer := zip.NewWriter(&buffer)
+	for name, fixture := range files {
+		header := &zip.FileHeader{Name: name, Method: zip.Store}
+		header.SetMode(fixture.mode)
+		entry, err := writer.CreateHeader(header)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.WriteString(entry, fixture.body); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -83,7 +83,7 @@ func Check(pkg manifest.Package, current Info) error {
 	if current.Firmware != wanted.Firmware {
 		return fmt.Errorf("firmware %s is not supported; need %s", current.Firmware, wanted.Firmware)
 	}
-	if compareVersions(current.Version, wanted.MinimumVersion) < 0 {
+	if wanted.MinimumVersion != "" && compareVersions(current.Version, wanted.MinimumVersion) < 0 {
 		return fmt.Errorf("firmware version %s is older than required %s", current.Version, wanted.MinimumVersion)
 	}
 	if !includes(wanted.Architectures, current.Arch) {

@@ -19,6 +19,14 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		Installed: true, InstalledVersion: "1.0.0", Healthy: false, Compatible: true,
 		Compatibility: "Compatible with detected platform", Actions: []appstore.Action{appstore.Repair, appstore.Uninstall},
 	}
+	experimental := appstore.Item{
+		Package: manifest.Package{
+			ID: "app.romm.grout", Name: "Grout", Type: "integration", Summary: "Connects a Linux retro handheld to a RomM server.",
+			Review:  manifest.Review{Status: "experimental", Approval: &manifest.Approval{Provenance: "community"}},
+			Install: &manifest.Install{Warning: "Unverified. Do not use Grout updater. Update only through Knulli App Store."},
+		},
+		PreExisting: true, Compatible: true, Compatibility: "Experimental test for detected platform", Actions: []appstore.Action{appstore.Adopt},
+	}
 	emuDrop := appstore.Item{
 		Package: manifest.Package{
 			ID: "io.github.ahmadteeb.emudrop", Name: "EmuDrop", Type: "utility", Summary: "Browses third-party sources and downloads ROM files and artwork.",
@@ -30,9 +38,10 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		Compatibility: "Community approved; installation is blocked by technical review",
 	}
 	states := map[string]*storeui.Model{
-		"browse":  {Items: []appstore.Item{emuDrop}},
-		"confirm": {Items: []appstore.Item{item}, Focus: storeui.Confirm},
-		"error":   {Items: []appstore.Item{item}, Error: "SHA-256 mismatch; package files were not changed"},
+		"browse":   {Items: []appstore.Item{emuDrop}},
+		"confirm":  {Items: []appstore.Item{experimental}, Focus: storeui.Confirm},
+		"error":    {Items: []appstore.Item{item}, Error: "SHA-256 mismatch; package files were not changed"},
+		"progress": {Items: []appstore.Item{experimental}, Busy: true, Message: "Downloading, verifying, and applying Grout"},
 	}
 	directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR")
 	for name, model := range states {

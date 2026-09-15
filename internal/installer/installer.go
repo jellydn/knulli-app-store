@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 	"syscall"
 
 	storearchive "github.com/jellydn/knulli-app-store/internal/archive"
@@ -92,11 +93,19 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	if err != nil {
 		return err
 	}
+	var existing []existingFile
+	var existingBytes uint64
+	if old == nil {
+		existing, existingBytes, err = inventoryExisting(destinationHost, pkg.Install.Destination)
+		if err != nil {
+			return fmt.Errorf("inventory pre-existing installation: %w", err)
+		}
+	}
 	available, err := safefs.AvailableBytes(destinationHost)
 	if err != nil {
 		return err
 	}
-	required := uint64(pkg.Release.Size) + uint64(pkg.Release.InstalledSize)*3
+	required := uint64(pkg.Release.Size) + uint64(pkg.Release.InstalledSize)*3 + existingBytes*2
 	if available < required {
 		return fmt.Errorf("not enough free space: need %d bytes, have %d", required, available)
 	}
@@ -120,6 +129,9 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	if len(files) == 0 {
 		return fmt.Errorf("release archive contains no installable files")
 	}
+	if err := applyExecutableModes(files, pkg.Install.Executables); err != nil {
+		return err
+	}
 	if !containsArchiveFile(files, pkg.Install.Launcher) {
 		return fmt.Errorf("release archive does not contain launcher %s", pkg.Install.Launcher)
 	}
@@ -135,7 +147,7 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 			}
 		}
 	}()
-	state, err := m.installFiles(tx, guard, pkg, old, files)
+	state, err := m.installFiles(tx, guard, pkg, old, files, existing)
 	if err != nil {
 		return err
 	}
@@ -162,8 +174,12 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	return nil
 }
 
-func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg manifest.Package, old *Installed, files []storearchive.File) (Installed, error) {
+func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg manifest.Package, old *Installed, files []storearchive.File, existing []existingFile) (Installed, error) {
 	state := Installed{Schema: "org.knulli.app-store/installed-state/v1", Manifest: pkg, Originals: make(map[string]string)}
+	releaseHashes := make(map[string]string, len(files))
+	for _, file := range files {
+		releaseHashes[path.Join(pkg.Install.Destination, file.Relative)] = file.SHA256
+	}
 	oldTracked := make(map[string]bool)
 	if old != nil {
 		for key, value := range old.Originals {
@@ -173,8 +189,28 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 			oldTracked[file.Path] = true
 		}
 	}
+	adoptedOwned := make(map[string]bool)
+	for _, file := range existing {
+		if releaseHashes[file.Virtual] == file.SHA256 {
+			adoptedOwned[file.Virtual] = true
+			continue
+		}
+		backup := originalPath(pkg.ID, file.Virtual)
+		backupHost, err := guard.Resolve(backup)
+		if err != nil {
+			return Installed{}, err
+		}
+		if _, err := os.Stat(backupHost); err == nil {
+			return Installed{}, fmt.Errorf("adoption backup already exists for %s; move the existing package aside before retrying", file.Virtual)
+		} else if !os.IsNotExist(err) {
+			return Installed{}, err
+		}
+		if err := tx.Copy(file.Host, backup, file.Mode); err != nil {
+			return Installed{}, err
+		}
+		state.Originals[file.Virtual] = backup
+	}
 	newPaths := make(map[string]bool)
-	preserved := stringSet(pkg.Install.Preserve)
 	for _, file := range files {
 		virtual := path.Join(pkg.Install.Destination, file.Relative)
 		newPaths[virtual] = true
@@ -182,7 +218,8 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 		if err != nil {
 			return Installed{}, err
 		}
-		if preserved[file.Relative] {
+		preserved := isPreserved(file.Relative, pkg.Install.Preserve)
+		if preserved {
 			if info, err := os.Stat(host); err == nil {
 				digest, err := safefs.SHA256(host)
 				if err != nil {
@@ -194,7 +231,7 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 				return Installed{}, err
 			}
 		}
-		if !oldTracked[virtual] {
+		if !oldTracked[virtual] && !adoptedOwned[virtual] {
 			if info, err := os.Stat(host); err == nil {
 				backup := originalPath(pkg.ID, virtual)
 				if _, exists := state.Originals[virtual]; !exists {
@@ -210,7 +247,7 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 		if err := tx.Copy(file.Path, virtual, file.Mode); err != nil {
 			return Installed{}, err
 		}
-		state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: file.SHA256, Mode: uint32(file.Mode.Perm()), Preserved: preserved[file.Relative]})
+		state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: file.SHA256, Mode: uint32(file.Mode.Perm()), Preserved: preserved})
 	}
 	if old != nil {
 		for _, stale := range old.Files {
@@ -283,7 +320,9 @@ func (m Manager) Uninstall(id string) (result error) {
 			}
 		}
 	}()
+	owned := make(map[string]bool, len(state.Files))
 	for _, file := range state.Files {
+		owned[file.Path] = true
 		if file.Preserved {
 			continue
 		}
@@ -303,6 +342,22 @@ func (m Manager) Uninstall(id string) (result error) {
 			return err
 		}
 	}
+	for target, backup := range state.Originals {
+		if owned[target] || isPreservedTarget(target, state.Manifest.Install.Destination, state.Manifest.Install.Preserve) {
+			continue
+		}
+		backupHost, err := guard.Resolve(backup)
+		if err != nil {
+			return err
+		}
+		info, err := os.Stat(backupHost)
+		if err != nil {
+			return err
+		}
+		if err := tx.Copy(backupHost, target, info.Mode()); err != nil {
+			return err
+		}
+	}
 	if state.Manifest.Install.Menu != nil {
 		if err := applyMenu(tx, guard, *state.Manifest.Install.Menu, true); err != nil {
 			return err
@@ -317,6 +372,89 @@ func (m Manager) Uninstall(id string) (result error) {
 		return err
 	}
 	return tx.Commit()
+}
+
+const maximumAdoptionBytes = 512 << 20
+
+type existingFile struct {
+	Virtual string
+	Host    string
+	Mode    os.FileMode
+	SHA256  string
+}
+
+func inventoryExisting(destinationHost, destination string) ([]existingFile, uint64, error) {
+	info, err := os.Lstat(destinationHost)
+	if os.IsNotExist(err) {
+		return nil, 0, nil
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+	if !info.IsDir() {
+		return nil, 0, fmt.Errorf("destination is not a directory; move it aside before retrying")
+	}
+	var files []existingFile
+	var total uint64
+	err = filepath.Walk(destinationHost, func(host string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("refusing non-regular pre-existing path %s; move the package directory aside before retrying", host)
+		}
+		relative, err := filepath.Rel(destinationHost, host)
+		if err != nil {
+			return err
+		}
+		size := uint64(info.Size())
+		if size > maximumAdoptionBytes || total > maximumAdoptionBytes-size {
+			return fmt.Errorf("pre-existing package exceeds the 512 MiB adoption limit; move it aside before retrying")
+		}
+		total += size
+		digest, err := safefs.SHA256(host)
+		if err != nil {
+			return err
+		}
+		files = append(files, existingFile{Virtual: path.Join(destination, filepath.ToSlash(relative)), Host: host, Mode: info.Mode(), SHA256: digest})
+		return nil
+	})
+	sort.Slice(files, func(i, j int) bool { return files[i].Virtual < files[j].Virtual })
+	return files, total, err
+}
+
+func applyExecutableModes(files []storearchive.File, executables []string) error {
+	wanted := stringSet(executables)
+	for index := range files {
+		if wanted[files[index].Relative] {
+			files[index].Mode = 0755
+			delete(wanted, files[index].Relative)
+		}
+	}
+	for executable := range wanted {
+		return fmt.Errorf("release archive does not contain declared executable %s", executable)
+	}
+	return nil
+}
+
+func isPreserved(relative string, preserved []string) bool {
+	for _, entry := range preserved {
+		if relative == entry || strings.HasPrefix(relative, entry+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func isPreservedTarget(target, destination string, preserved []string) bool {
+	prefix := strings.TrimSuffix(destination, "/") + "/"
+	if !strings.HasPrefix(target, prefix) {
+		return false
+	}
+	return isPreserved(strings.TrimPrefix(target, prefix), preserved)
 }
 
 func applyMenu(tx *safefs.Transaction, guard *safefs.Guard, menu manifest.Menu, remove bool) error {

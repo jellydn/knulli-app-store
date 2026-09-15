@@ -33,10 +33,19 @@ it does not guess raw event or button numbers.
 
 CURRENT SAFETY STATE
 
-All six bundled packages are review candidates. They are read-only and cannot
-be installed. EmuDrop, PlayTime, and Grout have community approval for
-catalogue inclusion, not package verification. EmuDrop downloads ROMs; users
-must have the required rights and comply with local copyright law.
+Grout 5.1.0.0 and PlayTime 1.0.0 are explicit experimental test packages for
+TrimUI Smart Pro. They require a risk confirmation and are not verified.
+Existing copies show ADOPT; adoption inventories and backs up uncertain files
+before installing the reviewed release. The other four packages are read-only.
+
+Do not use Grout's built-in updater. Use App Store Repair and future reviewed
+updates only. Grout config stays under /userdata/roms/tools/Grout. PlayTime
+statistics stay under /userdata/system/configs/playtime. Manager state and
+adoption backups are under /userdata/system/knulli-app-store. Refresh game
+lists or reboot after package install or uninstall.
+
+EmuDrop remains non-installable. It downloads ROMs; users must have the
+required rights and comply with local copyright law.
 
 TROUBLESHOOTING
 

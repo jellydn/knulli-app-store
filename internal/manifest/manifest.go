@@ -70,6 +70,8 @@ type Install struct {
 	Destination       string   `json:"destination"`
 	StripComponents   int      `json:"strip_components,omitempty"`
 	Launcher          string   `json:"launcher"`
+	Executables       []string `json:"executables,omitempty"`
+	Warning           string   `json:"warning,omitempty"`
 	Menu              *Menu    `json:"menu,omitempty"`
 	Preserve          []string `json:"preserve,omitempty"`
 	Network           bool     `json:"network"`
@@ -84,7 +86,11 @@ type Menu struct {
 }
 
 func (p Package) Installable() bool {
-	return p.Review.Status == "installable" || p.Review.Status == "verified"
+	return p.Review.Status == "experimental" || p.Review.Status == "installable" || p.Review.Status == "verified"
+}
+
+func (p Package) Experimental() bool {
+	return p.Review.Status == "experimental"
 }
 
 func (p Package) Validate() error {
@@ -104,8 +110,8 @@ func (p Package) Validate() error {
 	if strings.TrimSpace(p.Summary) == "" {
 		problems = append(problems, "summary is required")
 	}
-	if !oneOf(p.Review.Status, "candidate", "installable", "verified") {
-		problems = append(problems, "review.status must be candidate, installable, or verified")
+	if !oneOf(p.Review.Status, "candidate", "experimental", "installable", "verified") {
+		problems = append(problems, "review.status must be candidate, experimental, installable, or verified")
 	}
 	if p.Review.Approval != nil {
 		if !oneOf(p.Review.Approval.Provenance, "community", "maintainer") {
@@ -162,17 +168,20 @@ func (p Package) validateInstallable() []string {
 	if p.Compatibility == nil {
 		problems = append(problems, "installable packages require compatibility metadata")
 	} else {
-		if p.Compatibility.Firmware != "knulli" || p.Compatibility.MinimumVersion == "" {
-			problems = append(problems, "compatibility must name Knulli and a minimum version")
+		if p.Compatibility.Firmware != "knulli" {
+			problems = append(problems, "compatibility must name Knulli")
+		}
+		if !p.Experimental() && p.Compatibility.MinimumVersion == "" {
+			problems = append(problems, "non-experimental compatibility requires a minimum version")
 		}
 		if !contains(p.Compatibility.Architectures, "aarch64") {
 			problems = append(problems, "initial catalogue packages must include aarch64")
 		}
 		if len(p.Compatibility.Devices) == 0 {
-			problems = append(problems, "at least one tested device is required")
+			problems = append(problems, "at least one declared device is required")
 		}
 		if len(p.Compatibility.Resolutions) == 0 {
-			problems = append(problems, "at least one tested resolution is required")
+			problems = append(problems, "at least one declared resolution is required")
 		}
 	}
 	if p.Install == nil {
@@ -186,6 +195,19 @@ func (p Package) validateInstallable() []string {
 	}
 	if !safeRelative(p.Install.Launcher) {
 		problems = append(problems, "launcher must be a safe relative path")
+	}
+	if p.Experimental() && strings.TrimSpace(p.Install.Warning) == "" {
+		problems = append(problems, "experimental packages require an install warning")
+	}
+	executables := make(map[string]bool)
+	for _, executable := range p.Install.Executables {
+		if !safeRelative(executable) {
+			problems = append(problems, "executables must be safe relative paths")
+		}
+		if executables[executable] {
+			problems = append(problems, "executables must be unique")
+		}
+		executables[executable] = true
 	}
 	for _, preserve := range p.Install.Preserve {
 		if !safeRelative(preserve) {

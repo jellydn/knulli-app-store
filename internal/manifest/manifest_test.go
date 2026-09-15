@@ -47,6 +47,28 @@ func TestApprovalRejectsUnknownProvenance(t *testing.T) {
 	}
 }
 
+func TestExperimentalPackageAllowsUnknownMinimumWithWarning(t *testing.T) {
+	pkg := validPackage()
+	pkg.Review.Status = "experimental"
+	pkg.Compatibility.MinimumVersion = ""
+	pkg.Install.Warning = "Unverified device test."
+	if err := pkg.Validate(); err != nil {
+		t.Fatalf("expected experimental package to pass: %v", err)
+	}
+	pkg.Install.Warning = ""
+	if err := pkg.Validate(); err == nil || !strings.Contains(err.Error(), "install warning") {
+		t.Fatalf("expected missing experimental warning rejection, got %v", err)
+	}
+}
+
+func TestExecutablePathsMustBeSafeAndUnique(t *testing.T) {
+	pkg := validPackage()
+	pkg.Install.Executables = []string{"run.sh", "../escape", "run.sh"}
+	if err := pkg.Validate(); err == nil || !strings.Contains(err.Error(), "safe relative") || !strings.Contains(err.Error(), "unique") {
+		t.Fatalf("expected executable path rejection, got %v", err)
+	}
+}
+
 func TestMutableReleaseURLIsRejected(t *testing.T) {
 	pkg := validPackage()
 	pkg.Release.URL = "https://github.com/example/tool/releases/latest/download/tool.zip"

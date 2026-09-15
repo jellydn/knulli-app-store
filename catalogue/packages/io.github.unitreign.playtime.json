@@ -8,13 +8,14 @@
   "repository": "https://github.com/unitreign/playtime",
   "license": "GPL-3.0-only",
   "review": {
-    "status": "candidate",
+    "status": "experimental",
     "approval": {
       "provenance": "community"
     },
     "notes": [
-      "Installation is blocked: the release ZIP does not preserve executable modes, and there is no direct TrimUI Smart Pro or minimum Knulli version evidence.",
-      "Community approval permits catalogue inclusion but is not a real-device package verification."
+      "Experimental TrimUI Smart Pro test package; no minimum Knulli version or package-specific device result is claimed.",
+      "The manager restores execute permission only for the reviewed playtime binary and playtime.sh launcher.",
+      "PlayTime statistics remain outside the managed package directory under /userdata/system/configs/playtime."
     ],
     "evidence": [
       {
@@ -41,6 +42,34 @@
         "url": "https://github.com/unitreign/playtime/blob/5f60c2090e0c456bfbf343d9d3b9c76f2a327135/main.go",
         "note": "Reviewed paths are /userdata/roms/tools/PlayTime, /userdata/roms/tools/gamelist.xml, /userdata/system/configs/playtime, and /userdata/system/scripts/playtime-hook.sh. The tagged launcher and binary use local files and do not download or execute remote code."
       }
+    ]
+  },
+  "release": {
+    "url": "https://github.com/unitreign/playtime/releases/download/v1.0.0/PlayTime.zip",
+    "sha256": "7bc7480400693be09b841f3a0612a8d85cefec549a3f6e5d0edee3a73c80aed3",
+    "size": 1569588,
+    "installed_size": 6133404,
+    "format": "zip",
+    "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "devices": ["trimui-smart-pro"],
+    "resolutions": ["1280x720"]
+  },
+  "install": {
+    "destination": "/userdata/roms/tools/PlayTime",
+    "strip_components": 1,
+    "launcher": "playtime.sh",
+    "executables": ["playtime", "playtime.sh"],
+    "warning": "Unverified. Existing files are backed up. Statistics stay under /userdata/system.",
+    "network": false,
+    "allowed_write_paths": [
+      "/userdata/roms/tools/PlayTime",
+      "/userdata/roms/tools/gamelist.xml",
+      "/userdata/system/configs/playtime",
+      "/userdata/system/scripts/playtime-hook.sh"
     ]
   }
 }

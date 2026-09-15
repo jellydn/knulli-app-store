@@ -30,6 +30,7 @@ Upstream package code runs later when the user launches it. The installer does n
 - Atomically replace regular files and installed state.
 - Snapshot every changed file and roll back a failed operation in reverse order.
 - Keep a persistent backup when installation overwrites a file the package did not own.
+- Inventory unmanaged package directories before adoption. Exact release-hash matches can become manager-owned; changed and unknown files are backed up because ownership is not proven.
 - Preserve declared configuration during repair, update, and uninstall.
 - Track installed paths, hashes, modes, and original-file backups.
 - Parse and rewrite `gamelist.xml` as XML while retaining unknown elements.
@@ -44,6 +45,7 @@ Upstream package code runs later when the user launches it. The installer does n
 - Empty directories can remain after rollback or uninstall.
 - H700 detection file names need validation against real Knulli images. Operators must supply explicit flags when detection is incomplete.
 - The GUI has one community-reported TrimUI Smart Pro test. Package-specific real-device testing has not been completed, and no current package has a verified badge.
+- Grout and PlayTime are experimental, actionable packages only for the declared Smart Pro test. Grout's built-in updater is outside manager transactions and must not be used during the test.
 - EmuDrop is an approved catalogue exception, not an approved installer payload. Its copyright risk, missing license, and launch-time updater keep it non-installable.
 
 Report a security issue privately to the repository owner. Do not include user data, tokens, or private catalogue URLs in a public report.
