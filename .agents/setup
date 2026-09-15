@@ -1,9 +1,38 @@
 #!/bin/sh
 set -eu
 
-if ! command -v go >/dev/null 2>&1; then
-  sudo apt-get update -qq
-  sudo apt-get install -y -qq golang-go
+go_version=1.27.1
+install_go=true
+if command -v go >/dev/null 2>&1 && command -v gofmt >/dev/null 2>&1; then
+  current_version=$(go version | awk '{ sub(/^go/, "", $3); print $3 }')
+  if [ "$(printf '%s\n%s\n' 1.27 "$current_version" | sort -V | head -n 1)" = 1.27 ]; then
+    install_go=false
+  fi
+fi
+
+if "$install_go"; then
+  case "$(uname -m)" in
+    x86_64)
+      go_arch=amd64
+      go_sha256=63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445
+      ;;
+    aarch64)
+      go_arch=arm64
+      go_sha256=3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec
+      ;;
+    *)
+      echo "unsupported architecture for Go setup: $(uname -m)" >&2
+      exit 1
+      ;;
+  esac
+  archive=$(mktemp)
+  trap 'rm -f "$archive"' EXIT HUP INT TERM
+  curl -fsSL "https://go.dev/dl/go${go_version}.linux-${go_arch}.tar.gz" -o "$archive"
+  echo "$go_sha256  $archive" | sha256sum -c -
+  sudo rm -rf /usr/local/go
+  sudo tar -C /usr/local -xzf "$archive"
+  sudo ln -sf /usr/local/go/bin/go /usr/local/bin/go
+  sudo ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
 fi
 
 if ! pkg-config --exists sdl2 2>/dev/null; then

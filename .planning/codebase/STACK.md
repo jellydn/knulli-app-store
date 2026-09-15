@@ -45,7 +45,7 @@
 - SDL2 shared library `libSDL2-2.0.so.0` - GUI only; CLI is CGO-free
 
 **Infrastructure:**
-- GitHub Actions `actions/checkout@v4`, `actions/setup-go@v5`, `actions/upload-artifact@v4`
+- GitHub Actions `actions/checkout@v7`, `actions/setup-go@v7`, `actions/upload-artifact@v7`
 - Debian Bookworm `golang:1.27-bookworm` container for aarch64 device artifacts
 - `gcc-aarch64-linux-gnu` and `libsdl2-dev:arm64` for GUI cross-builds
 
@@ -65,7 +65,7 @@
 **Development:**
 - Go 1.27+
 - `libsdl2-dev` for GUI compile and `go test -tags sdl`
-- `.agents/setup` installs `golang-go` and `libsdl2-dev` on Debian-like hosts
+- `.agents/setup` installs checksum-verified Go 1.27.1 when needed and `libsdl2-dev` on Debian-like hosts
 
 **Production:**
 - Knulli on reviewed `aarch64` devices
