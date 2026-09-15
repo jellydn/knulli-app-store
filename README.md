@@ -3,7 +3,7 @@
   <a href="https://github.com/jellydn/knulli-app-store/actions/workflows/check.yml">
     <img alt="CI" src="https://github.com/jellydn/knulli-app-store/actions/workflows/check.yml/badge.svg" />
   </a>
-  <img alt="Go" src="https://img.shields.io/badge/Go-%3E%3D1.19-00ADD8.svg" />
+  <img alt="Go" src="https://img.shields.io/badge/Go-%3E%3D1.27-00ADD8.svg" />
   <a href="https://knulli.org/">
     <img alt="Knulli" src="https://img.shields.io/badge/Knulli-community-blue.svg" />
   </a>
@@ -42,7 +42,7 @@
 
 ## Prerequisites
 
-- Go >= 1.19
+- Go >= 1.27
 - `libsdl2-dev` for the experimental GUI
 - A reviewed Knulli `aarch64` device for on-device use
 

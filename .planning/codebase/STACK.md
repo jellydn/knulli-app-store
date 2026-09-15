@@ -5,7 +5,7 @@
 ## Languages
 
 **Primary:**
-- Go 1.19 - CLI, installer, catalogue, GUI state machine, and tests (`go.mod`)
+- Go 1.27 - CLI, installer, catalogue, GUI state machine, and tests (`go.mod`)
 
 **Secondary:**
 - C (cgo, SDL 2.0 only) - thin wrappers in `internal/sdlui/run.go` behind the `sdl` build tag
@@ -15,7 +15,7 @@
 ## Runtime
 
 **Environment:**
-- Go 1.19 toolchain (`go 1.19` in `go.mod`, CI `go-version: "1.19.x"`)
+- Go 1.27 toolchain (`go 1.27` in `go.mod`, CI `go-version: "1.27.x"`)
 - Device target: linux/arm64 (`aarch64`) on Knulli
 - Host tests: local Go with `-race`; GUI tests need SDL2 headers
 
@@ -35,18 +35,18 @@
 **Build/Dev:**
 - `Makefile` - `fmt`, `vet`, `test`, `build`, `build-ui`, `catalogue`
 - `gofmt` - formatting gate
-- `go vet` and `staticcheck v0.3.3` in CI (`.github/workflows/check.yml`)
+- `go vet` and `staticcheck v0.8.1` in CI (`.github/workflows/check.yml`)
 - Renovate `config:recommended` (`renovate.json`)
 
 ## Key Dependencies
 
 **Critical:**
-- `golang.org/x/image v0.7.0` - bitmap scaling and `basicfont` text in `internal/sdlui`
+- `golang.org/x/image v0.46.0` - bitmap scaling and `basicfont` text in `internal/sdlui`
 - SDL2 shared library `libSDL2-2.0.so.0` - GUI only; CLI is CGO-free
 
 **Infrastructure:**
 - GitHub Actions `actions/checkout@v4`, `actions/setup-go@v5`, `actions/upload-artifact@v4`
-- Debian Bookworm `golang:1.19-bookworm` container for aarch64 device artifacts
+- Debian Bookworm `golang:1.27-bookworm` container for aarch64 device artifacts
 - `gcc-aarch64-linux-gnu` and `libsdl2-dev:arm64` for GUI cross-builds
 
 ## Configuration
@@ -58,13 +58,12 @@
 
 **Build:**
 - `go.mod`, `go.sum`, `Makefile`
-- `sdl` build tag for GUI packages (`cmd/knulli-app-ui`, `internal/sdlui`)
-- Dual build constraints `//go:build sdl` and `// +build sdl` for Go 1.19
+- `sdl` build tag (`//go:build sdl`) for GUI packages (`cmd/knulli-app-ui`, `internal/sdlui`)
 
 ## Platform Requirements
 
 **Development:**
-- Go 1.19+
+- Go 1.27+
 - `libsdl2-dev` for GUI compile and `go test -tags sdl`
 - `.agents/setup` installs `golang-go` and `libsdl2-dev` on Debian-like hosts
 
