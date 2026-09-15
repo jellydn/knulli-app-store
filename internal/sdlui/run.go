@@ -186,12 +186,6 @@ func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, 
 		if C.event_key_repeat(event) != 0 {
 			return false
 		}
-		if controls.Mode == storeinput.Blocked {
-			if C.event_key(event) == C.SDLK_y {
-				model.ExportDiagnostics(ctx)
-			}
-			return C.event_key(event) == C.SDLK_ESCAPE
-		}
 		var action storeinput.Action
 		switch C.event_key(event) {
 		case C.SDLK_UP:
