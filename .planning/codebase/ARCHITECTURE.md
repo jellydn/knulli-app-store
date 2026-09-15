@@ -15,7 +15,7 @@
 ## Layers
 
 **Manifest and catalogue:**
-- Purpose: v1 data contract, semantic validation, deterministic signable index
+- Purpose: v1 data contract, semantic validation, deterministic signed index
 - Location: `internal/manifest`, `internal/catalog`, `schema/package-manifest-v1.schema.json`, `catalogue/`
 - Contains: package structs, review status, SHA-256 of canonical JSON
 - Depends on: encoding/json with `DisallowUnknownFields`

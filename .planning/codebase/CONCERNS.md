@@ -4,11 +4,11 @@
 
 ## Tech Debt
 
-**Catalogue index signing is not implemented:**
-- Issue: `catalog.Build` is deterministic and hash-bound, but release automation does not yet sign the index
-- Files: `internal/catalog/catalog.go`, `docs/architecture.md`, `docs/adr/0002-declarative-reviewed-catalogue.md`
-- Impact: A replaced `catalog-index.json` on device is not cryptographically authenticated by this project
-- Fix approach: Add signing and key distribution in the trusted release workflow before calling the index trusted
+**Long-lived catalogue signing key:**
+- Issue: device artifacts sign with a per-build ed25519 key compiled into the binary
+- Files: `internal/catalog/sign.go`, `.github/workflows/check.yml`
+- Impact: an index update still needs a matching app build
+- Fix approach: add a production key and rotation policy if the index is distributed apart from the binary
 
 ## Known Bugs
 
@@ -110,10 +110,6 @@
 
 ## Missing Critical Features
 
-**Signed catalogue index:**
-- Problem: index is deterministic but unsigned
-- Blocks: treating device `catalog-index.json` as a trusted distribution artifact
-
 **Package runtime sandbox:**
 - Problem: installed programs are not confined
 - Blocks: running untrusted upstream code safely
@@ -136,11 +132,11 @@
 - Risk: operators must pass flags when detection is incomplete
 - Priority: Medium
 
-**Index signing:**
-- What's not tested: absent feature
-- Files: `internal/catalog/catalog.go`
-- Risk: operators may over-trust a replaced `catalog-index.json` on device
-- Priority: High before a non-experimental release
+**Production catalogue key rotation:**
+- What's not tested: a long-lived release key and independent index updates
+- Files: `internal/catalog/sign.go`, `.github/workflows/check.yml`
+- Risk: operators may treat a per-build signature as a stable trust root
+- Priority: Medium until the index is shipped without a new binary
 
 ---
 

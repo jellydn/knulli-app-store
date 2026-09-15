@@ -70,7 +70,7 @@ GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o build/knulli-app-aar
 # Review one manifest without installing it.
 go run ./cmd/knulli-app validate catalogue/packages/io.github.unitreign.playtime.json
 
-# Build a deterministic index that release automation can sign.
+# Build a deterministic index. Device CI also writes catalog-index.json.sig.
 go run ./cmd/knulli-app catalogue -output build/catalog-index.json
 
 # Install an actionable local manifest. Flags fill values that detection cannot read.

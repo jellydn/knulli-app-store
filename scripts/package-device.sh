@@ -23,7 +23,8 @@ case "$TARGET" in
   *) echo "unsupported package target: $TARGET" >&2; exit 2 ;;
 esac
 
-for input in "$CLI" "$UI" "$CATALOG"; do
+SIG=$CATALOG.sig
+for input in "$CLI" "$UI" "$CATALOG" "$SIG"; do
   if [ ! -f "$input" ]; then
     echo "missing input: $input" >&2
     exit 1
@@ -39,6 +40,7 @@ mkdir -p "$APP" "$OUTPUT_DIR"
 install -m 0755 "$CLI" "$APP/knulli-app"
 install -m 0755 "$UI" "$APP/knulli-app-ui"
 install -m 0644 "$CATALOG" "$APP/catalog-index.json"
+install -m 0644 "$SIG" "$APP/catalog-index.json.sig"
 install -m 0755 "packaging/$TARGET/Knulli App Store.sh" "$PORTS/Knulli App Store.sh"
 install -m 0644 "packaging/$TARGET/README.txt" "$PORTS/knulli-app-store/README.txt"
 

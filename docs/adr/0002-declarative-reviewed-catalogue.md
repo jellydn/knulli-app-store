@@ -24,5 +24,5 @@ The weekly update checker downloads GitHub release metadata only. It reports cha
 ### Negative
 
 - Packages that ship only a self-extracting script, a mutable `latest` asset, or undeclared writes stay blocked. RAOfflineProxy and PocketCurator are current examples.
-- Catalogue-index signing and key distribution remain future release-workflow work.
+- Device artifacts sign the index with a per-build key compiled into the binary. A long-lived production key is still required if the index is distributed apart from the app.
 - Review cost is high: every path, checksum, and device matrix must be recorded by hand.

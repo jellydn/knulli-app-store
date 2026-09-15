@@ -26,6 +26,19 @@ func Load(path string) (Index, error) {
 	if err != nil {
 		return Index{}, err
 	}
+	key, err := EmbeddedPublicKey()
+	if err != nil {
+		return Index{}, err
+	}
+	if key != nil {
+		signature, err := loadSignature(SignaturePath(path))
+		if err != nil {
+			return Index{}, fmt.Errorf("read catalogue signature: %w", err)
+		}
+		if err := Verify(data, signature, key); err != nil {
+			return Index{}, err
+		}
+	}
 	var index Index
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()

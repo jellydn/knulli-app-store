@@ -26,7 +26,7 @@ make catalogue
 git diff --exit-code -- build/catalog-index.json
 ```
 
-Generated build output is not committed. Review the generated index locally and sign it only in trusted release automation.
+Generated build output is not committed. Review the generated index locally. Device CI signs `catalog-index.json` and compiles the matching public key into that build.
 
 The weekly release checker has read-only repository access. It downloads GitHub release metadata only and uploads a review report. Run it locally with `go run ./cmd/check-updates -output build/catalogue-update-report`; it writes a `.json` and a `.md` report for manual review and never edits a manifest. It does not download assets, edit manifests, approve updates, open issues, or merge changes. `GITHUB_TOKEN` is optional for local use and increases the GitHub API rate limit; never put it in a report.
 
