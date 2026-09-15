@@ -43,7 +43,7 @@ jobs:
   device-artifact:
     needs: test
     runs-on: ubuntu-latest
-    container: golang:1.19-bookworm
+    container: golang:1.27-bookworm
     strategy:
       matrix:
         target: [trimui-smart-pro, magicx-zero-28]
