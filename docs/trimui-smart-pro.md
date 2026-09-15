@@ -60,6 +60,8 @@ Use **Repair** to re-download, verify, and restore managed files. Use **Uninstal
 
 The App Store writes concise UTC timestamped events for startup, platform and catalogue decisions, package actions, download verification, extraction, transactions, backup, rollback, and completion. The active log is capped at 512 KiB and one prior file is retained as `knulli-app-store.log.1`. URLs lose credentials, query strings, and fragments; common token and password fields are redacted.
 
+Resolution selection records every candidate with its source, dimensions, validation result, and rejection reason. The GUI prefers the SDL renderer output, then the SDL window size and current display mode. Valid framebuffer mode data is a fallback; `fb0/virtual_size` is last because it describes an allocation and can be taller than the visible display. Dimensions outside 320×200 through 7680×4320 or outside a 1:2 through 3.5:1 aspect ratio are rejected. No valid source means compatibility remains blocked. Terminal control sequences from older launchers are removed from new logs and exports.
+
 Press SDL Y anywhere in the GUI to create a text bundle under `/userdata/system/knulli-app-store/diagnostics/`. The screen shows the exact output path. The bundle contains detected platform fields, public package IDs and review states, and the bounded redacted logs. It does not include Grout credentials, PlayTime data, ROMs, or private configuration.
 
 Do not use Grout's built-in updater during this test. It has no supported disable setting and operates outside App Store rollback. Future Grout updates must use a newly reviewed manifest. These manifests do not edit `gamelist.xml`: after install or uninstall, refresh game lists or reboot. This avoids deleting or replacing an entry that may belong to a pre-existing manual installation.
@@ -111,6 +113,6 @@ Report install, launch, core function, Repair, Uninstall, and adoption results s
 
 1. Update the App Store files from the new artifact and start it on current Knulli.
 2. Select Grout or PlayTime. Confirm compatibility says the Knulli identity came from `/etc/os-release:OS_NAME` and calls the decision experimental.
-3. Confirm Install or Adopt is available when the header shows TrimUI Smart Pro and runtime 1280×720.
+3. Confirm Install or Adopt is available when the header shows TrimUI Smart Pro and runtime 1280×720. The diagnostic log should select `SDL renderer output`; any `1280x13107` display or virtual-framebuffer candidate must show `valid=false` with a rejection reason.
 4. Press SDL Y and inspect the exported platform line. It should show raw firmware `knulli`, normalized firmware `knulli`, source `/etc/os-release:OS_NAME`, and the current release identifier from `/usr/share/knulli/knulli.version`.
 5. If an action remains unavailable, send the diagnostic bundle after checking it for private data. Unknown firmware must remain blocked.

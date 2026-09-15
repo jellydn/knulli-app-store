@@ -181,7 +181,7 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item) {
 	if model.Focus == storeui.Confirm {
 		action := item.Actions[model.Action]
 		if item.Package.Experimental() && (action == appstore.Install || action == appstore.Adopt) {
-			fill(frame, image.Rect(250, 108, 616, 252), color.RGBA{R: 35, G: 46, B: 64, A: 255})
+			fill(frame, image.Rect(250, 108, 616, 318), color.RGBA{R: 35, G: 46, B: 64, A: 255})
 			text(frame, 266, 132, palette.warning, "EXPERIMENTAL PACKAGE TEST")
 			text(frame, 266, 151, palette.text, strings.ToUpper(string(action))+" "+shorten(strings.ToUpper(item.Package.Name), 24)+"?")
 			warning := strings.ToUpper(item.Package.Install.Warning)

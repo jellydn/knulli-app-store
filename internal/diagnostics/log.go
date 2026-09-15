@@ -34,8 +34,47 @@ func Open(root string) (*Log, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return nil, err
 	}
+	for _, existing := range []string{path, path + ".1"} {
+		if err := sanitizeExisting(existing); err != nil {
+			return nil, err
+		}
+	}
 	writer := &boundedWriter{path: path, limit: maximumBytes}
 	return &Log{root: root, path: path, writer: writer, logger: log.New(writer, "", log.Ldate|log.Ltime|log.LUTC)}, nil
+}
+
+func sanitizeExisting(path string) error {
+	file, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	info, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return err
+	}
+	if info.Size() > maximumBytes {
+		if _, err := file.Seek(info.Size()-maximumBytes, 0); err != nil {
+			file.Close()
+			return err
+		}
+	}
+	data, readErr := io.ReadAll(io.LimitReader(file, maximumBytes))
+	closeErr := file.Close()
+	if readErr != nil {
+		return readErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	clean := []byte(Redact(string(data)))
+	if string(clean) == string(data) && info.Size() <= maximumBytes {
+		return nil
+	}
+	return os.WriteFile(path, clean, 0600)
 }
 
 func (l *Log) Event(name string, fields ...string) {
@@ -85,8 +124,10 @@ func (l *Log) Export(lines []string) (string, error) {
 
 var sensitiveValue = regexp.MustCompile(`(?i)(token|password|passwd|secret|api[_-]?key|authorization)(\s*[=:]\s*)([^\s&]+)`)
 var webURL = regexp.MustCompile(`https?://[^\s"'<>]+`)
+var terminalControl = regexp.MustCompile(`(?:\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-?]*[ -/]*[@-~]|\[\?[0-9;]*[ -/]*[@-~])`)
 
 func Redact(value string) string {
+	value = terminalControl.ReplaceAllString(value, "")
 	value = sensitiveValue.ReplaceAllString(value, `$1$2[REDACTED]`)
 	return webURL.ReplaceAllStringFunc(value, func(candidate string) string {
 		suffix := ""

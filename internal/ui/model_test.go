@@ -9,6 +9,7 @@ import (
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
+	"github.com/jellydn/knulli-app-store/internal/platform"
 )
 
 type fakeBackend struct {
@@ -16,6 +17,8 @@ type fakeBackend struct {
 	err    error
 	action appstore.Action
 }
+
+func (fake *fakeBackend) SetPlatform(platform.Info) {}
 
 func (fake *fakeBackend) ExportDiagnostics(context.Context) (string, error) {
 	return "/userdata/system/knulli-app-store/diagnostics/test.txt", fake.err

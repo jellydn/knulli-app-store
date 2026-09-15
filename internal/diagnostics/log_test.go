@@ -21,6 +21,19 @@ func TestRedactRemovesURLCredentialsAndSecrets(t *testing.T) {
 	}
 }
 
+func TestRedactStripsANSIAndDECTerminalControls(t *testing.T) {
+	input := "before\x1b[?25l[?1c middle\x1b[31mred\x1b[0m [?25h[?0c after\x1b]0;title\x07"
+	got := Redact(input)
+	for _, control := range []string{"[?25l", "[?1c", "[?25h", "[?0c", "[31m", "[0m", "]0;title"} {
+		if strings.Contains(got, control) {
+			t.Fatalf("terminal control %q remains in %q", control, got)
+		}
+	}
+	if !strings.Contains(got, "before") || !strings.Contains(got, "middle") || !strings.Contains(got, "red") || !strings.Contains(got, "after") {
+		t.Fatalf("terminal sanitizing removed useful text: %q", got)
+	}
+}
+
 func TestBoundedWriterRotatesAndCapsCurrentLog(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "app.log")
 	writer := &boundedWriter{path: path, limit: 24}
@@ -39,6 +52,27 @@ func TestBoundedWriterRotatesAndCapsCurrentLog(t *testing.T) {
 	}
 }
 
+func TestOpenSanitizesExistingApplicationLog(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "userdata/system/logs/knulli-app-store.log")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("old\x1b[?25l[?1c useful [?25h[?0c\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(root); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "[?") || strings.ContainsRune(string(data), '\x1b') || !strings.Contains(string(data), "useful") {
+		t.Fatalf("existing log was not safely sanitized: %q", data)
+	}
+}
+
 func TestExportContainsMetadataAndRedactedLogsOnly(t *testing.T) {
 	root := t.TempDir()
 	logger, err := Open(root)
@@ -46,6 +80,7 @@ func TestExportContainsMetadataAndRedactedLogsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	logger.Event("download_error", "url", "https://user:pass@example.com/release.zip?token=abc", "error", "password=hunter2")
+	logger.Event("terminal_noise", "value", "\x1b[?25l[?1c useful\x1b[?25h[?0c")
 	virtual, err := logger.Export([]string{"Platform: firmware=knulli", "Package: app.romm.grout experimental"})
 	if err != nil {
 		t.Fatal(err)
@@ -67,5 +102,8 @@ func TestExportContainsMetadataAndRedactedLogsOnly(t *testing.T) {
 		if strings.Contains(text, secret) {
 			t.Fatalf("export retained %q", secret)
 		}
+	}
+	if strings.Contains(text, "[?25") || strings.ContainsRune(text, '\x1b') {
+		t.Fatalf("export retained terminal controls: %q", text)
 	}
 }

@@ -6,10 +6,13 @@ package sdlui
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
+	"github.com/jellydn/knulli-app-store/internal/diagnostics"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
+	"github.com/jellydn/knulli-app-store/internal/platform"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
 )
 
@@ -25,7 +28,7 @@ func TestRenderRepresentativeStates(t *testing.T) {
 			Review:  manifest.Review{Status: "experimental", Approval: &manifest.Approval{Provenance: "community"}},
 			Install: &manifest.Install{Warning: "Unverified. Do not use Grout updater. Update only through Knulli App Store."},
 		},
-		PreExisting: true, Compatible: true, Compatibility: "Experimental compatibility: Knulli identity confirmed from /etc/os-release:OS_NAME; no minimum version is claimed; device=trimui-smart-pro architecture=aarch64 resolution=1280x720 version=scarab", Actions: []appstore.Action{appstore.Adopt},
+		PreExisting: true, Compatible: true, Compatibility: "Experimental compatibility: Knulli identity confirmed from /etc/os-release:OS_NAME; no minimum version is claimed; device=trimui-smart-pro architecture=aarch64 resolution=1280x720 source=SDL renderer output version=scarab", Actions: []appstore.Action{appstore.Adopt},
 	}
 	incompatible := experimental
 	incompatible.PreExisting = false
@@ -72,6 +75,29 @@ func TestWrapTextBreaksLongDiagnosticPaths(t *testing.T) {
 	for _, line := range lines {
 		if len(line) > 20 {
 			t.Fatalf("line is wider than the panel: %q", line)
+		}
+	}
+}
+
+func TestResolutionCandidateLoggingIncludesRejectionAndSelection(t *testing.T) {
+	root := t.TempDir()
+	logger, err := diagnostics.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidates := []platform.ResolutionCandidate{
+		{Source: "SDL current display mode", Width: 1280, Height: 0x3333},
+		{Source: "SDL renderer output", Width: 1280, Height: 720},
+	}
+	selected := platform.WithResolutionCandidates(platform.Info{Device: "trimui-smart-pro"}, candidates)
+	logResolutionCandidates(logger, platform.AssessResolutions(candidates), selected)
+	data, err := os.ReadFile(filepath.Join(root, "userdata/system/logs/knulli-app-store.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, wanted := range []string{`source="SDL current display mode"`, `height="13107"`, `valid="false"`, `reason="above maximum 7680x4320"`, `event=resolution_selected`, `resolution="1280x720"`, `source="SDL renderer output"`, `resolution_source=\"SDL renderer output\"`} {
+		if !strings.Contains(string(data), wanted) {
+			t.Fatalf("resolution log lacks %q: %s", wanted, data)
 		}
 	}
 }

@@ -52,19 +52,22 @@ func run() error {
 	override(&current.Version, *version)
 	override(&current.Arch, *arch)
 	override(&current.Device, *device)
-	override(&current.Resolution, *resolution)
+	if *resolution != "" {
+		candidates := append([]platform.ResolutionCandidate{platform.ResolutionCandidateFromString("command-line override", *resolution)}, current.ResolutionCandidates...)
+		current = platform.WithResolutionCandidates(current, candidates)
+	}
 	setOverrideEvidence(&current, *firmware, *version)
 	if current.Arch == "" {
 		current.Arch = runtime.GOARCH
 	}
-	diagnosticLog.Event("platform_detected", "details", platform.Summary(current))
+	diagnosticLog.Event("platform_filesystem_detected", "details", platform.Summary(current))
 	manager := installer.Manager{Root: *root, Platform: current, Diagnostics: diagnosticLog}
 	service, err := appstore.Open(*catalogue, manager)
 	if err != nil {
 		diagnosticLog.Event("startup_error", "error", err.Error())
 		return err
 	}
-	err = sdlui.Run(context.Background(), service, sdlui.Options{Windowed: *windowed || *screenshot != "", Screenshot: *screenshot, Platform: current})
+	err = sdlui.Run(context.Background(), service, sdlui.Options{Windowed: *windowed || *screenshot != "", Screenshot: *screenshot, Platform: current, Diagnostics: diagnosticLog})
 	if err != nil {
 		diagnosticLog.Event("final_error", "error", err.Error())
 	}

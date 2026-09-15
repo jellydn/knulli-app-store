@@ -37,6 +37,11 @@ type Backend interface {
 	Items(context.Context) ([]Item, error)
 	Execute(context.Context, string, Action, func(string)) error
 	ExportDiagnostics(context.Context) (string, error)
+	SetPlatform(platform.Info)
+}
+
+func (s *Service) SetPlatform(info platform.Info) {
+	s.manager.Platform = info
 }
 
 type Service struct {
@@ -159,7 +164,7 @@ func compatibility(pkg manifest.Package, current platform.Info) (bool, string) {
 		return false, err.Error()
 	}
 	if pkg.Experimental() {
-		return true, fmt.Sprintf("Experimental compatibility: Knulli identity confirmed from %s; no minimum version is claimed; device=%s architecture=%s resolution=%s version=%s", current.FirmwareSource, current.Device, current.Arch, current.Resolution, current.Version)
+		return true, fmt.Sprintf("Experimental compatibility: Knulli identity confirmed from %s; no minimum version is claimed; device=%s architecture=%s resolution=%s source=%s version=%s", current.FirmwareSource, current.Device, current.Arch, current.Resolution, current.ResolutionSource, current.Version)
 	}
 	return true, "Compatible with detected platform"
 }

@@ -95,6 +95,63 @@ func TestDisplayHeaderShowsFallbackStates(t *testing.T) {
 	}
 }
 
+func TestDisplayHeaderRejectsCorruptRuntimeSize(t *testing.T) {
+	info := Info{Device: "trimui-smart-pro", Resolution: "1280x720", ResolutionSource: "/sys/class/graphics/fb0/mode"}
+	if got := DisplayHeader(info, 1280, 0x3333); got != "TrimUI Smart Pro / 1280x720 fallback" {
+		t.Fatalf("header used corrupt runtime size: %q", got)
+	}
+}
+
+func TestResolutionSelectionRejectsCorruptDisplayMode(t *testing.T) {
+	candidates := []ResolutionCandidate{
+		{Source: "SDL renderer output", Width: 1280, Height: 720},
+		{Source: "SDL current display mode", Width: 1280, Height: 0x3333},
+		{Source: "/sys/class/graphics/fb0/virtual_size", Width: 1280, Height: 0x3333},
+	}
+	got := WithResolutionCandidates(Info{}, candidates)
+	if got.Resolution != "1280x720" || got.ResolutionSource != "SDL renderer output" {
+		t.Fatalf("selected corrupt resolution: %#v", got)
+	}
+	assessments := AssessResolutions(candidates)
+	for _, index := range []int{1, 2} {
+		if assessments[index].Valid || !strings.Contains(assessments[index].Reason, "maximum") {
+			t.Fatalf("1280x13107 was not rejected: %#v", assessments[index])
+		}
+	}
+}
+
+func TestResolutionSelectionUsesValidatedFramebufferModeFallback(t *testing.T) {
+	root := t.TempDir()
+	writePlatformFile(t, root, "sys/class/graphics/fb0/mode", "U:1280x720p-60\n")
+	writePlatformFile(t, root, "sys/class/graphics/fb0/virtual_size", "1280,13107\n")
+	got := Detect(root)
+	if got.Resolution != "1280x720" || got.ResolutionSource != "/sys/class/graphics/fb0/mode" {
+		t.Fatalf("did not select framebuffer mode fallback: %#v", got)
+	}
+}
+
+func TestResolutionSelectionBlocksUnknownWhenEveryCandidateIsInvalid(t *testing.T) {
+	candidates := []ResolutionCandidate{
+		{Source: "uninitialized", Width: 0, Height: 0},
+		{Source: "corrupt", Width: 1280, Height: 0x3333},
+		{Source: "query", Error: "display query failed"},
+	}
+	got := WithResolutionCandidates(Info{Resolution: "1280x720"}, candidates)
+	if got.Resolution != "" || got.ResolutionSource != "" {
+		t.Fatalf("invalid candidates became compatible: %#v", got)
+	}
+}
+
+func TestResolutionCandidateParserRejectsMalformedValues(t *testing.T) {
+	for _, value := range []string{"", "1280", "garbage", "0x0"} {
+		candidate := ResolutionCandidateFromString("test", value)
+		assessment := AssessResolutions([]ResolutionCandidate{candidate})[0]
+		if assessment.Valid {
+			t.Fatalf("malformed value %q became valid: %#v", value, assessment)
+		}
+	}
+}
+
 func TestCheckRejectsOlderVersionAndWrongResolution(t *testing.T) {
 	pkg := manifest.Package{Compatibility: &manifest.Compatibility{
 		Firmware: "knulli", MinimumVersion: "2025.10", Architectures: []string{"aarch64"}, Devices: []string{"h700"}, Resolutions: []string{"640x480"},
@@ -141,6 +198,15 @@ func TestCheckFailureIncludesDetectedEvidenceAndConstraint(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), wanted) {
 			t.Fatalf("diagnostic %q missing from %v", wanted, err)
 		}
+	}
+}
+
+func TestResolutionFailureIncludesSelectedSource(t *testing.T) {
+	pkg := manifest.Package{Compatibility: &manifest.Compatibility{Firmware: "knulli", Architectures: []string{"aarch64"}, Devices: []string{"trimui-smart-pro"}, Resolutions: []string{"1280x720"}}}
+	current := Info{Firmware: "knulli", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1024x600", ResolutionSource: "/sys/class/graphics/fb0/mode"}
+	err := Check(pkg, current)
+	if err == nil || !strings.Contains(err.Error(), `resolution_source="/sys/class/graphics/fb0/mode"`) {
+		t.Fatalf("resolution source missing from diagnostic: %v", err)
 	}
 }
 

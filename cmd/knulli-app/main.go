@@ -120,7 +120,10 @@ func runApply(operation string, arguments []string) error {
 	override(&current.Version, *version)
 	override(&current.Arch, *arch)
 	override(&current.Device, *device)
-	override(&current.Resolution, *resolution)
+	if *resolution != "" {
+		candidates := append([]platform.ResolutionCandidate{platform.ResolutionCandidateFromString("command-line override", *resolution)}, current.ResolutionCandidates...)
+		current = platform.WithResolutionCandidates(current, candidates)
+	}
 	setOverrideEvidence(&current, *firmware, *version)
 	if current.Arch == "" {
 		current.Arch = runtime.GOARCH

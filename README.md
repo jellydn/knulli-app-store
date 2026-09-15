@@ -80,4 +80,6 @@ The controller-native SDL2 GUI browses the catalogue, shows package details and 
 
 Current Knulli is identified through `OS_NAME="knulli"` in `/etc/os-release`, not its inherited `ID=buildroot`. The release identifier comes from `/usr/share/knulli/knulli.version`. Compatibility errors include the selected raw value, normalized value, source, and full detected device matrix. Press SDL Y in the GUI to export a redacted diagnostic text bundle. The active log is capped at 512 KiB with one rotated copy at `/userdata/system/logs/knulli-app-store.log.1`.
 
+The GUI validates SDL renderer, window, display-mode, and framebuffer resolution candidates before compatibility checks. It records the selected source and rejects corrupted or implausible dimensions instead of trusting `fb0/virtual_size`.
+
 GitHub Actions publishes `knulli-app-store-trimui-smart-pro-experimental` after all checks pass. See the [TrimUI Smart Pro test guide](docs/trimui-smart-pro.md) for authoritative runtime evidence, installation steps, controls, and the device test checklist. The build remains experimental because the exact tested Knulli version and repeatable evidence are not recorded.

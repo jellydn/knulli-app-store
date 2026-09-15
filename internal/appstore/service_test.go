@@ -70,9 +70,9 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 	root := t.TempDir()
 	for name, value := range map[string]string{
 		"etc/os-release":                      "NAME=Buildroot\nID=buildroot\nVERSION_ID=2025.02\nOS_NAME=\"knulli\"\nOS_VERSION=scarab\nOS_DATE=20260510\n",
-		"usr/share/knulli/knulli.version":     "scarab 2026/05/10 14:23\n",
+		"usr/share/knulli/knulli.version":     "scarab 2026/08/19 16:06\n",
 		"boot/boot/knulli.board":              "trimui-smart-pro\n",
-		"sys/class/graphics/fb0/virtual_size": "1280,720\n",
+		"sys/class/graphics/fb0/virtual_size": "1280,13107\n",
 	} {
 		host := filepath.Join(root, name)
 		if err := os.MkdirAll(filepath.Dir(host), 0755); err != nil {
@@ -92,6 +92,10 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 	}
 	detected := platform.Detect(root)
 	detected.Arch = "aarch64"
+	if detected.Resolution != "" {
+		t.Fatalf("corrupt framebuffer virtual size became compatible: %#v", detected)
+	}
+	detected = platform.WithResolutionCandidates(detected, append([]platform.ResolutionCandidate{{Source: "SDL renderer output", Width: 1280, Height: 720}}, detected.ResolutionCandidates...))
 	service, err := Open(indexPath, installer.Manager{Root: root, Platform: detected})
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +106,7 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 	}
 	for _, item := range items {
 		if item.Package.Experimental() {
-			if !item.Compatible || len(item.Actions) != 1 || !strings.Contains(item.Compatibility, "no minimum version is claimed") || !strings.Contains(item.Compatibility, "/etc/os-release:OS_NAME") {
+			if !item.Compatible || len(item.Actions) != 1 || !strings.Contains(item.Compatibility, "no minimum version is claimed") || !strings.Contains(item.Compatibility, "/etc/os-release:OS_NAME") || !strings.Contains(item.Compatibility, "source=SDL renderer output") {
 				t.Fatalf("latest Knulli experimental decision is wrong: %#v", item)
 			}
 		}

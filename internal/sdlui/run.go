@@ -26,6 +26,7 @@ import (
 	"unsafe"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
+	"github.com/jellydn/knulli-app-store/internal/diagnostics"
 	"github.com/jellydn/knulli-app-store/internal/platform"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
 	xdraw "golang.org/x/image/draw"
@@ -37,9 +38,10 @@ const (
 )
 
 type Options struct {
-	Windowed   bool
-	Screenshot string
-	Platform   platform.Info
+	Windowed    bool
+	Screenshot  string
+	Platform    platform.Info
+	Diagnostics *diagnostics.Log
 }
 
 func Run(ctx context.Context, backend appstore.Backend, options Options) error {
@@ -68,8 +70,17 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 		return sdlError("create SDL2 renderer")
 	}
 	defer C.SDL_DestroyRenderer(renderer)
-	screenWidth, screenHeight := runtimeScreenSize(window, renderer)
-	platformHeader := platform.DisplayHeader(options.Platform, screenWidth, screenHeight)
+	runtimeCandidates := runtimeResolutionCandidates(window, renderer)
+	allCandidates := append([]platform.ResolutionCandidate(nil), runtimeCandidates...)
+	if options.Platform.ResolutionSource == "command-line override" {
+		allCandidates = append(append([]platform.ResolutionCandidate(nil), options.Platform.ResolutionCandidates...), runtimeCandidates...)
+	} else {
+		allCandidates = append(allCandidates, options.Platform.ResolutionCandidates...)
+	}
+	options.Platform = platform.WithResolutionCandidates(options.Platform, allCandidates)
+	logResolutionCandidates(options.Diagnostics, platform.AssessResolutions(allCandidates), options.Platform)
+	backend.SetPlatform(options.Platform)
+	platformHeader := platform.DisplayHeader(options.Platform, 0, 0)
 	texture := C.SDL_CreateTexture(renderer, C.SDL_PIXELFORMAT_ABGR8888, C.SDL_TEXTUREACCESS_STREAMING, canvasWidth, canvasHeight)
 	if texture == nil {
 		return sdlError("create SDL2 texture")
@@ -115,17 +126,34 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	}
 }
 
-func runtimeScreenSize(window *C.SDL_Window, renderer *C.SDL_Renderer) (int, int) {
+func runtimeResolutionCandidates(window *C.SDL_Window, renderer *C.SDL_Renderer) []platform.ResolutionCandidate {
+	var candidates []platform.ResolutionCandidate
+	var width, height C.int
+	result := C.SDL_GetRendererOutputSize(renderer, &width, &height)
+	rendererCandidate := platform.ResolutionCandidate{Source: "SDL renderer output", Width: int(width), Height: int(height)}
+	if result != 0 {
+		rendererCandidate.Error = "SDL_GetRendererOutputSize failed: " + C.GoString(C.SDL_GetError())
+	}
+	candidates = append(candidates, rendererCandidate)
+	width, height = 0, 0
+	C.SDL_GetWindowSize(window, &width, &height)
+	candidates = append(candidates, platform.ResolutionCandidate{Source: "SDL window size", Width: int(width), Height: int(height)})
 	displayIndex := C.SDL_GetWindowDisplayIndex(window)
 	var mode C.SDL_DisplayMode
-	if displayIndex >= 0 && C.SDL_GetCurrentDisplayMode(displayIndex, &mode) == 0 && mode.w > 0 && mode.h > 0 {
-		return int(mode.w), int(mode.h)
+	if displayIndex >= 0 && C.SDL_GetCurrentDisplayMode(displayIndex, &mode) == 0 {
+		candidates = append(candidates, platform.ResolutionCandidate{Source: "SDL current display mode", Width: int(mode.w), Height: int(mode.h)})
+	} else {
+		candidates = append(candidates, platform.ResolutionCandidate{Source: "SDL current display mode", Error: "SDL display mode query failed: " + C.GoString(C.SDL_GetError())})
 	}
-	var width, height C.int
-	if C.SDL_GetRendererOutputSize(renderer, &width, &height) == 0 && width > 0 && height > 0 {
-		return int(width), int(height)
+	return candidates
+}
+
+func logResolutionCandidates(logger *diagnostics.Log, assessments []platform.ResolutionAssessment, selected platform.Info) {
+	for _, candidate := range assessments {
+		logger.Event("resolution_candidate", "source", candidate.Source, "width", fmt.Sprint(candidate.Width), "height", fmt.Sprint(candidate.Height), "valid", fmt.Sprint(candidate.Valid), "reason", candidate.Reason)
 	}
-	return 0, 0
+	logger.Event("resolution_selected", "resolution", selected.Resolution, "source", selected.ResolutionSource)
+	logger.Event("platform_detected", "details", platform.Summary(selected))
 }
 
 func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, controller **C.SDL_GameController) bool {

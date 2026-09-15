@@ -57,4 +57,8 @@ Press Y in the App Store to export platform, catalogue, and capped redacted
 logs to /userdata/system/knulli-app-store/diagnostics. The export does not
 include package credentials or private configuration files.
 
+The log records each SDL and framebuffer resolution candidate. On TrimUI
+Smart Pro it should select SDL renderer output 1280x720. Implausible values
+such as 1280x13107 are rejected. Terminal control sequences are removed.
+
 Do not replace Knulli's SDL library with a desktop or stock TrimUI copy.

@@ -14,15 +14,30 @@ import (
 )
 
 type Info struct {
-	Firmware       string
-	FirmwareRaw    string
-	FirmwareSource string
-	Version        string
-	VersionRaw     string
-	VersionSource  string
-	Arch           string
-	Device         string
-	Resolution     string
+	Firmware             string
+	FirmwareRaw          string
+	FirmwareSource       string
+	Version              string
+	VersionRaw           string
+	VersionSource        string
+	Arch                 string
+	Device               string
+	Resolution           string
+	ResolutionSource     string
+	ResolutionCandidates []ResolutionCandidate
+}
+
+type ResolutionCandidate struct {
+	Source string
+	Width  int
+	Height int
+	Error  string
+}
+
+type ResolutionAssessment struct {
+	ResolutionCandidate
+	Valid  bool
+	Reason string
 }
 
 func Detect(root string) Info {
@@ -82,10 +97,42 @@ func Detect(root string) Info {
 			break
 		}
 	}
-	if data, err := os.ReadFile(filepath.Join(root, "sys/class/graphics/fb0/virtual_size")); err == nil {
-		info.Resolution = strings.ReplaceAll(strings.TrimSpace(string(data)), ",", "x")
+	info.ResolutionCandidates = filesystemResolutionCandidates(root)
+	info = WithResolutionCandidates(info, info.ResolutionCandidates)
+	return info
+}
+
+func WithResolutionCandidates(info Info, candidates []ResolutionCandidate) Info {
+	info.Resolution = ""
+	info.ResolutionSource = ""
+	info.ResolutionCandidates = append([]ResolutionCandidate(nil), candidates...)
+	for _, assessment := range AssessResolutions(candidates) {
+		if assessment.Valid {
+			info.Resolution = fmt.Sprintf("%dx%d", assessment.Width, assessment.Height)
+			info.ResolutionSource = assessment.Source
+			break
+		}
 	}
 	return info
+}
+
+func AssessResolutions(candidates []ResolutionCandidate) []ResolutionAssessment {
+	result := make([]ResolutionAssessment, 0, len(candidates))
+	for _, candidate := range candidates {
+		assessment := ResolutionAssessment{ResolutionCandidate: candidate, Valid: true, Reason: "accepted"}
+		switch {
+		case candidate.Error != "":
+			assessment.Valid, assessment.Reason = false, candidate.Error
+		case candidate.Width < 320 || candidate.Height < 200:
+			assessment.Valid, assessment.Reason = false, "below minimum 320x200"
+		case candidate.Width > 7680 || candidate.Height > 4320:
+			assessment.Valid, assessment.Reason = false, "above maximum 7680x4320"
+		case float64(candidate.Width)/float64(candidate.Height) < 0.5 || float64(candidate.Width)/float64(candidate.Height) > 3.5:
+			assessment.Valid, assessment.Reason = false, "aspect ratio is outside 1:2 to 3.5:1"
+		}
+		result = append(result, assessment)
+	}
+	return result
 }
 
 func DisplayName(device string) string {
@@ -101,10 +148,14 @@ func DisplayName(device string) string {
 
 func DisplayHeader(info Info, runtimeWidth, runtimeHeight int) string {
 	resolution := "size unknown"
-	if runtimeWidth > 0 && runtimeHeight > 0 {
+	runtime := AssessResolutions([]ResolutionCandidate{{Source: "runtime header", Width: runtimeWidth, Height: runtimeHeight}})[0]
+	if runtime.Valid {
 		resolution = fmt.Sprintf("%dx%d", runtimeWidth, runtimeHeight)
-	} else if resolutionPattern.MatchString(info.Resolution) {
-		resolution = info.Resolution + " fallback"
+	} else if info.Resolution != "" {
+		resolution = info.Resolution
+		if !strings.HasPrefix(info.ResolutionSource, "SDL ") {
+			resolution += " fallback"
+		}
 	}
 	return DisplayName(info.Device) + " / " + resolution
 }
@@ -139,13 +190,13 @@ func Check(pkg manifest.Package, current Info) error {
 }
 
 func Summary(info Info) string {
-	return fmt.Sprintf("device=%q architecture=%q resolution=%q firmware_raw=%q firmware=%q firmware_source=%q version_raw=%q version=%q version_source=%q",
-		info.Device, info.Arch, info.Resolution, info.FirmwareRaw, info.Firmware, info.FirmwareSource, info.VersionRaw, info.Version, info.VersionSource)
+	return fmt.Sprintf("device=%q architecture=%q resolution=%q resolution_source=%q firmware_raw=%q firmware=%q firmware_source=%q version_raw=%q version=%q version_source=%q",
+		info.Device, info.Arch, info.Resolution, info.ResolutionSource, info.FirmwareRaw, info.Firmware, info.FirmwareSource, info.VersionRaw, info.Version, info.VersionSource)
 }
 
 func compatibilityError(field string, current Info, constraint string) error {
-	detected := fmt.Sprintf("device=%q architecture=%q resolution=%q firmware_raw=%q firmware=%q firmware_source=%q",
-		current.Device, current.Arch, current.Resolution, current.FirmwareRaw, current.Firmware, current.FirmwareSource)
+	detected := fmt.Sprintf("device=%q architecture=%q resolution=%q resolution_source=%q firmware_raw=%q firmware=%q firmware_source=%q",
+		current.Device, current.Arch, current.Resolution, current.ResolutionSource, current.FirmwareRaw, current.Firmware, current.FirmwareSource)
 	if field == "firmware_version" {
 		detected += fmt.Sprintf(" version_raw=%q version=%q version_source=%q", current.VersionRaw, current.Version, current.VersionSource)
 	}
@@ -153,8 +204,8 @@ func compatibilityError(field string, current Info, constraint string) error {
 }
 
 var versionPart = regexp.MustCompile(`[0-9]+|[a-zA-Z]+`)
-var resolutionPattern = regexp.MustCompile(`^[0-9]+x[0-9]+$`)
 var numericVersion = regexp.MustCompile(`^[0-9]`)
+var resolutionNumbers = regexp.MustCompile(`([0-9]+)[x,]([0-9]+)`)
 
 func normalizeFirmware(value string) string {
 	if strings.EqualFold(strings.TrimSpace(value), "knulli") {
@@ -235,4 +286,37 @@ func readText(path string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(data))
+}
+
+func filesystemResolutionCandidates(root string) []ResolutionCandidate {
+	sources := []struct {
+		path   string
+		source string
+	}{
+		{path: "sys/class/graphics/fb0/mode", source: "/sys/class/graphics/fb0/mode"},
+		{path: "sys/class/graphics/fb0/modes", source: "/sys/class/graphics/fb0/modes"},
+		{path: "sys/class/graphics/fb0/virtual_size", source: "/sys/class/graphics/fb0/virtual_size"},
+	}
+	var candidates []ResolutionCandidate
+	for _, item := range sources {
+		value := readText(filepath.Join(root, item.path))
+		if value == "" {
+			continue
+		}
+		candidates = append(candidates, ResolutionCandidateFromString(item.source, value))
+	}
+	return candidates
+}
+
+func ResolutionCandidateFromString(source, value string) ResolutionCandidate {
+	matches := resolutionNumbers.FindStringSubmatch(strings.TrimSpace(value))
+	if len(matches) != 3 {
+		return ResolutionCandidate{Source: source, Error: "value does not contain WIDTHxHEIGHT"}
+	}
+	width, widthErr := strconv.Atoi(matches[1])
+	height, heightErr := strconv.Atoi(matches[2])
+	if widthErr != nil || heightErr != nil {
+		return ResolutionCandidate{Source: source, Error: "width or height is not an integer"}
+	}
+	return ResolutionCandidate{Source: source, Width: width, Height: height}
 }
