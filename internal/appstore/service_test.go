@@ -52,8 +52,7 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 			}
 			continue
 		}
-		readOnlyStatus := strings.Contains(item.Compatibility, "Candidate") || strings.Contains(item.Compatibility, "installation is blocked")
-		if item.Compatible || len(item.Actions) != 0 || !readOnlyStatus {
+		if item.Compatible || len(item.Actions) != 0 || item.Verdict.State != StateCandidate {
 			t.Fatalf("candidate became actionable: %#v", item)
 		}
 	}
@@ -66,11 +65,11 @@ func TestApprovedCandidateRemainsReadOnly(t *testing.T) {
 	pkg := installablePackage()
 	pkg.Review = manifest.Review{Status: "candidate", Approval: &manifest.Approval{Provenance: "community"}}
 	pkg.Release, pkg.Compatibility, pkg.Install = nil, nil, nil
-	compatible, message := compatibility(pkg, platform.Info{})
-	if compatible || message != "Community approved; installation is blocked by technical review" {
-		t.Fatalf("unexpected approved candidate state: %v, %q", compatible, message)
+	verdict := assess(pkg, platform.Info{}, installer.Status{}, false)
+	if verdict.State != StateCandidate || verdict.Message() != "Community approved; installation is blocked by technical review" {
+		t.Fatalf("unexpected approved candidate state: %#v", verdict)
 	}
-	if actions(Item{Package: pkg}) != nil {
+	if len(verdict.Actions) != 0 {
 		t.Fatal("approved candidate must remain read-only")
 	}
 }
@@ -115,7 +114,7 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 	}
 	for _, item := range items {
 		if item.Package.Experimental() {
-			if !item.Compatible || len(item.Actions) != 1 || !strings.Contains(item.Compatibility, "no minimum version is claimed") || !strings.Contains(item.Compatibility, "/etc/os-release:OS_NAME") || !strings.Contains(item.Compatibility, "source=SDL renderer output") {
+			if !item.Compatible || len(item.Actions) != 1 || item.Verdict.State != StateAvailable || !hasReason(item.Verdict, "review", "no minimum version is claimed") || !hasReason(item.Verdict, "review", "/etc/os-release:OS_NAME") || !hasReason(item.Verdict, "review", "source=SDL renderer output") {
 				t.Fatalf("latest Knulli experimental decision is wrong: %#v", item)
 			}
 		}
@@ -149,29 +148,36 @@ func TestMagicXAllowsOnlyPlayTimeExperimentalPackage(t *testing.T) {
 				t.Fatalf("PlayTime was not offered as an unverified MagicX experiment: %#v", item)
 			}
 		case "app.romm.grout":
-			if item.Compatible || len(item.Actions) != 0 || !strings.Contains(item.Compatibility, "magicx-zero-28") {
+			if item.Compatible || len(item.Actions) != 0 || item.Verdict.State != StateIncompatible || !hasReason(item.Verdict, "platform", "magicx-zero-28") {
 				t.Fatalf("Grout became actionable on MagicX: %#v", item)
 			}
 		}
 	}
 }
 
-func TestActionsReflectInstallStateAndHealth(t *testing.T) {
-	item := Item{Package: installablePackage(), Compatible: true}
-	assertActions(t, actions(item), Install)
-	item.PreExisting = true
-	assertActions(t, actions(item), Adopt)
-	item.PreExisting = false
-	item.Installed = true
-	item.InstalledVersion = item.Package.Version
-	item.Healthy = true
-	assertActions(t, actions(item), Uninstall, Repair)
-	item.Healthy = false
-	assertActions(t, actions(item), Uninstall, Repair)
-	item.InstalledVersion = "0.9.0"
-	assertActions(t, actions(item), Update, Uninstall, Repair)
-	item.Compatible = false
-	assertActions(t, actions(item), Uninstall)
+func TestVerdictActionsReflectInstallStateAndHealth(t *testing.T) {
+	pkg := installablePackage()
+	current := platform.Info{Firmware: "knulli", Version: "2026.05", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720"}
+	assertActions(t, assess(pkg, current, installer.Status{}, false).Actions, Install)
+	assertActions(t, assess(pkg, current, installer.Status{}, true).Actions, Adopt)
+	status := installer.Status{Installed: true, Version: pkg.Version, Healthy: true}
+	assertActions(t, assess(pkg, current, status, false).Actions, Uninstall, Repair)
+	status.Healthy = false
+	assertActions(t, assess(pkg, current, status, false).Actions, Uninstall, Repair)
+	status.Version = "0.9.0"
+	assertActions(t, assess(pkg, current, status, false).Actions, Update, Uninstall, Repair)
+	status.Version = pkg.Version
+	incompatible := platform.Info{Firmware: "other", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720"}
+	assertActions(t, assess(pkg, incompatible, status, false).Actions, Uninstall)
+}
+
+func hasReason(verdict Verdict, kind, fragment string) bool {
+	for _, reason := range verdict.Reasons {
+		if reason.Kind == kind && strings.Contains(reason.Detail, fragment) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestCompletionMessageReportsRefreshOrRestartPrecisely(t *testing.T) {

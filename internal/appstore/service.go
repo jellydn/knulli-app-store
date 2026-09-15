@@ -33,6 +33,7 @@ type Item struct {
 	Compatible       bool
 	Compatibility    string
 	Actions          []Action
+	Verdict          Verdict
 }
 
 type Backend interface {
@@ -160,47 +161,20 @@ func (s *Service) item(ctx context.Context, entry catalog.Entry) (Item, error) {
 			return Item{}, fmt.Errorf("inspect %s destination: %w", entry.ID, err)
 		}
 	}
-	item.Compatible, item.Compatibility = compatibility(entry.Package, s.manager.Platform())
+	item.Verdict = assess(entry.Package, s.manager.Platform(), status, item.PreExisting)
+	item.Compatible = actionable(item.Verdict.State)
+	item.Compatibility = item.Verdict.Message()
 	s.manager.Diagnostics.Event("compatibility_decision", "package", entry.ID, "allowed", fmt.Sprint(item.Compatible), "decision", item.Compatibility)
-	item.Actions = actions(item)
+	item.Actions = item.Verdict.Actions
 	return item, nil
 }
 
-func compatibility(pkg manifest.Package, current platform.Info) (bool, string) {
-	if !pkg.Installable() {
-		if pkg.Review.Approval != nil {
-			return false, "Community approved; installation is blocked by technical review"
-		}
-		return false, "Candidate: compatibility is not approved"
-	}
-	if err := platform.Check(pkg, current); err != nil {
-		return false, err.Error()
-	}
-	if pkg.Experimental() {
-		return true, fmt.Sprintf("Experimental compatibility: Knulli identity confirmed from %s; no minimum version is claimed; device=%s architecture=%s resolution=%s source=%s version=%s", current.Evidence.FirmwareSource, current.Device, current.Arch, current.Resolution, current.ResolutionSource, current.Version)
-	}
-	return true, "Compatible with detected platform"
+// actionable reports whether the verdict state allows lifecycle actions.
+func actionable(state State) bool {
+	return state != StateCandidate && state != StateIncompatible
 }
 
-func actions(item Item) []Action {
-	if item.Installed {
-		result := []Action{Uninstall}
-		if item.Package.Installable() && item.Compatible {
-			if item.InstalledVersion != item.Package.Version {
-				result = append([]Action{Update}, result...)
-			}
-			result = append(result, Repair)
-		}
-		return result
-	}
-	if item.Package.Installable() && item.Compatible {
-		if item.PreExisting {
-			return []Action{Adopt}
-		}
-		return []Action{Install}
-	}
-	return nil
-}
+
 
 func operationMessage(action Action, name string) string {
 	if action == Adopt {
