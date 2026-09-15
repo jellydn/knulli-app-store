@@ -111,7 +111,7 @@ func extractTarGZ(archivePath, destination string, stripComponents int, maximumB
 			}
 			continue
 		}
-		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeRegA {
+		if header.Typeflag != tar.TypeReg {
 			return nil, fmt.Errorf("archive contains unsupported entry %q", header.Name)
 		}
 		relative, skip, err := safeName(header.Name, stripComponents)
