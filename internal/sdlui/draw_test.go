@@ -111,6 +111,19 @@ func TestRenderRepresentativeStates(t *testing.T) {
 	}
 }
 
+func TestHeaderIncludesBrandMark(t *testing.T) {
+	frame := draw(&storeui.Model{}, platformHeader("trimui-smart-pro"), nil)
+	if frame.RGBAAt(19, 12) != palette.accent {
+		t.Fatalf("filled brand tile missing accent: got %#v", frame.RGBAAt(19, 12))
+	}
+	if frame.RGBAAt(25, 12) != palette.accent {
+		t.Fatalf("outlined brand tile missing accent border: got %#v", frame.RGBAAt(25, 12))
+	}
+	if frame.RGBAAt(27, 12) != palette.background {
+		t.Fatalf("outlined brand tile missing inner background: got %#v", frame.RGBAAt(27, 12))
+	}
+}
+
 func TestCompactLabelsAndRequiredNotices(t *testing.T) {
 	verified := manifest.Package{Review: manifest.Review{Status: "verified"}, Install: &manifest.Install{Warning: "Do not use the updater."}}
 	experimental := manifest.Package{Review: manifest.Review{Status: "experimental"}, Install: &manifest.Install{Warning: "Unverified test."}}

@@ -34,9 +34,9 @@ The sources do not establish the general SDL2 package version, a third-party gli
 
 1. Shut down Knulli and connect its data card to a computer.
 2. Extract the versioned ZIP directly into `/userdata/roms/ports`.
-3. Check that `/userdata/roms/ports/Knulli App Store.sh` and `/userdata/roms/ports/knulli-app-store/knulli-app-ui` exist.
+3. Check that `/userdata/roms/ports/Knulli App Store.sh`, `/userdata/roms/ports/knulli-app-store/knulli-app-ui`, and `/userdata/roms/ports/images/Knulli App Store.png` exist.
 4. Safely eject the card and start Knulli.
-5. Refresh game lists or reboot, then open **Knulli App Store** in **Ports**.
+5. Refresh game lists or reboot, then open **Knulli App Store** in **Ports**. The Ports list uses the packaged image after the refresh.
 
 The launcher appends diagnostics to `/userdata/system/logs/knulli-app-store.log`.
 

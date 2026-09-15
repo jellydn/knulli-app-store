@@ -11,8 +11,10 @@ INSTALL
 3. Confirm these paths exist:
    /userdata/roms/ports/Knulli App Store.sh
    /userdata/roms/ports/knulli-app-store/knulli-app-ui
+   /userdata/roms/ports/images/Knulli App Store.png
 4. Safely eject the card, start Knulli, and refresh game lists or reboot.
-5. Open Knulli App Store from the Ports system.
+5. Open Knulli App Store from the Ports system. The Ports list uses the image
+   at images/Knulli App Store.png after a game list refresh.
 
 UPDATE
 

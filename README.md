@@ -1,4 +1,7 @@
-<h1 align="center">Welcome to knulli-app-store 👋</h1>
+<p align="center">
+  <img src="docs/assets/icon.svg" alt="Knulli App Store" width="128" height="128" />
+</p>
+<h1 align="center">Knulli App Store</h1>
 <p align="center">
   <a href="https://github.com/jellydn/knulli-app-store/actions/workflows/check.yml">
     <img alt="CI" src="https://github.com/jellydn/knulli-app-store/actions/workflows/check.yml/badge.svg" />

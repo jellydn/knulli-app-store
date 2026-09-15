@@ -13,7 +13,7 @@ No checked-in Knulli controller profile establishes the MagicX button indices. T
 
 ## Install and controller setup
 
-Download the `knulli-app-store-magicx-zero-28-experimental` Actions artifact. Verify `SHA256SUMS.txt`, shut down Knulli, then extract the inner ZIP into `/userdata/roms/ports`. Replace the old App Store files only when updating.
+Download the `knulli-app-store-magicx-zero-28-experimental` Actions artifact. Verify `SHA256SUMS.txt`, shut down Knulli, then extract the inner ZIP into `/userdata/roms/ports`. Replace the old App Store files only when updating. Confirm `/userdata/roms/ports/images/Knulli App Store.png` is present; the Ports list uses it after a game list refresh.
 
 The first launch for each device/controller identity opens a dedicated setup screen before the catalogue. Choose **Use Detected Mapping**, **Test Detected Mapping**, **Customize**, or **Safe Exit**. Customize assigns Up, Down, Left, Right, Confirm, Back, Details/Diagnostics, and Exit one at a time. Every detected button gets an Accept, Retry, Start Over, or Cancel review before progress continues. Conflicts stay on the current action. Custom and tested mappings require a complete preview before atomic save.
 
