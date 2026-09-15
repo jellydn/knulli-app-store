@@ -76,3 +76,35 @@ func TestLoadRejectsSignatureFromAnotherKey(t *testing.T) {
 		t.Fatal("expected a foreign signature to fail")
 	}
 }
+
+func TestLoadRejectsTrailingSignatureData(t *testing.T) {
+	public, private, err := GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	embeddedPublicKeyHex = hex.EncodeToString(public)
+	t.Cleanup(func() { embeddedPublicKeyHex = "" })
+
+	index, err := Build(filepath.Join("..", "..", "catalogue", "packages"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "catalog-index.json")
+	if err := Write(index, path); err != nil {
+		t.Fatal(err)
+	}
+	if err := SignFile(path, private); err != nil {
+		t.Fatal(err)
+	}
+	signaturePath := SignaturePath(path)
+	data, err := os.ReadFile(signaturePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(signaturePath, append(data, []byte("{}\n")...), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("expected trailing signature data to fail")
+	}
+}

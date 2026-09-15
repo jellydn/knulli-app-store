@@ -60,6 +60,7 @@ jobs:
         run: |
           mkdir -p build
           KEY=$(mktemp)
+          trap 'rm -f "$KEY" "$KEY.pub"' EXIT
           go run ./cmd/knulli-app catalogue -output build/catalog-index.json -generate-signing-key "$KEY"
           PUB=$(tr -d ' \n' < "$KEY.pub")
           if [ "${#PUB}" -ne 64 ]; then
@@ -67,7 +68,6 @@ jobs:
             exit 1
           fi
           echo "public_key=$PUB" >> "$GITHUB_OUTPUT"
-          rm -f "$KEY" "$KEY.pub"
       - name: Build Linux aarch64 binaries
         run: |
           LDFLAGS="-s -w -X github.com/jellydn/knulli-app-store/internal/catalog.embeddedPublicKeyHex=${{ steps.catalog.outputs.public_key }}"

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -119,6 +120,13 @@ func loadSignature(path string) (Signature, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&signature); err != nil {
+		return Signature{}, fmt.Errorf("decode catalogue signature: %w", err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return Signature{}, fmt.Errorf("decode catalogue signature: trailing JSON value")
+		}
 		return Signature{}, fmt.Errorf("decode catalogue signature: %w", err)
 	}
 	return signature, nil

@@ -87,10 +87,11 @@ func run(arguments []string) error {
 			if err != nil {
 				return err
 			}
-			if err := os.WriteFile(*generateKey, []byte(hex.EncodeToString(private)+"\n"), 0600); err != nil {
+			if err := writeNewFile(*generateKey, []byte(hex.EncodeToString(private)+"\n"), 0600); err != nil {
 				return err
 			}
-			if err := os.WriteFile(*generateKey+".pub", []byte(hex.EncodeToString(public)+"\n"), 0644); err != nil {
+			if err := writeNewFile(*generateKey+".pub", []byte(hex.EncodeToString(public)+"\n"), 0644); err != nil {
+				os.Remove(*generateKey)
 				return err
 			}
 			fmt.Fprintf(os.Stderr, "public key %s\n", hex.EncodeToString(public))
@@ -139,6 +140,23 @@ func run(arguments []string) error {
 	default:
 		return fmt.Errorf("unknown command %q", arguments[0])
 	}
+}
+
+func writeNewFile(path string, data []byte, mode os.FileMode) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
+	if err != nil {
+		return err
+	}
+	if _, err := file.Write(data); err != nil {
+		file.Close()
+		os.Remove(path)
+		return err
+	}
+	if err := file.Close(); err != nil {
+		os.Remove(path)
+		return err
+	}
+	return nil
 }
 
 func runApply(operation string, arguments []string) error {
