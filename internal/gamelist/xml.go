@@ -1,13 +1,15 @@
-package installer
+package gamelist
 
 import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/jellydn/knulli-app-store/internal/manifest"
+	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
 
 type xmlNode struct {
@@ -15,6 +17,53 @@ type xmlNode struct {
 	Attrs    []xml.Attr
 	Text     string
 	Children []*xmlNode
+}
+
+// addEntry writes the reviewed entry into its gamelist file inside the
+// transaction. An entry with the same path is left untouched: entries this
+// installer did not create are never edited.
+func addEntry(tx *safefs.Transaction, guard *safefs.Guard, menu manifest.Menu) (bool, error) {
+	return editGamelist(tx, guard, menu.Gamelist, func(data []byte) ([]byte, bool, error) {
+		return addMenuEntry(data, menu)
+	})
+}
+
+// replaceEntry rewrites an entry this installer owns — the same gamelist,
+// path, name, and description — with updated text.
+func replaceEntry(tx *safefs.Transaction, guard *safefs.Guard, previous, menu manifest.Menu) (bool, error) {
+	return editGamelist(tx, guard, menu.Gamelist, func(data []byte) ([]byte, bool, error) {
+		return replaceOwnedMenuEntry(data, previous, menu)
+	})
+}
+
+// removeEntry removes an entry this installer owns. Unowned entries with the
+// same path are left in place.
+func removeEntry(tx *safefs.Transaction, guard *safefs.Guard, menu manifest.Menu) (bool, error) {
+	return editGamelist(tx, guard, menu.Gamelist, func(data []byte) ([]byte, bool, error) {
+		return removeOwnedMenuEntry(data, menu)
+	})
+}
+
+// editGamelist rewrites one gamelist file inside the transaction. A missing
+// file is parsed as an empty gameList; a plan step that changes nothing
+// writes nothing.
+func editGamelist(tx *safefs.Transaction, guard *safefs.Guard, gamelist string, change func([]byte) ([]byte, bool, error)) (bool, error) {
+	host, err := guard.Resolve(gamelist)
+	if err != nil {
+		return false, err
+	}
+	data, err := os.ReadFile(host)
+	if err != nil && !os.IsNotExist(err) {
+		return false, err
+	}
+	updated, changed, err := change(data)
+	if err != nil {
+		return false, err
+	}
+	if !changed {
+		return false, nil
+	}
+	return true, tx.Write(gamelist, updated, 0644)
 }
 
 func addMenuEntry(data []byte, menu manifest.Menu) ([]byte, bool, error) {

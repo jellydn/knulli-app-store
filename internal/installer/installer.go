@@ -15,6 +15,7 @@ import (
 
 	storearchive "github.com/jellydn/knulli-app-store/internal/archive"
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
+	"github.com/jellydn/knulli-app-store/internal/gamelist"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/platform"
 	"github.com/jellydn/knulli-app-store/internal/safefs"
@@ -277,34 +278,17 @@ func (m Manager) commit(ctx context.Context, operation string, pkg manifest.Pack
 		return err
 	}
 	m.event("backup_complete", "package", pkg.ID, "originals", fmt.Sprint(len(state.Originals)))
-	gameListChanged := false
-	if old != nil && old.MenuOwned && old.Manifest.Install.Menu != nil && !sameMenu(old.Manifest.Install.Menu, pkg.Install.Menu) {
-		changed, menuErr := removeMenu(tx, guard, *old.Manifest.Install.Menu)
-		if menuErr != nil {
-			return menuErr
-		}
-		gameListChanged = gameListChanged || changed
+	var previous *manifest.Menu
+	if old != nil && old.MenuOwned && old.Manifest.Install.Menu != nil {
+		owned := *old.Manifest.Install.Menu
+		previous = &owned
 	}
-	if pkg.Install.Menu != nil {
-		if old != nil && old.MenuOwned && old.Manifest.Install.Menu != nil && sameMenu(old.Manifest.Install.Menu, pkg.Install.Menu) {
-			changed, menuErr := replaceMenu(tx, guard, *old.Manifest.Install.Menu, *pkg.Install.Menu)
-			if menuErr != nil {
-				return menuErr
-			}
-			state.MenuOwned = changed
-			gameListChanged = gameListChanged || changed
-		} else {
-			owned, menuErr := addMenu(tx, guard, *pkg.Install.Menu)
-			if menuErr != nil {
-				return menuErr
-			}
-			state.MenuOwned = owned
-			gameListChanged = gameListChanged || owned
-		}
+	menuChanged, menuOwned, err := gamelist.Apply(tx, guard, gamelist.Derive(previous != nil, previous, pkg.Install.Menu))
+	if err != nil {
+		return err
 	}
-	if old != nil && old.MenuOwned && pkg.Install.Menu == nil {
-		state.MenuOwned = false
-	}
+	state.MenuOwned = menuOwned
+	gameListChanged := menuChanged
 	stateData, err := encodeState(state)
 	if err != nil {
 		return err
@@ -513,9 +497,10 @@ func (m Manager) uninstall(ctx context.Context, id string, outcome *OperationOut
 	}
 	gameListChanged := false
 	if state.MenuOwned && state.Manifest.Install.Menu != nil {
-		changed, menuErr := removeMenu(tx, guard, *state.Manifest.Install.Menu)
-		if menuErr != nil {
-			return menuErr
+		menu := *state.Manifest.Install.Menu
+		changed, _, err := gamelist.Apply(tx, guard, gamelist.Derive(true, &menu, nil))
+		if err != nil {
+			return err
 		}
 		gameListChanged = changed
 	}
@@ -631,45 +616,6 @@ func isPreserved(relative string, preserved []string) bool {
 	return false
 }
 
-func addMenu(tx *safefs.Transaction, guard *safefs.Guard, menu manifest.Menu) (bool, error) {
-	return changeMenu(tx, guard, menu.Gamelist, func(data []byte) ([]byte, bool, error) {
-		return addMenuEntry(data, menu)
-	})
-}
-
-func replaceMenu(tx *safefs.Transaction, guard *safefs.Guard, oldMenu, newMenu manifest.Menu) (bool, error) {
-	return changeMenu(tx, guard, newMenu.Gamelist, func(data []byte) ([]byte, bool, error) {
-		return replaceOwnedMenuEntry(data, oldMenu, newMenu)
-	})
-}
-
-func removeMenu(tx *safefs.Transaction, guard *safefs.Guard, menu manifest.Menu) (bool, error) {
-	return changeMenu(tx, guard, menu.Gamelist, func(data []byte) ([]byte, bool, error) {
-		return removeOwnedMenuEntry(data, menu)
-	})
-}
-
-func changeMenu(tx *safefs.Transaction, guard *safefs.Guard, gamelist string, change func([]byte) ([]byte, bool, error)) (bool, error) {
-	host, err := guard.Resolve(gamelist)
-	if err != nil {
-		return false, err
-	}
-	data, err := os.ReadFile(host)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return false, err
-		}
-	}
-	updated, changed, err := change(data)
-	if err != nil {
-		return false, err
-	}
-	if !changed {
-		return false, nil
-	}
-	return true, tx.Write(gamelist, updated, 0644)
-}
-
 func originalPath(id, target string) string {
 	digest := sha256.Sum256([]byte(target))
 	return managerPath + "/originals/" + id + "/" + hex.EncodeToString(digest[:])
@@ -690,13 +636,6 @@ func stringSet(values []string) map[string]bool {
 		set[value] = true
 	}
 	return set
-}
-
-func sameMenu(left, right *manifest.Menu) bool {
-	if left == nil || right == nil {
-		return left == right
-	}
-	return left.Gamelist == right.Gamelist && left.Path == right.Path
 }
 
 func (m Manager) root() string {
