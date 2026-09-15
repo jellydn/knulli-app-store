@@ -38,7 +38,7 @@ signed index (future)                  HTTPS download
 
 ## Lifecycle invariants
 
-An archive is fully downloaded, hashed, and staged before a destination file changes. Every destination mutation enters the transaction before it happens. Installed state is the last file written. A failed step restores snapshots in reverse order.
+An archive is fully downloaded, hashed, and staged before a destination file changes. Every destination mutation enters the transaction and a durable journal before it happens. Installed state is the last file written. A failed step restores snapshots in reverse order. The next locked start rolls back an open journal and discards a committed leftover directory.
 
 Update and repair share the same safe application path. Update can replace the manifest version and remove stale owned files. Repair reinstalls the declared release. Both leave existing declared configuration unchanged. Uninstall removes owned files, leaves preserved configuration, and restores files that existed before first ownership. A pre-existing copy is offered as **Manage existing**. Adoption inventories it without reinstalling, records exact release matches, marks uncertain files unmanaged, and backs them up before later replacement.
 
