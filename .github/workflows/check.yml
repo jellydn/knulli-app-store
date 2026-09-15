@@ -59,8 +59,9 @@ jobs:
         id: catalog
         run: |
           mkdir -p build
-          KEY=$(mktemp)
-          trap 'rm -f "$KEY" "$KEY.pub"' EXIT
+          KEY_DIR=$(mktemp -d)
+          trap 'rm -rf "$KEY_DIR"' EXIT
+          KEY="$KEY_DIR/catalog-signing-key"
           go run ./cmd/knulli-app catalogue -output build/catalog-index.json -generate-signing-key "$KEY"
           PUB=$(tr -d ' \n' < "$KEY.pub")
           if [ "${#PUB}" -ne 64 ]; then
