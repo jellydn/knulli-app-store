@@ -12,7 +12,7 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/platform"
 )
 
-func TestServiceExposesOnlyExperimentalPackagesAsActionable(t *testing.T) {
+func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 	indexPath := filepath.Join(t.TempDir(), "index.json")
 	index, err := catalogForTest()
 	if err != nil {
@@ -22,7 +22,7 @@ func TestServiceExposesOnlyExperimentalPackagesAsActionable(t *testing.T) {
 		t.Fatal(err)
 	}
 	service, err := Open(indexPath, installer.Manager{Root: t.TempDir(), Platform: platform.Info{
-		Firmware: "knulli", Version: "2026.05", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720",
+		Firmware: "knulli", Version: "scarab", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720",
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -31,15 +31,24 @@ func TestServiceExposesOnlyExperimentalPackagesAsActionable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 6 {
-		t.Fatalf("expected six catalogue items, got %d", len(items))
+	if len(items) != 5 {
+		t.Fatalf("expected five catalogue items, got %d", len(items))
 	}
 	experimental := 0
+	verified := 0
 	for _, item := range items {
-		if item.Package.Experimental() {
-			experimental++
+		if (item.Package.ID == "app.romm.grout" || item.Package.ID == "io.github.unitreign.playtime") && !item.DeviceTested {
+			t.Fatalf("Smart Pro test evidence was not matched for %s", item.Package.ID)
+		}
+		if item.Package.Installable() {
+			if item.Package.Experimental() {
+				experimental++
+			}
+			if item.Package.Review.Status == "verified" {
+				verified++
+			}
 			if !item.Compatible || len(item.Actions) != 1 || item.Actions[0] != Install {
-				t.Fatalf("experimental package is not installable: %#v", item)
+				t.Fatalf("reviewed package is not installable: %#v", item)
 			}
 			continue
 		}
@@ -48,8 +57,8 @@ func TestServiceExposesOnlyExperimentalPackagesAsActionable(t *testing.T) {
 			t.Fatalf("candidate became actionable: %#v", item)
 		}
 	}
-	if experimental != 2 {
-		t.Fatalf("expected two experimental packages, got %d", experimental)
+	if experimental != 1 || verified != 1 {
+		t.Fatalf("expected one experimental and one verified package, got %d and %d", experimental, verified)
 	}
 }
 
@@ -136,7 +145,7 @@ func TestMagicXAllowsOnlyPlayTimeExperimentalPackage(t *testing.T) {
 	for _, item := range items {
 		switch item.Package.ID {
 		case "io.github.unitreign.playtime":
-			if !item.Compatible || !item.Package.Experimental() || len(item.Actions) != 1 || item.Actions[0] != Install || !strings.Contains(strings.ToLower(item.Package.Install.Warning), "unverified") {
+			if !item.Compatible || item.DeviceTested || !item.Package.Experimental() || len(item.Actions) != 1 || item.Actions[0] != Install || !strings.Contains(strings.ToLower(item.Package.Install.Warning), "unverified") {
 				t.Fatalf("PlayTime was not offered as an unverified MagicX experiment: %#v", item)
 			}
 		case "app.romm.grout":

@@ -45,11 +45,10 @@ Upstream package code runs later when the user launches it. The installer does n
 - Power loss is not yet journal-recovered across process restarts. Atomic file replacement limits corruption, and synchronous failures roll back.
 - Empty directories can remain after rollback or uninstall.
 - H700 detection file names need validation against real Knulli images. Operators must supply explicit flags when detection is incomplete.
-- The GUI has one community-reported TrimUI Smart Pro test. Package-specific real-device testing has not been completed, and no current package has a verified badge.
-- Grout is an experimental, actionable package only for the Smart Pro test. PlayTime is an experimental, actionable package for Smart Pro and MagicX Zero 28. This user authorization is not upstream support or real-device package verification. Grout's built-in updater is outside manager transactions and must not be used during the test.
+- The GUI has one community-reported TrimUI Smart Pro test. Grout 5.1.0.0 is verified only for that declared device matrix. The report did not itemize lifecycle steps.
+- PlayTime is experimental on Smart Pro and MagicX Zero 28. Its Smart Pro test does not verify its untested MagicX matrix. Grout's built-in updater is outside manager transactions and must not be used.
 - Diagnostic export contains detected platform metadata, public catalogue package status, and redacted App Store logs. It does not scan or copy package configuration, credentials, ROMs, or user data.
 - Controller mappings are device- and controller-scoped, validated before load/save, and replaced atomically. A missing GUID uses the controller name only within the detected Knulli device; an unidentified controller is not persisted.
-- MagicX Zero 28 is an experimental App Store target. PlayTime has separate user-authorized experimental compatibility; Grout remains blocked. Neither package has a verified badge.
-- EmuDrop is an approved catalogue exception, not an approved installer payload. Its copyright risk, missing license, and launch-time updater keep it non-installable.
+- MagicX Zero 28 is an experimental App Store target. PlayTime has separate user-authorized experimental compatibility; Grout remains blocked.
 
 Report a security issue privately to the repository owner. Do not include user data, tokens, or private catalogue URLs in a public report.

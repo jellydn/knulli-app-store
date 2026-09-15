@@ -44,9 +44,17 @@ type Approval struct {
 }
 
 type Evidence struct {
-	Kind string `json:"kind"`
-	URL  string `json:"url"`
-	Note string `json:"note,omitempty"`
+	Kind           string `json:"kind"`
+	URL            string `json:"url"`
+	Note           string `json:"note,omitempty"`
+	Tester         string `json:"tester,omitempty"`
+	Date           string `json:"date,omitempty"`
+	PackageVersion string `json:"package_version,omitempty"`
+	Firmware       string `json:"firmware,omitempty"`
+	Architecture   string `json:"architecture,omitempty"`
+	Device         string `json:"device,omitempty"`
+	Resolution     string `json:"resolution,omitempty"`
+	Result         string `json:"result,omitempty"`
 }
 
 type Release struct {
@@ -93,6 +101,15 @@ func (p Package) Experimental() bool {
 	return p.Review.Status == "experimental"
 }
 
+func (p Package) DeviceTested(firmware, architecture, device, resolution string) bool {
+	for _, item := range p.Review.Evidence {
+		if item.Kind == "real-device-test" && item.Result == "passed" && item.PackageVersion == p.Version && strings.EqualFold(item.Firmware, firmware) && strings.EqualFold(item.Architecture, architecture) && strings.EqualFold(item.Device, device) && strings.EqualFold(item.Resolution, resolution) {
+			return true
+		}
+	}
+	return false
+}
+
 func (p Package) Validate() error {
 	var problems []string
 	if p.Schema != SchemaV1 {
@@ -122,9 +139,12 @@ func (p Package) Validate() error {
 		if !isHTTPS(evidence.URL) || strings.TrimSpace(evidence.Kind) == "" {
 			problems = append(problems, fmt.Sprintf("review.evidence[%d] needs a kind and HTTPS URL", i))
 		}
+		if evidence.Kind == "real-device-test" && (strings.TrimSpace(evidence.Tester) == "" || strings.TrimSpace(evidence.Date) == "" || evidence.PackageVersion == "" || evidence.Firmware == "" || evidence.Architecture == "" || evidence.Device == "" || evidence.Resolution == "" || evidence.Result != "passed") {
+			problems = append(problems, fmt.Sprintf("review.evidence[%d] real-device-test needs tester, date, package version, firmware, architecture, device, resolution, and passed result", i))
+		}
 	}
-	if p.Review.Status == "verified" && !hasDeviceEvidence(p.Review.Evidence) {
-		problems = append(problems, "verified packages require real-device-test evidence")
+	if p.Review.Status == "verified" && !hasVerifiedMatrixEvidence(p) {
+		problems = append(problems, "verified packages require real-device-test evidence for every declared device and resolution")
 	}
 	if p.Repository != "" && !isHTTPS(p.Repository) {
 		problems = append(problems, "repository must use HTTPS")
@@ -296,11 +316,22 @@ func contains(values []string, wanted string) bool {
 	return false
 }
 
-func hasDeviceEvidence(evidence []Evidence) bool {
-	for _, item := range evidence {
-		if item.Kind == "real-device-test" {
-			return true
+func hasVerifiedMatrixEvidence(pkg Package) bool {
+	if pkg.Compatibility == nil {
+		return false
+	}
+	for _, device := range pkg.Compatibility.Devices {
+		for _, resolution := range pkg.Compatibility.Resolutions {
+			found := false
+			for _, architecture := range pkg.Compatibility.Architectures {
+				if pkg.DeviceTested(pkg.Compatibility.Firmware, architecture, device, resolution) {
+					found = true
+				}
+			}
+			if !found {
+				return false
+			}
 		}
 	}
-	return false
+	return true
 }

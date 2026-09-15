@@ -19,9 +19,13 @@ func TestVerifiedRequiresDeviceEvidence(t *testing.T) {
 	if err := pkg.Validate(); err == nil || !strings.Contains(err.Error(), "real-device-test") {
 		t.Fatalf("expected device evidence rejection, got %v", err)
 	}
-	pkg.Review.Evidence = []Evidence{{Kind: "real-device-test", URL: "https://example.com/report"}}
+	pkg.Review.Evidence = []Evidence{{Kind: "real-device-test", URL: "https://example.com/report", Tester: "Tester", Date: "2026-09-15", PackageVersion: pkg.Version, Firmware: "knulli", Architecture: "aarch64", Device: "h700", Resolution: "640x480", Result: "passed"}}
 	if err := pkg.Validate(); err != nil {
 		t.Fatalf("expected verified package to pass: %v", err)
+	}
+	pkg.Compatibility.Devices = append(pkg.Compatibility.Devices, "untested-device")
+	if err := pkg.Validate(); err == nil || !strings.Contains(err.Error(), "every declared device") {
+		t.Fatalf("expected incomplete verified matrix rejection, got %v", err)
 	}
 }
 

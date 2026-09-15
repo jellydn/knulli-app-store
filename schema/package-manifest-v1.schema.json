@@ -61,8 +61,22 @@
       "properties": {
         "kind": { "type": "string", "minLength": 1 },
         "url": { "type": "string", "format": "uri", "pattern": "^https://" },
-        "note": { "type": "string" }
-      }
+        "note": { "type": "string" },
+        "tester": { "type": "string", "minLength": 1 },
+        "date": { "type": "string", "minLength": 1 },
+        "package_version": { "type": "string", "minLength": 1 },
+        "firmware": { "type": "string", "minLength": 1 },
+        "architecture": { "type": "string", "minLength": 1 },
+        "device": { "type": "string", "minLength": 1 },
+        "resolution": { "type": "string", "pattern": "^[0-9]+x[0-9]+$" },
+        "result": { "const": "passed" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "real-device-test" } } },
+          "then": { "required": ["tester", "date", "package_version", "firmware", "architecture", "device", "resolution", "result"] }
+        }
+      ]
     },
     "release": {
       "type": "object",

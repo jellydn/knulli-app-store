@@ -14,7 +14,7 @@
     },
     "notes": [
       "User-authorized experimental test package for TrimUI Smart Pro and MagicX Zero 28; this is not an upstream compatibility claim or a verified package.",
-      "A user reported successful install and launch on TrimUI Smart Pro, but tracking, relaunch, repair, adoption, and uninstall are not yet verified.",
+      "Real-device validation is limited to PlayTime 1.0.0 on TrimUI Smart Pro with Knulli Scarab. The tester reported only that the test was all good; individual lifecycle steps were not reported.",
       "MagicX testing is authorized from confirmed Knulli, aarch64, 640x480, and SDL GameController runtime facts; package install and launch remain untested.",
       "The manager restores execute permission only for the reviewed playtime binary and playtime.sh launcher.",
       "PlayTime statistics remain outside the managed package directory under /userdata/system/configs/playtime.",
@@ -49,6 +49,19 @@
         "kind": "magicx-experimental-review",
         "url": "https://github.com/unitreign/playtime/blob/5f60c2090e0c456bfbf343d9d3b9c76f2a327135/internal/ui/ui.go",
         "note": "The tagged code uses runtime display dimensions with a 640x480 fallback and SDL GameController actions. MagicX accelerated rendering and controller behavior are not yet package-tested."
+      },
+      {
+        "kind": "real-device-test",
+        "url": "https://github.com/jellydn/knulli-app-store/blob/main/docs/real-device-tests.md",
+        "note": "Tester reported 'Tested Grout and Playtime. All good.' The report did not itemize lifecycle steps and does not cover MagicX Zero 28.",
+        "tester": "Dung Huynh Duc",
+        "date": "2026-09-15",
+        "package_version": "1.0.0",
+        "firmware": "knulli",
+        "architecture": "aarch64",
+        "device": "trimui-smart-pro",
+        "resolution": "1280x720",
+        "result": "passed"
       }
     ]
   },

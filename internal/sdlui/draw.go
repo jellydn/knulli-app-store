@@ -12,7 +12,6 @@ import (
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
 	storeinput "github.com/jellydn/knulli-app-store/internal/input"
-	"github.com/jellydn/knulli-app-store/internal/manifest"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
@@ -65,19 +64,16 @@ func draw(model *storeui.Model, platformName string, controls *storeinput.Sessio
 		drawDetails(frame, model, controls)
 	}
 	drawStatus(frame, model)
-	controllerStatus := "NO CONTROLLER"
 	controlHelp := "CONFIRM --  BACK --  SETTINGS --"
 	if controls != nil && controls.Connected {
-		controllerStatus = strings.ToUpper(shorten(controls.Source, 20))
 		controlHelp = "CONFIRM " + storeinput.ButtonLabel(controls.Mapping[storeinput.Confirm]) + "  BACK " + storeinput.ButtonLabel(controls.Mapping[storeinput.Back]) + "  SETTINGS " + storeinput.ButtonLabel(controls.Mapping[storeinput.Diagnostics])
 	}
-	text(frame, 16, 345, palette.muted, shorten(controlHelp, 57))
-	text(frame, 474, 345, palette.muted, shorten(controllerStatus, 20))
+	text(frame, 16, 345, palette.muted, shorten(controlHelp, 84))
 	return frame
 }
 
 func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName string, controls *storeinput.Session) {
-	fill(frame, image.Rect(16, 50, 624, 338), palette.panel)
+	fill(frame, image.Rect(16, 50, 624, 344), palette.panel)
 	text(frame, 32, 76, palette.accent, "CONTROLLER SETUP")
 	text(frame, 32, 96, palette.text, "DEVICE  "+shorten(strings.ToUpper(platformName), 70))
 	controllerName := strings.TrimSpace(controls.Identity.Name)
@@ -94,8 +90,8 @@ func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName 
 	text(frame, 32, 160, palette.muted, controllerSetupProgress(controls))
 	switch controls.Mode {
 	case storeinput.Blocked:
-		text(frame, 32, 178, palette.warning, "SETUP CANNOT CONTINUE WITHOUT AN SDL GAMECONTROLLER")
-		text(frame, 32, 201, palette.text, "RECONNECT A CONTROLLER, THEN RESTART OR WAIT FOR DETECTION.")
+		text(frame, 32, 178, palette.warning, "NO SDL GAMECONTROLLER")
+		text(frame, 32, 201, palette.text, "RECONNECT A CONTROLLER TO CONTINUE.")
 		text(frame, 32, 231, palette.muted, "LOG  /USERDATA/SYSTEM/LOGS/KNULLI-APP-STORE.LOG")
 		text(frame, 32, 250, palette.muted, "DIAGNOSTICS  /USERDATA/SYSTEM/KNULLI-APP-STORE/DIAGNOSTICS/")
 		diagnosticStatus := model.Message
@@ -107,9 +103,9 @@ func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName 
 		if diagnosticStatus != "" {
 			text(frame, 32, 279, statusColor, shorten(strings.ToUpper(diagnosticStatus), 78))
 		}
-		text(frame, 32, 316, palette.muted, "USE THE SYSTEM EXIT CONTROL TO RETURN SAFELY")
+		text(frame, 32, 316, palette.muted, "USE THE SYSTEM EXIT CONTROL TO LEAVE")
 	case storeinput.Setup:
-		text(frame, 32, 174, palette.warning, "SETUP IS REQUIRED SO CONTROLS ARE SAFE AND PREDICTABLE")
+		text(frame, 32, 174, palette.warning, "SETUP IS REQUIRED FOR SAFE CONTROLS")
 		for index, item := range storeinput.SetupItems {
 			prefix := "  "
 			shade := palette.text
@@ -138,11 +134,10 @@ func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName 
 		text(frame, 32, 316, palette.muted, setupHelp(controls))
 	case storeinput.Calibrating:
 		action, _ := controls.Calibration.Current()
-		text(frame, 32, 176, palette.warning, "PRESS ONE PHYSICAL BUTTON FOR")
+		text(frame, 32, 176, palette.warning, "PRESS A BUTTON FOR")
 		text(frame, 32, 205, palette.text, storeinput.Label(action))
 		text(frame, 32, 226, palette.muted, fmt.Sprintf("ACTION %d OF %d", controls.Calibration.Index+1, len(storeinput.Actions)))
-		text(frame, 32, 252, palette.muted, "CONFLICTS STAY ON THIS ACTION FOR A SAFE RETRY")
-		text(frame, 32, 281, palette.muted, "THE NEXT SCREEN OFFERS RETRY, START OVER, OR CANCEL")
+		text(frame, 32, 252, palette.muted, "A BUTTON CAN HAVE ONLY ONE ACTION")
 		text(frame, 344, 176, palette.muted, "COMPLETED ACTIONS")
 		drawMappingSummary(frame, controls.Calibration.Mapping, nil, 344, 196, 140, 18)
 	case storeinput.Review:
@@ -162,9 +157,9 @@ func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName 
 		text(frame, 344, 176, palette.muted, "CURRENT ASSIGNMENTS")
 		drawMappingSummary(frame, controls.Calibration.Mapping, nil, 344, 196, 140, 18)
 	case storeinput.Preview:
-		text(frame, 32, 176, palette.warning, "TEST EVERY ACTION - SAVE OCCURS ONLY AFTER ALL PASS")
+		text(frame, 32, 176, palette.warning, "TEST ALL ACTIONS BEFORE SAVE")
 		drawMappingSummary(frame, controls.Calibration.Mapping, controls.Calibration.Tested, 48, 205, 280, 36)
-		text(frame, 32, 316, palette.muted, "PRESS EACH SHOWN CONTROL; UNRECOGNIZED BUTTONS ARE IGNORED")
+		text(frame, 32, 316, palette.muted, "PRESS EACH SHOWN CONTROL")
 	}
 	if controls.ValidationError != "" {
 		text(frame, 32, 332, palette.error, shorten(strings.ToUpper(controls.ValidationError), 78))
@@ -225,7 +220,7 @@ func setupHelp(controls *storeinput.Session) string {
 	if controls.FirstRun {
 		mapping = storeinput.AutoMapping()
 	}
-	return storeinput.Label(storeinput.Confirm) + " (" + storeinput.ButtonLabel(mapping[storeinput.Confirm]) + ") SELECT  " + storeinput.Label(storeinput.Back) + " (" + storeinput.ButtonLabel(mapping[storeinput.Back]) + ") CANCEL  " + storeinput.Label(storeinput.Exit) + " (" + storeinput.ButtonLabel(mapping[storeinput.Exit]) + ") SAFE EXIT"
+	return storeinput.Label(storeinput.Confirm) + " (" + storeinput.ButtonLabel(mapping[storeinput.Confirm]) + ") SELECT  " + storeinput.Label(storeinput.Back) + " (" + storeinput.ButtonLabel(mapping[storeinput.Back]) + ") BACK  " + storeinput.Label(storeinput.Exit) + " (" + storeinput.ButtonLabel(mapping[storeinput.Exit]) + ") EXIT"
 }
 
 func drawList(frame *image.RGBA, model *storeui.Model) {
@@ -251,86 +246,136 @@ func drawList(frame *image.RGBA, model *storeui.Model) {
 			fill(frame, image.Rect(24, y, 222, y+38), palette.selected)
 			fill(frame, image.Rect(24, y, 28, y+38), palette.accent)
 		}
-		text(frame, 34, y+15, palette.text, shorten(strings.ToUpper(item.Package.Name), 24))
-		status := reviewLabel(item.Package)
-		statusColor := palette.warning
-		if item.Package.Review.Status == "verified" {
-			statusColor = palette.accent
+		name := strings.ToUpper(item.Package.Name)
+		if item.Package.Version != "" {
+			name += "  " + strings.ToUpper(item.Package.Version)
 		}
-		text(frame, 34, y+31, statusColor, status)
+		text(frame, 34, y+15, palette.text, shorten(name, 24))
+		text(frame, 34, y+31, statusColor(item), shorten(rowTrustLabel(item)+"  |  "+installState(item), 26))
 	}
 }
 
 func drawDetails(frame *image.RGBA, model *storeui.Model, controls *storeinput.Session) {
 	item := model.Items[model.Selected]
 	text(frame, 258, 66, palette.text, shorten(strings.ToUpper(item.Package.Name), 38))
-	text(frame, 258, 84, palette.muted, strings.ToUpper(item.Package.Type)+"  /  "+reviewLabel(item.Package))
-	y := 101
-	installed := "NOT INSTALLED"
-	installedColor := palette.muted
-	if item.PreExisting {
-		installed = "EXISTING COPY / NOT MANAGED"
-		installedColor = palette.warning
-	}
-	if item.Installed {
-		installed = "INSTALLED " + strings.ToUpper(item.InstalledVersion)
-		installedColor = palette.accent
-		if !item.Healthy {
-			installed += " / REPAIR NEEDED"
-			installedColor = palette.error
-		}
-	}
-	text(frame, 258, y, installedColor, installed)
-	y += 18
-	if item.HealthReason != "" {
-		for index, line := range wrapText(strings.ToUpper(item.HealthReason), 48) {
-			if index == 2 {
-				break
-			}
-			text(frame, 258, y, palette.error, line)
-			y += 15
-		}
-		y += 3
-	}
-	for _, line := range wrapText(strings.ToUpper(item.Package.Summary), 48) {
-		text(frame, 258, y, palette.text, line)
-		y += 15
-	}
+	text(frame, 258, 84, palette.muted, "VERSION "+strings.ToUpper(item.Package.Version)+"  |  "+strings.ToUpper(item.Package.Type))
+	next := drawBadge(frame, 258, 94, trustLabel(item), trustColor(item))
+	drawBadge(frame, next+8, 94, installState(item), statusColor(item))
+	y := 132
 	if model.Error != "" {
 		drawActions(frame, model, item, controls)
 		return
 	}
-	y += 12
-	text(frame, 258, y, palette.muted, "TRUST AND COMPATIBILITY")
-	y += 18
-	statusColor := palette.warning
-	if item.Compatible {
-		statusColor = palette.accent
-	}
-	for _, line := range wrapText(strings.ToUpper(item.Compatibility), 48) {
-		text(frame, 258, y, statusColor, line)
-		y += 15
-	}
-	if len(item.Package.Review.Notes) > 0 {
-		y += 10
-		text(frame, 258, y, palette.muted, "REVIEW NOTE")
-		y += 18
-		for _, line := range wrapText(strings.ToUpper(item.Package.Review.Notes[0]), 48) {
-			text(frame, 258, y, palette.text, line)
-			y += 15
-			if y > 245 {
-				break
-			}
+	if model.Focus == storeui.Browse {
+		drawWrapped(frame, 258, y, palette.text, item.Package.Summary, 48, 2)
+		if item.HealthReason != "" {
+			text(frame, 258, 184, palette.error, "ISSUE - OPEN DETAILS FOR THE HEALTH CHECK")
+		} else {
+			text(frame, 258, 184, palette.muted, "CONFIRM: OPEN ACTIONS AND DETAILS")
 		}
+		drawActions(frame, model, item, controls)
+		return
+	}
+	text(frame, 258, y, palette.muted, "COMPATIBILITY")
+	y += 18
+	y = drawWrapped(frame, 258, y, compatibilityColor(item), item.Compatibility, 48, 4)
+	notice := item.HealthReason
+	noticeColor := palette.error
+	if notice == "" && item.Package.Install != nil {
+		notice = item.Package.Install.Warning
+		noticeColor = palette.warning
+	}
+	if notice == "" && len(item.Package.Review.Notes) > 0 {
+		notice = item.Package.Review.Notes[0]
+		noticeColor = palette.text
+	}
+	if notice != "" && y < 235 {
+		text(frame, 258, y+3, palette.muted, "NOTICE")
+		drawWrapped(frame, 258, y+21, noticeColor, notice, 48, 2)
 	}
 	drawActions(frame, model, item, controls)
 }
 
-func reviewLabel(pkg manifest.Package) string {
-	if pkg.Review.Approval != nil {
-		return "APPROVED / " + strings.ToUpper(pkg.Review.Status)
+func trustLabel(item appstore.Item) string {
+	if item.DeviceTested && item.Package.Review.Status != "verified" {
+		return "DEVICE TESTED"
 	}
-	return strings.ToUpper(pkg.Review.Status)
+	switch item.Package.Review.Status {
+	case "verified":
+		return "VERIFIED"
+	case "experimental":
+		return "EXPERIMENTAL"
+	case "installable":
+		return "REVIEWED"
+	default:
+		return "CANDIDATE"
+	}
+}
+
+func installState(item appstore.Item) string {
+	if item.Installed {
+		if !item.Healthy {
+			return "ISSUE"
+		}
+		return "INSTALLED"
+	}
+	if item.PreExisting {
+		return "ADOPT"
+	}
+	if item.Compatible && item.Package.Installable() {
+		return "AVAILABLE"
+	}
+	return "BLOCKED"
+}
+
+func rowTrustLabel(item appstore.Item) string {
+	if item.DeviceTested && item.Package.Review.Status != "verified" {
+		return "TESTED"
+	}
+	return trustLabel(item)
+}
+
+func trustColor(item appstore.Item) color.Color {
+	if item.Package.Review.Status == "verified" || item.DeviceTested {
+		return palette.accent
+	}
+	return palette.warning
+}
+
+func statusColor(item appstore.Item) color.Color {
+	if item.Installed && !item.Healthy {
+		return palette.error
+	}
+	if item.Compatible || item.Installed {
+		return palette.accent
+	}
+	return palette.warning
+}
+
+func compatibilityColor(item appstore.Item) color.Color {
+	if item.Compatible {
+		return palette.accent
+	}
+	return palette.warning
+}
+
+func drawBadge(frame *image.RGBA, x, y int, label string, shade color.Color) int {
+	label = " " + strings.ToUpper(label) + " "
+	width := len(label)*7 + 6
+	fill(frame, image.Rect(x, y, x+width, y+21), palette.selected)
+	text(frame, x+3, y+15, shade, label)
+	return x + width
+}
+
+func drawWrapped(frame *image.RGBA, x, y int, shade color.Color, value string, width, limit int) int {
+	for index, line := range wrapText(strings.ToUpper(value), width) {
+		if index == limit {
+			break
+		}
+		text(frame, x, y, shade, line)
+		y += 15
+	}
+	return y
 }
 
 func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item, controls *storeinput.Session) {
@@ -339,7 +384,7 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item, co
 		text(frame, 258, y, palette.warning, "READ ONLY - REVIEW REQUIRED")
 		return
 	}
-	text(frame, 258, y-14, palette.muted, "AVAILABLE ACTIONS")
+	text(frame, 258, y-14, palette.muted, "ACTIONS")
 	x := 258
 	for index, action := range item.Actions {
 		label := " " + strings.ToUpper(string(action)) + " "
@@ -354,9 +399,9 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item, co
 	}
 	if model.Focus == storeui.Confirm {
 		action := item.Actions[model.Action]
-		if item.Package.Experimental() && (action == appstore.Install || action == appstore.Adopt) {
+		if item.Package.Install != nil && item.Package.Install.Warning != "" && (action == appstore.Install || action == appstore.Adopt) {
 			fill(frame, image.Rect(250, 108, 616, 318), color.RGBA{R: 35, G: 46, B: 64, A: 255})
-			text(frame, 266, 132, palette.warning, "EXPERIMENTAL PACKAGE TEST")
+			text(frame, 266, 132, trustColor(item), "PACKAGE NOTICE  |  "+trustLabel(item))
 			text(frame, 266, 151, palette.text, strings.ToUpper(string(action))+" "+shorten(strings.ToUpper(item.Package.Name), 24)+"?")
 			warning := strings.ToUpper(item.Package.Install.Warning)
 			for index, line := range wrapText(warning, 40) {

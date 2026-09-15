@@ -8,13 +8,13 @@
   "repository": "https://github.com/rommapp/grout",
   "license": "MIT",
   "review": {
-    "status": "experimental",
+    "status": "verified",
     "approval": {
       "provenance": "community"
     },
     "notes": [
-      "Experimental TrimUI Smart Pro test package; upstream names this device but no minimum Knulli version or linked test report is claimed.",
-      "Do not use Grout's built-in updater during this test. It cannot be disabled through a supported setting; use Knulli App Store for repair or future updates.",
+      "Real-device validation is limited to Grout 5.1.0.0 on TrimUI Smart Pro with Knulli Scarab. The tester reported only that the test was all good; individual lifecycle steps were not reported.",
+      "Do not use Grout's built-in updater. It cannot be disabled through a supported setting; use Knulli App Store for repair or future updates.",
       "The manager preserves and backs up pre-existing config.json, save_slots.json, cache, logs, and unknown files before adoption.",
       "MagicX Zero 28 remains blocked: the tagged Knulli release does not establish MagicX orientation, input handling, SDL ABI, or readable 640x480 behavior."
     ],
@@ -42,6 +42,19 @@
         "kind": "filesystem-and-network-review",
         "url": "https://github.com/rommapp/grout/blob/v5.1.0.0/cfw/knulli/knulli.go",
         "note": "Reviewed paths are /userdata/roms/tools/Grout, /userdata/roms/tools/.update, /userdata/roms/tools/gamelist.xml, /userdata/roms, /userdata/bios, and /userdata/saves. Network access is required for RomM and updates. The launcher executes local files; the binary updater checks a supplied SHA-256 before staging release code."
+      },
+      {
+        "kind": "real-device-test",
+        "url": "https://github.com/jellydn/knulli-app-store/blob/main/docs/real-device-tests.md",
+        "note": "Tester reported 'Tested Grout and Playtime. All good.' The report did not itemize lifecycle steps.",
+        "tester": "Dung Huynh Duc",
+        "date": "2026-09-15",
+        "package_version": "5.1.0.0",
+        "firmware": "knulli",
+        "architecture": "aarch64",
+        "device": "trimui-smart-pro",
+        "resolution": "1280x720",
+        "result": "passed"
       }
     ]
   },
@@ -55,6 +68,7 @@
   },
   "compatibility": {
     "firmware": "knulli",
+    "minimum_version": "scarab",
     "architectures": ["aarch64"],
     "devices": ["trimui-smart-pro"],
     "resolutions": ["1280x720"]
@@ -64,7 +78,7 @@
     "strip_components": 1,
     "launcher": "Grout.sh",
     "executables": ["Grout.sh", "grout"],
-    "warning": "Unverified. Do not use Grout updater. Update only through Knulli App Store.",
+    "warning": "Do not use Grout updater. Update only through Knulli App Store.",
     "preserve": ["config.json", "save_slots.json", ".cache", "logs"],
     "network": true,
     "allowed_write_paths": [

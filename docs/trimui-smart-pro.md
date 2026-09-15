@@ -48,7 +48,7 @@ The launcher appends diagnostics to `/userdata/system/logs/knulli-app-store.log`
 
 ## Experimental package operations
 
-Only Grout 5.1.0.0 and PlayTime 1.0.0 are actionable. Select **Install** for a new copy or **Adopt** when the destination already exists, then read and confirm the experimental warning. Adoption inventories all regular files before download. Files that match the reviewed release hash become manager-owned. Changed and unknown files are backed up under `/userdata/system/knulli-app-store/originals/<package-id>/` before replacement. State is stored under `/userdata/system/knulli-app-store/installed/`.
+Only Grout 5.1.0.0 and PlayTime 1.0.0 are actionable. Grout is verified for this Smart Pro matrix. PlayTime remains experimental because MagicX is untested. Select **Install** for a new copy or **Adopt** when the destination already exists, then read the package notice. Adoption inventories all regular files before download. Files that match the reviewed release hash become manager-owned. Changed and unknown files are backed up under `/userdata/system/knulli-app-store/originals/<package-id>/` before replacement. State is stored under `/userdata/system/knulli-app-store/installed/`.
 
 The manager restores execute mode only on reviewed paths. PlayTime needs `playtime` and `playtime.sh` to be executable so Knulli can start the launcher and its local binary. Grout needs `Grout.sh` and `grout` for the same reason. No downloaded script is executed during installation.
 
@@ -83,8 +83,7 @@ If SDL exposes no GameController, the setup screen stays blocked, automatically 
 - Confirm the footer shows the active semantic controls and mapping source; record the log if no controller appears.
 - Open Settings with its displayed physical label, export diagnostics, and inspect the bundle for platform and mapping decisions. Do not send it if manual inspection finds private data.
 - Confirm the header shows `TRIMUI SMART PRO / 1280X720`. Unknown boards must show `UNKNOWN DEVICE`, and failed runtime-size detection must identify its fallback.
-- Confirm Grout and PlayTime show `APPROVED / EXPERIMENTAL`; the other four packages remain read-only.
-- Confirm EmuDrop shows the ROM copyright warning and remains `APPROVED / CANDIDATE`.
+- Confirm Grout shows `VERIFIED`, PlayTime shows its Smart Pro test state, and the other three packages remain read-only.
 - Confirm returning to EmulationStation works and a second launch also works.
 - Confirm Wi-Fi disabled and enabled produce the same catalogue because this artifact reads its bundled index.
 - Send the log, firmware version, observed controls, and a photo or screenshot with the result. Do not include credentials or private network data.
@@ -107,7 +106,7 @@ After this checklist passes, add linked `real-device-test` evidence for the GUI 
 4. Run Uninstall and confirm managed files are gone while the preserved paths remain.
 5. If Grout existed before this test, repeat through Adopt and confirm credentials and configuration remain.
 
-Report install, launch, core function, Repair, Uninstall, and adoption results separately for each package. Until all relevant checks pass on hardware, both packages remain unverified.
+Report install, launch, core function, Repair, Uninstall, and adoption results separately for each package. The current report says both package tests were good but does not itemize these steps. PlayTime stays experimental until its MagicX matrix is tested.
 
 ## Firmware-fix reproduction
 

@@ -1,6 +1,18 @@
 # Knulli App Store
 
-Knulli App Store is an early, safety-focused package manager for community Knulli utilities, themes, and integrations. It combines a reviewable catalogue, a transactional headless installer, and an experimental controller UI that uses the same installer interface.
+## What
+
+[Knulli App Store](https://github.com/jellydn/knulli-app-store) is a safe community package manager for [Knulli](https://knulli.org/) utilities, themes, and integrations. It has a reviewable catalogue, a transactional installer, and a controller-only SDL2 interface.
+
+The catalogue currently has five packages. [Grout 5.1.0.0](https://github.com/rommapp/grout) is verified only on TrimUI Smart Pro. [PlayTime 1.0.0](https://github.com/unitreign/playtime) has a successful Smart Pro report but stays experimental because MagicX Zero 28 is not yet package-tested.
+
+## Why
+
+Package operations can damage user data. The installer verifies immutable releases, limits writes, preserves declared data, records ownership, and rolls back failed operations. It never runs a remote install script. See the [security model](docs/security-model.md) and [architecture](docs/architecture.md).
+
+## How
+
+Download the newest device build from [GitHub Actions](https://github.com/jellydn/knulli-app-store/actions/workflows/check.yml), then follow the [TrimUI Smart Pro](docs/trimui-smart-pro.md) or [MagicX Zero 28](docs/magicx-zero-28.md) installation guide. Package evidence is in the [manifest review guide](docs/manifest-review.md) and [real-device test record](docs/real-device-tests.md).
 
 ## Current scope
 
@@ -10,14 +22,9 @@ Knulli App Store is an early, safety-focused package manager for community Knull
 - ZIP and `tar.gz` release archives, up to 512 MiB compressed and installed
 - Writes below `/userdata` only
 
-The experimental GUI is functional on one community-tested TrimUI Smart Pro. A real MagicX diagnostic confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController `magicx-input`; full GUI testing is still incomplete. PlayTime 1.0.0 is now a user-authorized experimental package on both devices. Grout 5.1.0.0 remains Smart Pro only. Neither package is verified.
+The GUI is functional on one community-tested TrimUI Smart Pro. A real MagicX diagnostic confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController `magicx-input`; full GUI testing is still incomplete. Grout remains unsupported on MagicX. PlayTime remains experimental there.
 
-PortMaster is a featured external provider. Users open it through Knulli's official install and launch mechanism. This repository does not copy the PortMaster catalogue or implement another PortMaster installer. ROM-download sources, including EmuDrop, are outside the official catalogue policy.
-EmuDrop is one explicit community-approved exception. It remains non-installable and displays a copyright warning. This exception does not permit other ROM-download sources.
-
-## Why the installer comes first
-
-Package operations can damage user data even when a user interface looks safe. The command-line core makes compatibility checks, download verification, extraction, rollback, and uninstall behavior testable without SDL or a device display. See [Architecture](docs/architecture.md) and [Security model](docs/security-model.md).
+PortMaster is a featured external provider. Users open it through Knulli's official install and launch mechanism. This repository does not copy the PortMaster catalogue or implement another PortMaster installer. ROM-download sources are outside the official catalogue policy.
 
 ## Build and check
 
@@ -61,13 +68,12 @@ The installer never runs remote install scripts. It only copies regular files fr
 
 ## Catalogue status
 
-The catalogue contains two experimental packages and four non-actionable candidates. Community approval records provenance separately from technical and real-device status.
+The catalogue contains one verified package, one experimental package, and three non-actionable candidates. Community approval records provenance separately from technical and real-device status.
 
 | Package | Status | Remaining blocker |
 | --- | --- | --- |
-| EmuDrop | Community approved | No license; launch-time updater bypasses manager verification and rollback; ROM/copyright risk |
-| PlayTime 1.0.0 | Experimental test on Smart Pro and MagicX | Smart Pro install and launch passed; tracking, relaunch, repair, adoption, and uninstall are not complete; no MagicX package result |
-| Grout 5.1.0.0 | Experimental test | No linked Smart Pro result or minimum Knulli version; built-in updater cannot be disabled |
+| PlayTime 1.0.0 | Smart Pro tested; MagicX experimental | The Smart Pro report did not itemize lifecycle steps; no MagicX package result |
+| Grout 5.1.0.0 | Verified on Smart Pro | The report was positive but did not itemize lifecycle steps; built-in updater must not be used |
 | RAOfflineProxy | Not approved | Knulli asset is an unrestricted install script with no publisher checksum |
 | ETK Tool | Not approved | Release is script-based; system-space behavior is outside the initial policy |
 | PocketCurator | Not approved | A checksum exists, but the repository has no declared license; paths and device behavior are not tested |

@@ -21,59 +21,106 @@ import (
 )
 
 func TestRenderRepresentativeStates(t *testing.T) {
-	item := appstore.Item{
+	issue := appstore.Item{
 		Package:   manifest.Package{ID: "org.example.demo", Name: "Demo Utility", Type: "utility", Summary: "A safe package used to verify action and error layouts.", Review: manifest.Review{Status: "installable"}},
 		Installed: true, InstalledVersion: "1.0.0", Healthy: false, Compatible: true,
 		HealthReason: "mode changed: /userdata/roms/tools/Demo/demo (expected 0755, got 0644)", Compatibility: "Compatible with detected platform", Actions: []appstore.Action{appstore.Repair, appstore.Uninstall},
 	}
-	experimental := appstore.Item{
+	verified := appstore.Item{
 		Package: manifest.Package{
 			ID: "app.romm.grout", Name: "Grout", Type: "integration", Summary: "Connects a Linux retro handheld to a RomM server.",
-			Review:  manifest.Review{Status: "experimental", Approval: &manifest.Approval{Provenance: "community"}},
-			Install: &manifest.Install{Warning: "Unverified. Do not use Grout updater. Update only through Knulli App Store."},
+			Version: "5.1.0.0", Review: manifest.Review{Status: "verified", Approval: &manifest.Approval{Provenance: "community"}},
+			Install: &manifest.Install{Warning: "Do not use Grout updater. Update only through Knulli App Store."},
 		},
-		PreExisting: true, Compatible: true, Compatibility: "Experimental compatibility: Knulli identity confirmed from /etc/os-release:OS_NAME; no minimum version is claimed; device=trimui-smart-pro architecture=aarch64 resolution=1280x720 source=SDL renderer output version=scarab", Actions: []appstore.Action{appstore.Adopt},
+		Installed: true, InstalledVersion: "5.1.0.0", Healthy: true, DeviceTested: true, Compatible: true, Compatibility: "Compatible with detected platform", Actions: []appstore.Action{appstore.Uninstall, appstore.Repair},
+	}
+	experimental := appstore.Item{
+		Package: manifest.Package{
+			ID: "io.github.unitreign.playtime", Name: "PlayTime", Version: "1.0.0", Type: "utility", Summary: "Tracks game play time on Knulli.",
+			Review: manifest.Review{Status: "experimental", Approval: &manifest.Approval{Provenance: "community"}}, Install: &manifest.Install{Warning: "Unverified experimental test. Existing files are backed up."},
+		},
+		DeviceTested: true, Compatible: true, Compatibility: "Experimental compatibility on this device; no minimum version is claimed", Actions: []appstore.Action{appstore.Install},
 	}
 	incompatible := experimental
-	incompatible.PreExisting = false
 	incompatible.Compatible = false
 	incompatible.Actions = nil
 	incompatible.Compatibility = `compatibility failed field=firmware: detected device="trimui-smart-pro" architecture="aarch64" resolution="1280x720" firmware_raw="buildroot" firmware="" firmware_source="/etc/os-release:ID"; package requires firmware="knulli"`
-	emuDrop := appstore.Item{
-		Package: manifest.Package{
-			ID: "io.github.ahmadteeb.emudrop", Name: "EmuDrop", Type: "utility", Summary: "Browses third-party sources and downloads ROM files and artwork.",
-			Review: manifest.Review{
-				Status: "candidate", Approval: &manifest.Approval{Provenance: "community"},
-				Notes: []string{"WARNING: ROM downloads can infringe copyright. Users must confirm that each download is lawful in their jurisdiction and that they have the required rights."},
-			},
-		},
-		Compatibility: "Community approved; installation is blocked by technical review",
+	candidate := appstore.Item{
+		Package:       manifest.Package{ID: "io.github.example.candidate", Name: "Candidate Tool", Type: "utility", Summary: "Metadata is still under review.", Review: manifest.Review{Status: "candidate"}},
+		Compatibility: "Candidate: compatibility is not approved",
 	}
 	states := map[string]*storeui.Model{
-		"browse":              {Items: []appstore.Item{emuDrop}},
-		"compatibility-error": {Items: []appstore.Item{incompatible}},
+		"catalogue":           {Items: []appstore.Item{verified, experimental, candidate}},
+		"details":             {Items: []appstore.Item{experimental}, Focus: storeui.Actions},
+		"installed-healthy":   {Items: []appstore.Item{verified}},
+		"verified":            {Items: []appstore.Item{verified}, Focus: storeui.Actions},
+		"experimental":        {Items: []appstore.Item{experimental}, Focus: storeui.Actions},
+		"issue":               {Items: []appstore.Item{issue}},
+		"issue-details":       {Items: []appstore.Item{issue}, Focus: storeui.Actions},
+		"compatibility-error": {Items: []appstore.Item{incompatible}, Focus: storeui.Actions},
 		"confirm":             {Items: []appstore.Item{experimental}, Focus: storeui.Confirm},
+		"verified-confirm":    {Items: []appstore.Item{{Package: verified.Package, Compatible: true, Actions: []appstore.Action{appstore.Install}}}, Focus: storeui.Confirm},
 		"diagnostics":         {Items: []appstore.Item{experimental}, Message: "Diagnostics saved to /userdata/system/knulli-app-store/diagnostics/knulli-app-store-diagnostics-20260915T073500Z.txt"},
-		"error":               {Items: []appstore.Item{item}, Error: "SHA-256 mismatch; package files were not changed"},
+		"error":               {Items: []appstore.Item{issue}, Error: "SHA-256 mismatch; package files were not changed"},
 		"progress":            {Items: []appstore.Item{experimental}, Busy: true, Message: "Downloading, verifying, and applying Grout"},
 	}
-	controls := storeinput.NewSession(t.TempDir(), "trimui-smart-pro")
-	controls.Connected = true
-	controls.Source = "Knulli SDL_GAMECONTROLLERCONFIG"
-	controls.Mode = storeinput.Normal
 	directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR")
-	for name, model := range states {
-		frame := draw(model, "TrimUI Smart Pro / 1280x720", controls)
-		if frame.Bounds().Dx() != canvasWidth || frame.Bounds().Dy() != canvasHeight {
-			t.Fatalf("%s frame has unexpected bounds %v", name, frame.Bounds())
+	for _, device := range []string{"trimui-smart-pro", "magicx-zero-28"} {
+		controls := storeinput.NewSession(t.TempDir(), device)
+		controls.Connected = true
+		controls.Source = "Knulli SDL_GAMECONTROLLERCONFIG"
+		controls.Mode = storeinput.Normal
+		controls.Message = ""
+		width, height := targetSize(device)
+		for name, model := range states {
+			for index := range model.Items {
+				if model.Items[index].Package.ID == "io.github.unitreign.playtime" {
+					model.Items[index].DeviceTested = device == "trimui-smart-pro"
+				}
+			}
+			frame := draw(model, platformHeader(device), controls)
+			output := renderOutput(frame, width, height)
+			if frame.Bounds() != image.Rect(0, 0, canvasWidth, canvasHeight) || output.Bounds() != image.Rect(0, 0, width, height) {
+				t.Fatalf("%s/%s has unexpected bounds: frame=%v output=%v", device, name, frame.Bounds(), output.Bounds())
+			}
+			if directory != "" {
+				if err := os.MkdirAll(directory, 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := saveOutputScreenshot(filepath.Join(directory, device+"-gui-"+name+".png"), frame, width, height); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		controls.Mode = storeinput.Settings
+		controls.Message = "Controller settings"
+		settings := draw(&storeui.Model{}, platformHeader(device), controls)
+		if output := renderOutput(settings, width, height); output.Bounds() != image.Rect(0, 0, width, height) {
+			t.Fatalf("%s settings has unexpected bounds %v", device, output.Bounds())
 		}
 		if directory != "" {
-			if err := os.MkdirAll(directory, 0755); err != nil {
+			if err := saveOutputScreenshot(filepath.Join(directory, device+"-gui-settings.png"), settings, width, height); err != nil {
 				t.Fatal(err)
 			}
-			if err := saveScreenshot(filepath.Join(directory, "trimui-smart-pro-gui-"+name+".png"), frame); err != nil {
-				t.Fatal(err)
-			}
+		}
+	}
+}
+
+func TestCompactLabelsAndRequiredNotices(t *testing.T) {
+	verified := manifest.Package{Review: manifest.Review{Status: "verified"}, Install: &manifest.Install{Warning: "Do not use the updater."}}
+	experimental := manifest.Package{Review: manifest.Review{Status: "experimental"}, Install: &manifest.Install{Warning: "Unverified test."}}
+	if trustLabel(appstore.Item{Package: verified}) != "VERIFIED" || trustLabel(appstore.Item{Package: experimental}) != "EXPERIMENTAL" || trustLabel(appstore.Item{Package: experimental, DeviceTested: true}) != "DEVICE TESTED" {
+		t.Fatal("trust labels do not separate verified and experimental packages")
+	}
+	if got := installState(appstore.Item{Package: verified, Installed: true, Healthy: true}); got != "INSTALLED" {
+		t.Fatalf("healthy install label = %q", got)
+	}
+	if got := installState(appstore.Item{Package: verified, Installed: true, Healthy: false}); got != "ISSUE" {
+		t.Fatalf("unhealthy install label = %q", got)
+	}
+	for _, pkg := range []manifest.Package{verified, experimental} {
+		if pkg.Install.Warning == "" || len(wrapText(strings.ToUpper(pkg.Install.Warning), 40)) > 2 {
+			t.Fatalf("required package notice is not concise and visible: %#v", pkg.Install)
 		}
 	}
 }

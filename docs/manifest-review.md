@@ -9,6 +9,8 @@
 
 `review.approval` is separate from these technical states. Community approval permits catalogue inclusion, but it does not provide compatibility evidence, enable installation, or grant a verified badge.
 
+`real-device-test` evidence records the tester, date, exact package version, firmware, architecture, device, resolution, and passed result. A mixed device matrix can show a tested device without marking an untested device as verified.
+
 ## Promotion checklist
 
 1. Confirm the repository belongs to the project or documented maintainer.

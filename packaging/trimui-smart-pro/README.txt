@@ -38,10 +38,11 @@ Mappings are stored by device and controller identity under:
 
 CURRENT SAFETY STATE
 
-Grout 5.1.0.0 and PlayTime 1.0.0 are explicit experimental test packages for
-TrimUI Smart Pro. They require a risk confirmation and are not verified.
+Grout 5.1.0.0 is verified only for TrimUI Smart Pro. PlayTime 1.0.0 has a
+successful Smart Pro report but remains experimental because MagicX is not
+package-tested. Package notices still apply.
 Existing copies show ADOPT; adoption inventories and backs up uncertain files
-before installing the reviewed release. The other four packages are read-only.
+before installing the reviewed release. The other three packages are read-only.
 
 Do not use Grout's built-in updater. Use App Store Repair and future reviewed
 updates only. Grout config stays under /userdata/roms/tools/Grout. PlayTime
@@ -52,9 +53,6 @@ lists or reboot after package install or uninstall.
 Health checks cover immutable managed release files. PlayTime runtime data does
 not cause Repair. If Repair appears, package details and the application log
 show the exact missing, changed, or mode-mismatched managed path.
-
-EmuDrop remains non-installable. It downloads ROMs; users must have the
-required rights and comply with local copyright law.
 
 TROUBLESHOOTING
 
