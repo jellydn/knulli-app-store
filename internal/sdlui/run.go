@@ -181,7 +181,7 @@ func logResolutionCandidates(logger *diagnostics.Log, assessments []platform.Res
 func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, controller **controllerState, controls *storeinput.Session, logger *diagnostics.Log) bool {
 	switch C.event_type(event) {
 	case C.SDL_QUIT:
-		return true
+		return Handle(ctx, model, controls, logger, Event{Kind: EventQuit}).Exit
 	case C.SDL_KEYDOWN:
 		if C.event_key_repeat(event) != 0 {
 			return false
@@ -212,20 +212,18 @@ func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, 
 		if controls.FirstRun {
 			mapping = storeinput.AutoMapping()
 		}
-		return processButton(ctx, model, controls, mapping[action], logger)
+		return Handle(ctx, model, controls, logger, Event{Kind: EventButton, Button: int(mapping[action])}).Exit
 	case C.SDL_CONTROLLERBUTTONDOWN:
 		if *controller == nil || C.event_controller_which(event) != (*controller).instanceID {
 			return false
 		}
-		return processButton(ctx, model, controls, int(C.event_controller_button(event)), logger)
+		return Handle(ctx, model, controls, logger, Event{Kind: EventButton, Button: int(C.event_controller_button(event))}).Exit
 	case C.SDL_CONTROLLERDEVICEREMOVED:
 		if *controller != nil && C.event_device_which(event) == (*controller).instanceID {
 			logger.Event("controller_disconnected", "name", (*controller).identity.Name, "guid", (*controller).identity.GUID)
 			C.SDL_GameControllerClose((*controller).handle)
 			*controller = nil
-			beforeMode, beforeSource := controls.Mode, controls.Source
-			controls.Disconnect()
-			logControllerTransition(logger, controls, beforeMode, beforeSource)
+			Handle(ctx, model, controls, logger, Event{Kind: EventControllerRemoved})
 		}
 	case C.SDL_CONTROLLERDEVICEADDED:
 		if *controller == nil {
@@ -275,62 +273,6 @@ func connectController(controls *storeinput.Session, controller *controllerState
 func startupOverride(controller *controllerState, mapping storeinput.Mapping) bool {
 	return C.controller_button(controller.handle, C.int(mapping[storeinput.Back])) != 0 &&
 		C.controller_button(controller.handle, C.int(mapping[storeinput.Diagnostics])) != 0
-}
-
-func processButton(ctx context.Context, model *storeui.Model, controls *storeinput.Session, button int, logger *diagnostics.Log) bool {
-	beforeMode := controls.Mode
-	beforeSource := controls.Source
-	beforeError := controls.ValidationError
-	beforeIndex, beforeTested := setupProgress(controls)
-	action, effect := controls.HandleButton(button)
-	afterIndex, afterTested := setupProgress(controls)
-	logControllerTransition(logger, controls, beforeMode, beforeSource)
-	if afterIndex != beforeIndex && afterIndex >= 0 {
-		logger.Event("controller_setup_progress", "completed", fmt.Sprint(afterIndex), "total", fmt.Sprint(len(storeinput.Actions)))
-	}
-	if afterTested != beforeTested && afterTested >= 0 {
-		logger.Event("controller_preview_progress", "tested", fmt.Sprint(afterTested), "total", fmt.Sprint(len(storeinput.Actions)))
-	}
-	if controls.ValidationError != "" && controls.ValidationError != beforeError {
-		logger.Event("controller_mapping_validation_failed", "error", controls.ValidationError)
-	}
-	if action != "" {
-		logger.Event("controller_semantic_action", "action", string(action), "screen", string(beforeMode))
-	}
-	if effect == storeinput.ExportDiagnostics {
-		logger.Event("controller_setup_action", "action", "export-diagnostics")
-		model.ExportDiagnostics(ctx)
-	}
-	return dispatchAction(ctx, model, action)
-}
-
-func logControllerTransition(logger *diagnostics.Log, controls *storeinput.Session, beforeMode storeinput.Mode, beforeSource string) {
-	if controls.Mode != beforeMode || controls.Source != beforeSource {
-		logger.Event("controller_screen_transition", "from", string(beforeMode), "to", string(controls.Mode), "mapping_source", controls.Source, "message", controls.Message)
-	}
-}
-
-func setupProgress(controls *storeinput.Session) (int, int) {
-	if controls.Calibration == nil {
-		return -1, -1
-	}
-	return controls.Calibration.Index, len(controls.Calibration.Tested)
-}
-
-func dispatchAction(ctx context.Context, model *storeui.Model, action storeinput.Action) bool {
-	switch action {
-	case storeinput.Up, storeinput.Left:
-		model.Move(-1)
-	case storeinput.Down, storeinput.Right:
-		model.Move(1)
-	case storeinput.Confirm:
-		model.Select(ctx)
-	case storeinput.Back:
-		return model.Back()
-	case storeinput.Exit:
-		return true
-	}
-	return false
 }
 
 func selectedOutputSize(resolution string) (int, int) {
