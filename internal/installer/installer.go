@@ -83,6 +83,9 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 		return err
 	}
 	defer releaseLock(lock)
+	if err := safefs.Recover(m.root(), managerHost); err != nil {
+		return err
+	}
 
 	old, err := loadState(baseGuard, pkg.ID)
 	if err != nil {
@@ -390,6 +393,9 @@ func (m Manager) UninstallContext(ctx context.Context, id string) (result error)
 		return err
 	}
 	defer releaseLock(lock)
+	if err := safefs.Recover(m.root(), managerHost); err != nil {
+		return err
+	}
 	state, err := loadState(baseGuard, id)
 	if err != nil {
 		return err

@@ -10,12 +10,6 @@
 - Impact: A replaced `catalog-index.json` on device is not cryptographically authenticated by this project
 - Fix approach: Add signing and key distribution in the trusted release workflow before calling the index trusted
 
-**Power-loss journal is missing:**
-- Issue: Transactions roll back in-process; restart after power loss is not recovered from a journal
-- Files: `internal/safefs/transaction.go`, `docs/security-model.md`
-- Impact: A kill during commit can leave backups and partial state that need manual repair
-- Fix approach: Persist a journal before mutation and resume or roll back on next start
-
 ## Known Bugs
 
 **No tracked FIXME/TODO in source:**
@@ -120,10 +114,6 @@
 - Problem: index is deterministic but unsigned
 - Blocks: treating device `catalog-index.json` as a trusted distribution artifact
 
-**Crash journal:**
-- Problem: no restart recovery for interrupted transactions
-- Blocks: guaranteed rollback after power loss
-
 **Package runtime sandbox:**
 - Problem: installed programs are not confined
 - Blocks: running untrusted upstream code safely
@@ -146,10 +136,10 @@
 - Risk: operators must pass flags when detection is incomplete
 - Priority: Medium
 
-**Index signing and journal recovery:**
-- What's not tested: absent features
-- Files: `internal/catalog/catalog.go`, `internal/safefs/transaction.go`
-- Risk: operators may over-trust generated artifacts and crash behavior
+**Index signing:**
+- What's not tested: absent feature
+- Files: `internal/catalog/catalog.go`
+- Risk: operators may over-trust a replaced `catalog-index.json` on device
 - Priority: High before a non-experimental release
 
 ---

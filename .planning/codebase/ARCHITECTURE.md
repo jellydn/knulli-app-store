@@ -31,7 +31,7 @@
 **Safe filesystem and archives:**
 - Purpose: bound extraction and destination mutation
 - Location: `internal/archive`, `internal/safefs`
-- Contains: ZIP/`tar.gz` extractors, symlink rejection, atomic writes, transactions
+- Contains: ZIP/`tar.gz` extractors, symlink rejection, atomic writes, journaled transactions
 - Depends on: stdlib archive packages
 - Used by: `internal/installer`
 

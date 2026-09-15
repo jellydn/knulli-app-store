@@ -22,7 +22,7 @@
 - Reviewable catalogue with separate community approval and technical status
 - Transactional installer that never runs a remote install script
 - Immutable HTTPS releases with exact size and SHA-256 checks
-- Writes below `/userdata` only, with snapshots and rollback
+- Writes below `/userdata` only, with snapshots, a crash journal, and rollback
 - Controller-only SDL2 GUI for TrimUI Smart Pro (1280×720) and MagicX Zero 28 (640×480)
 - Static `aarch64` CLI for review, install, repair, and uninstall
 - PortMaster as a featured external provider. This repo does not copy that catalogue

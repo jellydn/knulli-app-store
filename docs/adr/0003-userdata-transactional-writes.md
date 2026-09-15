@@ -9,7 +9,7 @@ Package operations can damage ROMs, saves, configuration, and EmulationStation m
 
 ## Decision
 
-Allow writes only below `/userdata`. Resolve every destination through `internal/safefs`, reject symlink path components, and stage archives before any destination mutation. Record each change in a transaction, write installed state last, and restore snapshots in reverse order on failure. Preserve declared configuration during repair, update, and uninstall. Own a menu entry only when the installer created an unchanged exact launch path. After a committed menu change, ask Knulli's loopback `/reloadgames` endpoint to queue a refresh; if that request is not accepted, report restart required and leave the operation committed.
+Allow writes only below `/userdata`. Resolve every destination through `internal/safefs`, reject symlink path components, and stage archives before any destination mutation. Record each change in a transaction, persist a journal before destination mutation, write installed state last, and restore snapshots in reverse order on failure. On the next locked operation, roll back any open journal and discard a committed leftover directory. Preserve declared configuration during repair, update, and uninstall. Own a menu entry only when the installer created an unchanged exact launch path. After a committed menu change, ask Knulli's loopback `/reloadgames` endpoint to queue a refresh; if that request is not accepted, report restart required and leave the operation committed.
 
 Health checks compare immutable managed files with the mode observed after copy, not only the requested staging mode. Runtime files outside the release inventory stay unmanaged.
 
@@ -23,7 +23,7 @@ Health checks compare immutable managed files with the mode observed after copy,
 
 ### Negative
 
-- Power loss is not journal-recovered across process restarts.
+- A corrupt journal blocks the next locked operation until the operator inspects the leftover transaction directory.
 - Empty directories can remain after rollback or uninstall.
 - Path checks do not defend against a hostile local process that races a checked directory into a symlink.
 - Root can still change files below approved `/userdata` paths.
