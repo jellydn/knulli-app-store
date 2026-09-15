@@ -45,7 +45,8 @@ var palette = struct {
 func draw(model *storeui.Model, platformName string, controls *storeinput.Session) *image.RGBA {
 	frame := image.NewRGBA(image.Rect(0, 0, canvasWidth, canvasHeight))
 	fill(frame, frame.Bounds(), palette.background)
-	text(frame, 16, 25, palette.text, "KNULLI APP STORE")
+	drawBrandMark(frame, 16, 9, 16)
+	text(frame, 38, 25, palette.text, "KNULLI APP STORE")
 	text(frame, 472, 25, palette.warning, "EXPERIMENTAL")
 	if platformName != "" {
 		text(frame, 16, 39, palette.muted, shorten(strings.ToUpper(platformName), 58))
@@ -360,6 +361,42 @@ func compatibilityColor(item appstore.Item) color.Color {
 		return palette.accent
 	}
 	return palette.warning
+}
+
+// drawBrandMark paints the 2x2 catalogue mark used in docs/assets/icon.svg.
+// The GUI is nearest-neighbour scaled, so the mark stays on whole pixels.
+func drawBrandMark(frame *image.RGBA, x, y, size int) {
+	if size < 8 {
+		fill(frame, image.Rect(x, y, x+size, y+size), palette.accent)
+		return
+	}
+	gap := size / 8
+	if gap < 1 {
+		gap = 1
+	}
+	cell := (size - gap) / 2
+	if cell < 2 {
+		fill(frame, image.Rect(x, y, x+size, y+size), palette.accent)
+		return
+	}
+	used := cell*2 + gap
+	offsetX := x + (size-used)/2
+	offsetY := y + (size-used)/2
+	cells := []image.Point{
+		{X: offsetX, Y: offsetY},
+		{X: offsetX + cell + gap, Y: offsetY},
+		{X: offsetX, Y: offsetY + cell + gap},
+		{X: offsetX + cell + gap, Y: offsetY + cell + gap},
+	}
+	for index, cellOrigin := range cells {
+		outer := image.Rect(cellOrigin.X, cellOrigin.Y, cellOrigin.X+cell, cellOrigin.Y+cell)
+		fill(frame, outer, palette.accent)
+		if index == 0 || cell < 4 {
+			continue
+		}
+		inner := image.Rect(cellOrigin.X+1, cellOrigin.Y+1, cellOrigin.X+cell-1, cellOrigin.Y+cell-1)
+		fill(frame, inner, palette.background)
+	}
 }
 
 func drawBadge(frame *image.RGBA, x, y int, label string, shade color.Color) int {

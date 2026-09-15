@@ -11,8 +11,10 @@ INSTALL OR UPDATE
 2. Shut down Knulli.
 3. Extract the versioned ZIP into /userdata/roms/ports and replace an older
    Knulli App Store launcher and knulli-app-store directory when updating.
+   Confirm images/Knulli App Store.png is present beside the launcher.
 4. Safely eject, boot, and refresh game lists or reboot.
-5. Open Knulli App Store in Ports.
+5. Open Knulli App Store in Ports. The Ports list uses that image after a
+   game list refresh.
 
 CONTROLLER SETUP
 

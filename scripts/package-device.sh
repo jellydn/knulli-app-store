@@ -23,8 +23,9 @@ case "$TARGET" in
   *) echo "unsupported package target: $TARGET" >&2; exit 2 ;;
 esac
 
+ICON="docs/assets/cover.png"
 SIG=$CATALOG.sig
-for input in "$CLI" "$UI" "$CATALOG" "$SIG"; do
+for input in "$CLI" "$UI" "$CATALOG" "$SIG" "$ICON"; do
   if [ ! -f "$input" ]; then
     echo "missing input: $input" >&2
     exit 1
@@ -35,7 +36,7 @@ WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 PORTS="$WORK/ports"
 APP="$PORTS/knulli-app-store"
-mkdir -p "$APP" "$OUTPUT_DIR"
+mkdir -p "$APP" "$PORTS/images" "$OUTPUT_DIR"
 
 install -m 0755 "$CLI" "$APP/knulli-app"
 install -m 0755 "$UI" "$APP/knulli-app-ui"
@@ -43,6 +44,7 @@ install -m 0644 "$CATALOG" "$APP/catalog-index.json"
 install -m 0644 "$SIG" "$APP/catalog-index.json.sig"
 install -m 0755 "packaging/$TARGET/Knulli App Store.sh" "$PORTS/Knulli App Store.sh"
 install -m 0644 "packaging/$TARGET/README.txt" "$PORTS/knulli-app-store/README.txt"
+install -m 0644 "$ICON" "$PORTS/images/Knulli App Store.png"
 
 ARCHIVE="$OUTPUT_DIR/knulli-app-store-$TARGET-experimental-$VERSION.zip"
 (cd "$PORTS" && find . -type f -print | LC_ALL=C sort | zip -X "$ARCHIVE" -@ >/dev/null)
