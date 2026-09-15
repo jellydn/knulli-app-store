@@ -35,7 +35,19 @@ func AtomicWrite(path string, data []byte, mode os.FileMode) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	return os.Rename(name, path)
+	if err := os.Rename(name, path); err != nil {
+		return err
+	}
+	return syncDirectory(filepath.Dir(path))
+}
+
+func syncDirectory(path string) error {
+	directory, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	return directory.Sync()
 }
 
 func Copy(source, destination string, mode os.FileMode) error {

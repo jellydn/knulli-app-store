@@ -51,6 +51,11 @@ func Begin(guard *Guard, transactionParent string) (*Transaction, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Make the journal directory durable before any destination can be changed.
+	if err := syncDirectory(transactionParent); err != nil {
+		os.RemoveAll(directory)
+		return nil, err
+	}
 	return &Transaction{guard: guard, directory: directory, seen: make(map[string]bool)}, nil
 }
 
