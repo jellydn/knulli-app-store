@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jellydn/knulli-app-store/blob/main/schema/package-manifest-v1.schema.json",
+  "title": "Knulli App Store package manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "name", "type", "summary", "review"],
+  "properties": {
+    "schema": { "const": "org.knulli.app-store/package-manifest/v1" },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(\\.[a-z0-9][a-z0-9-]*){2,}$" },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "minLength": 1 },
+    "type": { "enum": ["utility", "theme", "integration"] },
+    "summary": { "type": "string", "minLength": 1 },
+    "repository": { "type": "string", "format": "uri", "pattern": "^https://" },
+    "license": { "type": "string", "minLength": 1 },
+    "review": { "$ref": "#/$defs/review" },
+    "release": { "$ref": "#/$defs/release" },
+    "compatibility": { "$ref": "#/$defs/compatibility" },
+    "install": { "$ref": "#/$defs/install" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "review": { "properties": { "status": { "const": "candidate" } } } } },
+      "then": { "not": { "anyOf": [{ "required": ["release"] }, { "required": ["compatibility"] }, { "required": ["install"] }] } },
+      "else": { "required": ["version", "repository", "license", "release", "compatibility", "install"] }
+    }
+  ],
+  "$defs": {
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["candidate", "installable", "verified"] },
+        "notes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "url"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "note": { "type": "string" }
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "sha256", "size", "installed_size", "format", "immutable"],
+      "properties": {
+        "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "size": { "type": "integer", "minimum": 1, "maximum": 536870912 },
+        "installed_size": { "type": "integer", "minimum": 1, "maximum": 536870912 },
+        "format": { "enum": ["zip", "tar.gz"] },
+        "immutable": { "const": true }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["firmware", "minimum_version", "architectures", "devices", "resolutions"],
+      "properties": {
+        "firmware": { "const": "knulli" },
+        "minimum_version": { "type": "string", "minLength": 1 },
+        "architectures": { "type": "array", "contains": { "const": "aarch64" }, "items": { "type": "string" } },
+        "devices": { "type": "array", "contains": { "const": "h700" }, "items": { "type": "string" } },
+        "resolutions": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[0-9]+x[0-9]+$" } }
+      }
+    },
+    "install": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["destination", "launcher", "network", "allowed_write_paths"],
+      "properties": {
+        "destination": { "type": "string", "pattern": "^/userdata/" },
+        "strip_components": { "type": "integer", "minimum": 0 },
+        "launcher": { "type": "string", "minLength": 1 },
+        "menu": { "$ref": "#/$defs/menu" },
+        "preserve": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "network": { "type": "boolean" },
+        "allowed_write_paths": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^/userdata/" }, "uniqueItems": true }
+      }
+    },
+    "menu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gamelist", "path", "name"],
+      "properties": {
+        "gamelist": { "type": "string", "pattern": "^/userdata/" },
+        "path": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" }
+      }
+    }
+  }
+}

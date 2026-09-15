@@ -1,0 +1,12 @@
+{
+  "schema": "org.knulli.app-store/external-provider/v1",
+  "id": "org.portmaster.games",
+  "name": "PortMaster",
+  "featured": true,
+  "catalogue_policy": "external-only",
+  "homepage": "https://portmaster.games/",
+  "launch": {
+    "mechanism": "knulli-official",
+    "note": "Launch the PortMaster integration supplied through Knulli; this project does not mirror its catalogue or run a replacement installer."
+  }
+}

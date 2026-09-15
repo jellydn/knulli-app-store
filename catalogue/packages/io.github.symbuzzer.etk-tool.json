@@ -1,0 +1,27 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "io.github.symbuzzer.etk-tool",
+  "name": "ETK Tool",
+  "type": "theme",
+  "summary": "Installs and updates the es-theme-knulli theme.",
+  "repository": "https://github.com/symbuzzer/etk_tool",
+  "license": "GPL-3.0-only",
+  "review": {
+    "status": "candidate",
+    "notes": [
+      "The release provides scripts rather than a checksummed reviewable theme archive.",
+      "System-space writes are outside the initial /userdata-only policy and will not be enabled without a separate design review."
+    ],
+    "evidence": [
+      {
+        "kind": "repository",
+        "url": "https://github.com/symbuzzer/etk_tool"
+      },
+      {
+        "kind": "tagged-release",
+        "url": "https://github.com/symbuzzer/etk_tool/releases/tag/v2.9.1",
+        "note": "Release observed during candidate review; not approved for installation."
+      }
+    ]
+  }
+}
