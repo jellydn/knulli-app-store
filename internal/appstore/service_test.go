@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jellydn/knulli-app-store/internal/installer"
+	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/platform"
 )
 
@@ -29,13 +30,27 @@ func TestServiceExposesCandidatesAsReadOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 5 {
-		t.Fatalf("expected five catalogue items, got %d", len(items))
+	if len(items) != 6 {
+		t.Fatalf("expected six catalogue items, got %d", len(items))
 	}
 	for _, item := range items {
-		if item.Compatible || len(item.Actions) != 0 || !strings.Contains(item.Compatibility, "Candidate") {
+		readOnlyStatus := strings.Contains(item.Compatibility, "Candidate") || strings.Contains(item.Compatibility, "installation is blocked")
+		if item.Compatible || len(item.Actions) != 0 || !readOnlyStatus {
 			t.Fatalf("candidate became actionable: %#v", item)
 		}
+	}
+}
+
+func TestApprovedCandidateRemainsReadOnly(t *testing.T) {
+	pkg := installablePackage()
+	pkg.Review = manifest.Review{Status: "candidate", Approval: &manifest.Approval{Provenance: "community"}}
+	pkg.Release, pkg.Compatibility, pkg.Install = nil, nil, nil
+	compatible, message := compatibility(pkg, platform.Info{})
+	if compatible || message != "Community approved; installation is blocked by technical review" {
+		t.Fatalf("unexpected approved candidate state: %v, %q", compatible, message)
+	}
+	if actions(Item{Package: pkg}) != nil {
+		t.Fatal("approved candidate must remain read-only")
 	}
 }
 

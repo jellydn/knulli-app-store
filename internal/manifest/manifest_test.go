@@ -25,6 +25,28 @@ func TestVerifiedRequiresDeviceEvidence(t *testing.T) {
 	}
 }
 
+func TestCommunityApprovalDoesNotMakeCandidateInstallable(t *testing.T) {
+	pkg := validPackage()
+	pkg.Review = Review{Status: "candidate", Approval: &Approval{Provenance: "community"}}
+	pkg.Release = nil
+	pkg.Compatibility = nil
+	pkg.Install = nil
+	if err := pkg.Validate(); err != nil {
+		t.Fatalf("expected approved candidate to pass: %v", err)
+	}
+	if pkg.Installable() {
+		t.Fatal("community approval must not make a candidate installable")
+	}
+}
+
+func TestApprovalRejectsUnknownProvenance(t *testing.T) {
+	pkg := validPackage()
+	pkg.Review.Approval = &Approval{Provenance: "social-media"}
+	if err := pkg.Validate(); err == nil || !strings.Contains(err.Error(), "provenance") {
+		t.Fatalf("expected approval provenance rejection, got %v", err)
+	}
+}
+
 func TestMutableReleaseURLIsRejected(t *testing.T) {
 	pkg := validPackage()
 	pkg.Release.URL = "https://github.com/example/tool/releases/latest/download/tool.zip"

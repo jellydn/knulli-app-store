@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
+	"github.com/jellydn/knulli-app-store/internal/manifest"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
@@ -91,7 +92,7 @@ func drawList(frame *image.RGBA, model *storeui.Model) {
 			fill(frame, image.Rect(24, y, 28, y+38), palette.accent)
 		}
 		text(frame, 34, y+15, palette.text, shorten(strings.ToUpper(item.Package.Name), 24))
-		status := strings.ToUpper(item.Package.Review.Status)
+		status := reviewLabel(item.Package)
 		statusColor := palette.warning
 		if item.Package.Review.Status == "verified" {
 			statusColor = palette.accent
@@ -103,7 +104,7 @@ func drawList(frame *image.RGBA, model *storeui.Model) {
 func drawDetails(frame *image.RGBA, model *storeui.Model) {
 	item := model.Items[model.Selected]
 	text(frame, 258, 66, palette.text, shorten(strings.ToUpper(item.Package.Name), 38))
-	text(frame, 258, 84, palette.muted, strings.ToUpper(item.Package.Type)+"  /  "+strings.ToUpper(item.Package.Review.Status))
+	text(frame, 258, 84, palette.muted, strings.ToUpper(item.Package.Type)+"  /  "+reviewLabel(item.Package))
 	y := 101
 	installed := "NOT INSTALLED"
 	installedColor := palette.muted
@@ -145,6 +146,13 @@ func drawDetails(frame *image.RGBA, model *storeui.Model) {
 		}
 	}
 	drawActions(frame, model, item)
+}
+
+func reviewLabel(pkg manifest.Package) string {
+	if pkg.Review.Approval != nil {
+		return "APPROVED / " + strings.ToUpper(pkg.Review.Status)
+	}
+	return strings.ToUpper(pkg.Review.Status)
 }
 
 func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item) {

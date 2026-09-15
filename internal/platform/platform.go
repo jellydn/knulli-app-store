@@ -42,7 +42,7 @@ func Detect(root string) Info {
 			info.Version = values["VERSION_ID"]
 		}
 	}
-	for _, devicePath := range []string{"etc/knulli-device", "boot/batocera.board"} {
+	for _, devicePath := range []string{"boot/boot/knulli.board", "etc/knulli-device", "boot/batocera.board"} {
 		if data, err := os.ReadFile(filepath.Join(root, devicePath)); err == nil {
 			info.Device = strings.TrimSpace(string(data))
 			break
@@ -52,6 +52,27 @@ func Detect(root string) Info {
 		info.Resolution = strings.ReplaceAll(strings.TrimSpace(string(data)), ",", "x")
 	}
 	return info
+}
+
+func DisplayName(device string) string {
+	device = strings.TrimSpace(device)
+	if strings.EqualFold(device, "trimui-smart-pro") {
+		return "TrimUI Smart Pro"
+	}
+	if device == "" {
+		return "Unknown device"
+	}
+	return "Unknown device (" + device + ")"
+}
+
+func DisplayHeader(info Info, runtimeWidth, runtimeHeight int) string {
+	resolution := "size unknown"
+	if runtimeWidth > 0 && runtimeHeight > 0 {
+		resolution = fmt.Sprintf("%dx%d", runtimeWidth, runtimeHeight)
+	} else if resolutionPattern.MatchString(info.Resolution) {
+		resolution = info.Resolution + " fallback"
+	}
+	return DisplayName(info.Device) + " / " + resolution
 }
 
 func Check(pkg manifest.Package, current Info) error {
@@ -78,6 +99,7 @@ func Check(pkg manifest.Package, current Info) error {
 }
 
 var versionPart = regexp.MustCompile(`[0-9]+|[a-zA-Z]+`)
+var resolutionPattern = regexp.MustCompile(`^[0-9]+x[0-9]+$`)
 
 func compareVersions(left, right string) int {
 	a := versionPart.FindAllString(strings.ToLower(left), -1)

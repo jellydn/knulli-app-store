@@ -6,7 +6,7 @@
 - `installable`: two reviewers have checked all evidence and the package can be used by the installer.
 - `verified`: `installable` plus linked real-device test evidence for every declared device and resolution.
 
-The state is a trust decision, not an upstream popularity score.
+`review.approval` is separate from these technical states. Community approval permits catalogue inclusion, but it does not provide compatibility evidence, enable installation, or grant a verified badge.
 
 ## Promotion checklist
 
@@ -20,6 +20,8 @@ The state is a trust decision, not an upstream popularity score.
 8. Establish the minimum Knulli version and test `aarch64`, H700, and each listed resolution.
 9. Have a second reviewer reproduce the checksum, archive inspection, and manifest validation.
 10. Promote to `installable`. Add `real-device-test` evidence and promote to `verified` only after the exact matrix passes on hardware.
+
+For ROM-download software, record a visible copyright warning and review every provider and self-update path. Approval does not establish that a ROM download is lawful. The user must have the required rights and comply with local law.
 
 ## Build the index
 

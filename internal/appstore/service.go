@@ -117,6 +117,9 @@ func (s *Service) find(id string) (catalog.Entry, bool) {
 
 func compatibility(pkg manifest.Package, current platform.Info) (bool, string) {
 	if !pkg.Installable() {
+		if pkg.Review.Approval != nil {
+			return false, "Community approved; installation is blocked by technical review"
+		}
 		return false, "Candidate: compatibility is not approved"
 	}
 	if err := platform.Check(pkg, current); err != nil {

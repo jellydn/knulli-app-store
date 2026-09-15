@@ -55,8 +55,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	platformName := fmt.Sprintf("%s %s / %s / %s / %s", current.Firmware, current.Version, current.Arch, current.Device, current.Resolution)
-	return sdlui.Run(context.Background(), service, sdlui.Options{Windowed: *windowed || *screenshot != "", Screenshot: *screenshot, Platform: platformName})
+	return sdlui.Run(context.Background(), service, sdlui.Options{Windowed: *windowed || *screenshot != "", Screenshot: *screenshot, Platform: current})
 }
 
 func override(target *string, value string) {

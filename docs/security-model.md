@@ -43,6 +43,7 @@ Upstream package code runs later when the user launches it. The installer does n
 - Power loss is not yet journal-recovered across process restarts. Atomic file replacement limits corruption, and synchronous failures roll back.
 - Empty directories can remain after rollback or uninstall.
 - H700 detection file names need validation against real Knulli images. Operators must supply explicit flags when detection is incomplete.
-- Real-device testing has not been completed. No current package has a verified badge.
+- The GUI has one community-reported TrimUI Smart Pro test. Package-specific real-device testing has not been completed, and no current package has a verified badge.
+- EmuDrop is an approved catalogue exception, not an approved installer payload. Its copyright risk, missing license, and launch-time updater keep it non-installable.
 
 Report a security issue privately to the repository owner. Do not include user data, tokens, or private catalogue URLs in a public report.

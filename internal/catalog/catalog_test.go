@@ -17,8 +17,13 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first.Packages) != 5 || len(second.Packages) != 5 {
-		t.Fatalf("expected five candidates, got %d and %d", len(first.Packages), len(second.Packages))
+	if len(first.Packages) != 6 || len(second.Packages) != 6 {
+		t.Fatalf("expected six candidates, got %d and %d", len(first.Packages), len(second.Packages))
+	}
+	approved := map[string]bool{
+		"app.romm.grout":               true,
+		"io.github.ahmadteeb.emudrop":  true,
+		"io.github.unitreign.playtime": true,
 	}
 	for index := range first.Packages {
 		if first.Packages[index].ID != second.Packages[index].ID || first.Packages[index].ManifestSHA256 != second.Packages[index].ManifestSHA256 {
@@ -26,6 +31,10 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 		}
 		if first.Packages[index].Package.Installable() {
 			t.Fatalf("candidate unexpectedly installable: %s", first.Packages[index].ID)
+		}
+		approval := first.Packages[index].Package.Review.Approval
+		if approved[first.Packages[index].ID] != (approval != nil && approval.Provenance == "community") {
+			t.Fatalf("unexpected approval state: %s", first.Packages[index].ID)
 		}
 	}
 }

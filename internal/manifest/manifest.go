@@ -34,8 +34,13 @@ type Package struct {
 
 type Review struct {
 	Status   string     `json:"status"`
+	Approval *Approval  `json:"approval,omitempty"`
 	Notes    []string   `json:"notes,omitempty"`
 	Evidence []Evidence `json:"evidence,omitempty"`
+}
+
+type Approval struct {
+	Provenance string `json:"provenance"`
 }
 
 type Evidence struct {
@@ -101,6 +106,11 @@ func (p Package) Validate() error {
 	}
 	if !oneOf(p.Review.Status, "candidate", "installable", "verified") {
 		problems = append(problems, "review.status must be candidate, installable, or verified")
+	}
+	if p.Review.Approval != nil {
+		if !oneOf(p.Review.Approval.Provenance, "community", "maintainer") {
+			problems = append(problems, "review.approval.provenance must be community or maintainer")
+		}
 	}
 	for i, evidence := range p.Review.Evidence {
 		if !isHTTPS(evidence.URL) || strings.TrimSpace(evidence.Kind) == "" {

@@ -19,13 +19,24 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		Installed: true, InstalledVersion: "1.0.0", Healthy: false, Compatible: true,
 		Compatibility: "Compatible with detected platform", Actions: []appstore.Action{appstore.Repair, appstore.Uninstall},
 	}
+	emuDrop := appstore.Item{
+		Package: manifest.Package{
+			ID: "io.github.ahmadteeb.emudrop", Name: "EmuDrop", Type: "utility", Summary: "Browses third-party sources and downloads ROM files and artwork.",
+			Review: manifest.Review{
+				Status: "candidate", Approval: &manifest.Approval{Provenance: "community"},
+				Notes: []string{"WARNING: ROM downloads can infringe copyright. Users must confirm that each download is lawful in their jurisdiction and that they have the required rights."},
+			},
+		},
+		Compatibility: "Community approved; installation is blocked by technical review",
+	}
 	states := map[string]*storeui.Model{
+		"browse":  {Items: []appstore.Item{emuDrop}},
 		"confirm": {Items: []appstore.Item{item}, Focus: storeui.Confirm},
 		"error":   {Items: []appstore.Item{item}, Error: "SHA-256 mismatch; package files were not changed"},
 	}
 	directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR")
 	for name, model := range states {
-		frame := draw(model, "KNULLI 2026.05 / AARCH64 / TRIMUI-SMART-PRO / 1280X720", true)
+		frame := draw(model, "TrimUI Smart Pro / 1280x720", true)
 		if frame.Bounds().Dx() != canvasWidth || frame.Bounds().Dy() != canvasHeight {
 			t.Fatalf("%s frame has unexpected bounds %v", name, frame.Bounds())
 		}

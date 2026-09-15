@@ -33,8 +33,17 @@
       "required": ["status"],
       "properties": {
         "status": { "enum": ["candidate", "installable", "verified"] },
+        "approval": { "$ref": "#/$defs/approval" },
         "notes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
         "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provenance"],
+      "properties": {
+        "provenance": { "enum": ["community", "maintainer"] }
       }
     },
     "evidence": {

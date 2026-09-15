@@ -26,6 +26,7 @@ import (
 	"unsafe"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
+	"github.com/jellydn/knulli-app-store/internal/platform"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
 	xdraw "golang.org/x/image/draw"
 )
@@ -38,7 +39,7 @@ const (
 type Options struct {
 	Windowed   bool
 	Screenshot string
-	Platform   string
+	Platform   platform.Info
 }
 
 func Run(ctx context.Context, backend appstore.Backend, options Options) error {
@@ -67,6 +68,8 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 		return sdlError("create SDL2 renderer")
 	}
 	defer C.SDL_DestroyRenderer(renderer)
+	screenWidth, screenHeight := runtimeScreenSize(window, renderer)
+	platformHeader := platform.DisplayHeader(options.Platform, screenWidth, screenHeight)
 	texture := C.SDL_CreateTexture(renderer, C.SDL_PIXELFORMAT_ABGR8888, C.SDL_TEXTUREACCESS_STREAMING, canvasWidth, canvasHeight)
 	if texture == nil {
 		return sdlError("create SDL2 texture")
@@ -93,7 +96,7 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 			}
 		}
 		model.Poll()
-		frame := draw(model, options.Platform, controller != nil)
+		frame := draw(model, platformHeader, controller != nil)
 		if C.SDL_UpdateTexture(texture, nil, unsafe.Pointer(&frame.Pix[0]), C.int(frame.Stride)) != 0 {
 			return sdlError("upload UI frame")
 		}
@@ -110,6 +113,19 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 		case <-ticker.C:
 		}
 	}
+}
+
+func runtimeScreenSize(window *C.SDL_Window, renderer *C.SDL_Renderer) (int, int) {
+	displayIndex := C.SDL_GetWindowDisplayIndex(window)
+	var mode C.SDL_DisplayMode
+	if displayIndex >= 0 && C.SDL_GetCurrentDisplayMode(displayIndex, &mode) == 0 && mode.w > 0 && mode.h > 0 {
+		return int(mode.w), int(mode.h)
+	}
+	var width, height C.int
+	if C.SDL_GetRendererOutputSize(renderer, &width, &height) == 0 && width > 0 && height > 0 {
+		return int(width), int(height)
+	}
+	return 0, 0
 }
 
 func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, controller **C.SDL_GameController) bool {

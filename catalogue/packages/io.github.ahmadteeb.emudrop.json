@@ -1,0 +1,47 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "io.github.ahmadteeb.emudrop",
+  "name": "EmuDrop",
+  "version": "2.1.6",
+  "type": "utility",
+  "summary": "Browses third-party sources and downloads ROM files and artwork.",
+  "repository": "https://github.com/ahmadteeb/EmuDrop",
+  "review": {
+    "status": "candidate",
+    "approval": {
+      "provenance": "community"
+    },
+    "notes": [
+      "WARNING: ROM downloads can infringe copyright. Users must confirm that each download is lawful in their jurisdiction and that they have the required rights.",
+      "Installation is blocked: the tagged source has no license or redistribution grant.",
+      "The bundled launch-time updater disables TLS verification and replaces executable code outside app-manager checksum, path, backup, and rollback controls.",
+      "Community approval permits catalogue inclusion but is not a real-device package verification."
+    ],
+    "evidence": [
+      {
+        "kind": "repository",
+        "url": "https://github.com/ahmadteeb/EmuDrop"
+      },
+      {
+        "kind": "release-asset",
+        "url": "https://github.com/ahmadteeb/EmuDrop/releases/download/v2.1.6/EmuDropKnulli.zip",
+        "note": "Version-pinned Knulli ZIP; 18,009,624 bytes compressed, 41,370,114 bytes extracted, SHA-256 02fe1fe562a7f7991e45940d95b1f3d4af023c371be62c1ae79b1bb75203f799."
+      },
+      {
+        "kind": "tagged-source",
+        "url": "https://github.com/ahmadteeb/EmuDrop/tree/afb3e8c3b35df902fb5a49857e8127958afd943c",
+        "note": "No license, COPYING file, SPDX header, or explicit redistribution grant was found at this tag commit."
+      },
+      {
+        "kind": "compatibility-claim",
+        "url": "https://github.com/ahmadteeb/EmuDrop/blob/v2.1.6/README.md",
+        "note": "Upstream names TrimUI Smart Pro with Knulli and provides Knulli paths, but provides no linked real-device test report or minimum Knulli version."
+      },
+      {
+        "kind": "filesystem-and-network-review",
+        "url": "https://github.com/ahmadteeb/EmuDrop/blob/v2.1.6/platform/Trimui%20Smart%20Pro/EmuDropKnulli/EmuDrop.pygame",
+        "note": "Reviewed paths include /userdata/roms/pygame/EmuDropKnulli and broad writes below /userdata/roms for ROMs, images, and gamelist.xml files. Network access is required. The local launcher invokes an updater that downloads replacement code with TLS verification disabled."
+      }
+    ]
+  }
+}

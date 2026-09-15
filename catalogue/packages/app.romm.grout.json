@@ -2,15 +2,20 @@
   "schema": "org.knulli.app-store/package-manifest/v1",
   "id": "app.romm.grout",
   "name": "Grout",
+  "version": "5.1.0.0",
   "type": "integration",
   "summary": "Connects a Linux retro handheld to a RomM server.",
   "repository": "https://github.com/rommapp/grout",
   "license": "MIT",
   "review": {
     "status": "candidate",
+    "approval": {
+      "provenance": "community"
+    },
     "notes": [
-      "The Knulli release asset has no publisher-provided checksum.",
-      "H700 compatibility, configuration preservation, and write paths need maintainer review and real-device testing."
+      "Installation is blocked: upstream says TrimUI Smart Pro on Knulli was tested but does not identify the minimum Knulli version required by the manifest.",
+      "The package self-updater stages hash-checked code outside app-manager transactions; repair can restore catalogue files, but this remains a trust limitation.",
+      "Community approval permits catalogue inclusion but is not a real-device package verification."
     ],
     "evidence": [
       {
@@ -18,9 +23,24 @@
         "url": "https://github.com/rommapp/grout"
       },
       {
-        "kind": "tagged-release",
-        "url": "https://github.com/rommapp/grout/releases/tag/v5.1.0.0",
-        "note": "Release observed during candidate review; not approved for installation."
+        "kind": "release-asset",
+        "url": "https://github.com/rommapp/grout/releases/download/v5.1.0.0/Grout-Knulli.zip",
+        "note": "Version-pinned Knulli ZIP; 24,279,213 bytes compressed, 95,180,746 bytes extracted, SHA-256 1af9924fc42dd7213c45f09c1a8d93726c7ade5cdac8394a020a433260cbb356."
+      },
+      {
+        "kind": "license",
+        "url": "https://github.com/rommapp/grout/blob/a812d0cb9bc802f61eb88e4d4b522e3d1eee0483/LICENSE",
+        "note": "MIT license reviewed at the tagged commit."
+      },
+      {
+        "kind": "device-compatibility-claim",
+        "url": "https://github.com/rommapp/grout/blob/v5.1.0.0/docs/getting-started/install-knulli.md",
+        "note": "Upstream lists TrimUI Smart Pro as tested with Knulli, without a firmware version or test report."
+      },
+      {
+        "kind": "filesystem-and-network-review",
+        "url": "https://github.com/rommapp/grout/blob/v5.1.0.0/cfw/knulli/knulli.go",
+        "note": "Reviewed paths are /userdata/roms/tools/Grout, /userdata/roms/tools/.update, /userdata/roms/tools/gamelist.xml, /userdata/roms, /userdata/bios, and /userdata/saves. Network access is required for RomM and updates. The launcher executes local files; the binary updater checks a supplied SHA-256 before staging release code."
       }
     ]
   }

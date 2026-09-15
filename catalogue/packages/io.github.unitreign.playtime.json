@@ -2,15 +2,19 @@
   "schema": "org.knulli.app-store/package-manifest/v1",
   "id": "io.github.unitreign.playtime",
   "name": "PlayTime",
+  "version": "1.0.0",
   "type": "utility",
   "summary": "Tracks game play time on Knulli.",
   "repository": "https://github.com/unitreign/playtime",
   "license": "GPL-3.0-only",
   "review": {
     "status": "candidate",
+    "approval": {
+      "provenance": "community"
+    },
     "notes": [
-      "The tagged release has no publisher-provided checksum.",
-      "H700 compatibility and installation paths need maintainer review and real-device testing."
+      "Installation is blocked: the release ZIP does not preserve executable modes, and there is no direct TrimUI Smart Pro or minimum Knulli version evidence.",
+      "Community approval permits catalogue inclusion but is not a real-device package verification."
     ],
     "evidence": [
       {
@@ -18,9 +22,24 @@
         "url": "https://github.com/unitreign/playtime"
       },
       {
-        "kind": "tagged-release",
-        "url": "https://github.com/unitreign/playtime/releases/tag/v1.0.0",
-        "note": "Release observed during candidate review; not approved for installation."
+        "kind": "release-asset",
+        "url": "https://github.com/unitreign/playtime/releases/download/v1.0.0/PlayTime.zip",
+        "note": "Version-pinned ZIP; 1,569,588 bytes compressed, 6,133,404 bytes extracted, SHA-256 7bc7480400693be09b841f3a0612a8d85cefec549a3f6e5d0edee3a73c80aed3."
+      },
+      {
+        "kind": "license",
+        "url": "https://github.com/unitreign/playtime/blob/5f60c2090e0c456bfbf343d9d3b9c76f2a327135/LICENSE",
+        "note": "GPL-3.0-only license reviewed at the tagged commit."
+      },
+      {
+        "kind": "compatibility-claim",
+        "url": "https://github.com/unitreign/playtime/blob/5f60c2090e0c456bfbf343d9d3b9c76f2a327135/README.md",
+        "note": "The release is Knulli-specific and ARM64, but this revision does not identify TrimUI Smart Pro or a minimum Knulli version."
+      },
+      {
+        "kind": "filesystem-and-network-review",
+        "url": "https://github.com/unitreign/playtime/blob/5f60c2090e0c456bfbf343d9d3b9c76f2a327135/main.go",
+        "note": "Reviewed paths are /userdata/roms/tools/PlayTime, /userdata/roms/tools/gamelist.xml, /userdata/system/configs/playtime, and /userdata/system/scripts/playtime-hook.sh. The tagged launcher and binary use local files and do not download or execute remote code."
       }
     ]
   }

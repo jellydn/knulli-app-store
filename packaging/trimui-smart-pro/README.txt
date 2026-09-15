@@ -1,7 +1,8 @@
 KNULLI APP STORE - TRIMUI SMART PRO EXPERIMENTAL BUILD
 
-This build has not passed a real-device test. It targets Linux aarch64,
-the TrimUI Smart Pro 1280x720 display, and Knulli's SDL2 runtime.
+The GUI was reported functional on one TrimUI Smart Pro. This build remains
+experimental until the exact Knulli release and repeatable test evidence are
+recorded. Package compatibility is reviewed separately.
 
 INSTALL
 
@@ -12,6 +13,12 @@ INSTALL
    /userdata/roms/ports/knulli-app-store/knulli-app-ui
 4. Safely eject the card, start Knulli, and refresh game lists or reboot.
 5. Open Knulli App Store from the Ports system.
+
+UPDATE
+
+Verify the new checksum, shut down Knulli, and extract the new ZIP into the
+same /userdata/roms/ports directory. Allow replacement of the old launcher
+and knulli-app-store files. Manager state under /userdata/system is retained.
 
 CONTROLS
 
@@ -26,9 +33,10 @@ it does not guess raw event or button numbers.
 
 CURRENT SAFETY STATE
 
-All bundled packages are review candidates. They are read-only and cannot
-be installed. A package becomes actionable only after its manifest passes
-the repository review and compatibility policy.
+All six bundled packages are review candidates. They are read-only and cannot
+be installed. EmuDrop, PlayTime, and Grout have community approval for
+catalogue inclusion, not package verification. EmuDrop downloads ROMs; users
+must have the required rights and comply with local copyright law.
 
 TROUBLESHOOTING
 

@@ -21,11 +21,37 @@ func TestDetectReadsKnulliDeviceAndFramebuffer(t *testing.T) {
 		}
 	}
 	write("etc/knulli-release", "ID=knulli\nVERSION_ID=2025.2\n")
-	write("etc/knulli-device", "h700\n")
-	write("sys/class/graphics/fb0/virtual_size", "640,480\n")
+	write("boot/boot/knulli.board", "trimui-smart-pro\n")
+	write("etc/knulli-device", "legacy-device\n")
+	write("sys/class/graphics/fb0/virtual_size", "1280,720\n")
 	got := Detect(root)
-	if got.Firmware != "knulli" || got.Version != "2025.2" || got.Device != "h700" || got.Resolution != "640x480" {
+	if got.Firmware != "knulli" || got.Version != "2025.2" || got.Device != "trimui-smart-pro" || got.Resolution != "1280x720" {
 		t.Fatalf("unexpected detection: %#v", got)
+	}
+}
+
+func TestDisplayHeaderUsesKnownDeviceAndRuntimeSize(t *testing.T) {
+	info := Info{Device: "trimui-smart-pro", Resolution: "640x480"}
+	if got := DisplayHeader(info, 1280, 720); got != "TrimUI Smart Pro / 1280x720" {
+		t.Fatalf("unexpected display header: %q", got)
+	}
+}
+
+func TestDisplayHeaderShowsFallbackStates(t *testing.T) {
+	tests := []struct {
+		name string
+		info Info
+		want string
+	}{
+		{name: "framebuffer size", info: Info{Device: "new-board", Resolution: "1024x600"}, want: "Unknown device (new-board) / 1024x600 fallback"},
+		{name: "nothing detected", info: Info{}, want: "Unknown device / size unknown"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := DisplayHeader(test.info, 0, 0); got != test.want {
+				t.Fatalf("unexpected display header: %q", got)
+			}
+		})
 	}
 }
 
