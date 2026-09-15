@@ -293,13 +293,26 @@ func TestCustomMappingRequiresReviewAndPreviewBeforeAtomicSave(t *testing.T) {
 	}
 }
 
+func TestBlockedExportDiagnosticsBindsToConfirm(t *testing.T) {
+	session := NewSession(t.TempDir(), "trimui-smart-pro")
+	if _, effect := session.HandleButton(AutoMapping()[Confirm]); effect != ExportDiagnostics {
+		t.Fatalf("blocked Confirm did not export diagnostics: %q", effect)
+	}
+	if _, effect := session.HandleButton(AutoMapping()[Diagnostics]); effect != NoEffect {
+		t.Fatalf("blocked Diagnostics still exported: %q", effect)
+	}
+	if action, _ := session.HandleButton(AutoMapping()[Back]); action != Exit {
+		t.Fatalf("blocked Back did not leave: %q", action)
+	}
+}
+
 func TestNoControllerBlockedReconnectResetAndSafeExit(t *testing.T) {
 	session := NewSession(t.TempDir(), "magicx-zero-28")
 	if session.Mode != Blocked || !session.FirstRun {
 		t.Fatalf("no-controller launch was not blocked: %#v", session)
 	}
-	if action, effect := session.HandleButton(0); action != "" || effect != NoEffect {
-		t.Fatal("no-controller input caused an action")
+	if action, effect := session.HandleButton(AutoMapping()[Down]); action != "" || effect != NoEffect {
+		t.Fatalf("blocked Down navigated the catalogue: action=%q effect=%q", action, effect)
 	}
 	session.Connect(Identity{GUID: "one", Name: "Pad"}, true)
 	if session.Mode != Setup || session.Source != "Knulli SDL_GAMECONTROLLERCONFIG" {

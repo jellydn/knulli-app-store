@@ -14,6 +14,7 @@ func TestRuntimeCodeDoesNotBypassSemanticControllerActions(t *testing.T) {
 		regexp.MustCompile("SDL_CONTROLLER_BUTTON_" + "[AB]"),
 		regexp.MustCompile(`(?i)\b[AB]\s+(confirm|cancel|back)\b`),
 		regexp.MustCompile(`HandleButton\(\s*[0-9]+\s*\)`),
+		regexp.MustCompile(`event_key\(event\) == C\.SDLK_y`),
 	}
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

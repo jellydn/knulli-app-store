@@ -102,8 +102,8 @@ func (session *Session) OpenSetup() {
 }
 
 func (session *Session) HandleButton(button int) (Action, Effect) {
-	if !session.Connected {
-		return "", NoEffect
+	if !session.Connected || session.Mode == Blocked {
+		return session.handleBlocked(button)
 	}
 	switch session.Mode {
 	case Setup:
@@ -116,8 +116,6 @@ func (session *Session) HandleButton(button int) (Action, Effect) {
 		return session.handlePreview(button)
 	case Settings:
 		return session.handleSettings(button)
-	case Blocked:
-		return "", NoEffect
 	default:
 		action, ok := session.Mapping.Action(button)
 		if !ok {
@@ -133,11 +131,25 @@ func (session *Session) HandleButton(button int) (Action, Effect) {
 	}
 }
 
-func (session *Session) handleSetup(button int) (Action, Effect) {
-	controls := session.Mapping
-	if session.FirstRun {
-		controls = AutoMapping()
+func (session *Session) handleBlocked(button int) (Action, Effect) {
+	// Keyboard still reaches this path when no GameController exists.
+	// Confirm exports diagnostics. Back and Exit leave. Catalogue navigation stays closed.
+	action, ok := session.activeMapping().Action(button)
+	if !ok {
+		return "", NoEffect
 	}
+	switch action {
+	case Confirm:
+		return "", ExportDiagnostics
+	case Back, Exit:
+		return Exit, NoEffect
+	default:
+		return "", NoEffect
+	}
+}
+
+func (session *Session) handleSetup(button int) (Action, Effect) {
+	controls := session.activeMapping()
 	action, ok := controls.Action(button)
 	if !ok {
 		return "", NoEffect
@@ -321,6 +333,13 @@ func (session *Session) saveMapping(mapping Mapping, source string) bool {
 	session.FirstRun = false
 	session.ValidationError = ""
 	return true
+}
+
+func (session *Session) activeMapping() Mapping {
+	if session.FirstRun {
+		return AutoMapping()
+	}
+	return session.Mapping
 }
 
 func wrap(value, length int) int {
