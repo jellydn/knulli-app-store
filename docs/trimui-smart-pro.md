@@ -14,7 +14,7 @@ Authoritative Knulli sources establish these facts:
 - Knulli's [`shGenerator.py`](https://github.com/knulli-cfw/knulli-linux/blob/master/package/system/knulli-configgen/configgen/configgen/generators/sh/shGenerator.py) runs Ports entries with `/bin/bash` and exports the generated controller mapping.
 - The [game storage guide](https://knulli.org/play/add-games/game-storage/) defines `/userdata/roms/ports` for ports and `/userdata/system` for persistent settings.
 
-The sources do not establish the general SDL2 package version, a third-party glibc contract, raw button numbers, or whether this binary works with the patched PowerVR backend. CI uses Debian Bullseye to keep the binary at `libSDL2-2.0.so.0` and glibc 2.31 or older, then rejects newer glibc imports. This lowers the ABI requirement but does not prove compatibility with Knulli's patched runtime.
+The sources do not establish the general SDL2 package version, a third-party glibc contract, raw button numbers, or whether this binary works with the patched PowerVR backend. CI uses Debian Bookworm. The binary needs `libSDL2-2.0.so.0` and glibc symbols through 2.34. Knulli's bundled A133 `trimui_inputd` also imports glibc 2.34, but one system binary is evidence, not a published compatibility guarantee.
 
 ## Download and verify
 

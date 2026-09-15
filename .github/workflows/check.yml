@@ -42,7 +42,7 @@ jobs:
   trimui-smart-pro-artifact:
     needs: test
     runs-on: ubuntu-latest
-    container: golang:1.19-bullseye
+    container: golang:1.19-bookworm
     steps:
       - uses: actions/checkout@v4
       - name: Install aarch64 cross compiler and SDL2 headers
@@ -64,7 +64,7 @@ jobs:
           file build/knulli-app build/knulli-app-ui
           readelf -d build/knulli-app-ui | grep -F 'Shared library: [libSDL2-2.0.so.0]'
           test "$(readelf -d build/knulli-app-ui | grep -c '(NEEDED)')" -eq 2
-          ! readelf --version-info build/knulli-app-ui | grep -E 'GLIBC_2\.(3[2-9]|[4-9][0-9])'
+          readelf --version-info build/knulli-app-ui | grep -F 'Name: GLIBC_2.34'
       - name: Package experimental Ports artifact
         run: |
           VERSION=$(printf '%.7s' "$GITHUB_SHA")
