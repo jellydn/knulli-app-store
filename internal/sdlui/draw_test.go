@@ -265,7 +265,7 @@ func TestResolutionCandidateLoggingIncludesRejectionAndSelection(t *testing.T) {
 		{Source: "SDL current display mode", Width: 1280, Height: 0x3333},
 		{Source: "SDL renderer output", Width: 1280, Height: 720},
 	}
-	selected := platform.WithResolutionCandidates(platform.Info{Device: "trimui-smart-pro"}, candidates)
+	selected := platform.Info{Device: "trimui-smart-pro"}.WithCandidates(candidates)
 	logResolutionCandidates(logger, platform.AssessResolutions(candidates), selected)
 	data, err := os.ReadFile(filepath.Join(root, "userdata/system/logs/knulli-app-store.log"))
 	if err != nil {

@@ -14,17 +14,98 @@ import (
 )
 
 type Info struct {
-	Firmware             string
-	FirmwareRaw          string
-	FirmwareSource       string
-	Version              string
-	VersionRaw           string
-	VersionSource        string
-	Arch                 string
-	Device               string
-	Resolution           string
-	ResolutionSource     string
-	ResolutionCandidates []ResolutionCandidate
+	Firmware         string
+	Version          string
+	Arch             string
+	Device           string
+	Resolution       string
+	ResolutionSource string
+
+	// Evidence records where each detected value came from. It is produced
+	// by Resolve; overrides attach their own evidence.
+	Evidence Evidence
+}
+
+// Evidence is the provenance bundle for a resolved platform: raw source
+// values, where they were read from, and every resolution candidate that
+// was considered.
+type Evidence struct {
+	FirmwareRaw    string
+	FirmwareSource string
+	VersionRaw     string
+	VersionSource  string
+	Candidates     []ResolutionCandidate
+}
+
+// Option adjusts one detection input before resolution. Every option is a
+// no-op on the zero value.
+type Option func(*request)
+
+type request struct {
+	root       string
+	firmware   string
+	version    string
+	arch       string
+	device     string
+	resolution string
+}
+
+// WithFirmware overrides the normalized firmware identity.
+func WithFirmware(value string) Option {
+	return func(r *request) { r.firmware = value }
+}
+
+// WithVersion overrides the normalized firmware version.
+func WithVersion(value string) Option {
+	return func(r *request) { r.version = value }
+}
+
+// WithArch overrides the detected architecture verbatim.
+func WithArch(value string) Option {
+	return func(r *request) { r.arch = value }
+}
+
+// WithDevice overrides the detected device identity.
+func WithDevice(value string) Option {
+	return func(r *request) { r.device = value }
+}
+
+// WithResolutionOverride prepends a WIDTHxHEIGHT candidate ahead of every
+// detected source.
+func WithResolutionOverride(value string) Option {
+	return func(r *request) { r.resolution = value }
+}
+
+// Resolve reads the platform from Knulli-owned files and applies the given
+// options. It is the single entry point for detection: the returned Info
+// always carries consistent normalized values and matching evidence.
+func Resolve(root string, options ...Option) Info {
+	request := &request{root: root}
+	for _, option := range options {
+		option(request)
+	}
+	info := detect(request.root)
+	if request.firmware != "" {
+		info.Firmware = request.firmware
+		info.Evidence.FirmwareRaw = request.firmware
+		info.Evidence.FirmwareSource = "command-line override"
+	}
+	if request.version != "" {
+		info.Version = request.version
+		info.Evidence.VersionRaw = request.version
+		info.Evidence.VersionSource = "command-line override"
+	}
+	if request.arch != "" {
+		info.Arch = request.arch
+	}
+	if request.device != "" {
+		info.Device = request.device
+	}
+	if request.resolution != "" {
+		candidates := append([]ResolutionCandidate{ResolutionCandidateFromString("command-line override", request.resolution)}, info.Evidence.Candidates...)
+		info = info.WithCandidates(candidates)
+	}
+	return info
 }
 
 type ResolutionCandidate struct {
@@ -40,7 +121,7 @@ type ResolutionAssessment struct {
 	Reason string
 }
 
-func Detect(root string) Info {
+func detect(root string) Info {
 	if root == "" {
 		root = "/"
 	}
@@ -63,14 +144,14 @@ func Detect(root string) Info {
 		{path: "/etc/os-release", key: "ID", value: osRelease["ID"]},
 	}
 	for _, source := range firmwareSources {
-		if strings.TrimSpace(source.value) != "" && info.FirmwareSource == "" {
-			info.FirmwareRaw = source.value
-			info.FirmwareSource = source.path + ":" + source.key
+		if strings.TrimSpace(source.value) != "" && info.Evidence.FirmwareSource == "" {
+			info.Evidence.FirmwareRaw = source.value
+			info.Evidence.FirmwareSource = source.path + ":" + source.key
 		}
 		if normalized := normalizeFirmware(source.value); normalized != "" {
 			info.Firmware = normalized
-			info.FirmwareRaw = source.value
-			info.FirmwareSource = source.path + ":" + source.key
+			info.Evidence.FirmwareRaw = source.value
+			info.Evidence.FirmwareSource = source.path + ":" + source.key
 			break
 		}
 	}
@@ -86,8 +167,8 @@ func Detect(root string) Info {
 	for _, source := range versionSources {
 		if normalized := normalizeVersion(source.value); normalized != "" {
 			info.Version = normalized
-			info.VersionRaw = source.value
-			info.VersionSource = source.path
+			info.Evidence.VersionRaw = source.value
+			info.Evidence.VersionSource = source.path
 			break
 		}
 	}
@@ -97,23 +178,24 @@ func Detect(root string) Info {
 			break
 		}
 	}
-	info.ResolutionCandidates = filesystemResolutionCandidates(root)
-	info = WithResolutionCandidates(info, info.ResolutionCandidates)
+	info = info.WithCandidates(filesystemResolutionCandidates(root))
 	return info
 }
 
-func WithResolutionCandidates(info Info, candidates []ResolutionCandidate) Info {
-	info.Resolution = ""
-	info.ResolutionSource = ""
-	info.ResolutionCandidates = append([]ResolutionCandidate(nil), candidates...)
+// WithCandidates returns a copy of the info with the given resolution
+// candidates and re-selects the resolution from them.
+func (i Info) WithCandidates(candidates []ResolutionCandidate) Info {
+	i.Resolution = ""
+	i.ResolutionSource = ""
+	i.Evidence.Candidates = append([]ResolutionCandidate(nil), candidates...)
 	for _, assessment := range AssessResolutions(candidates) {
 		if assessment.Valid {
-			info.Resolution = fmt.Sprintf("%dx%d", assessment.Width, assessment.Height)
-			info.ResolutionSource = assessment.Source
+			i.Resolution = fmt.Sprintf("%dx%d", assessment.Width, assessment.Height)
+			i.ResolutionSource = assessment.Source
 			break
 		}
 	}
-	return info
+	return i
 }
 
 func AssessResolutions(candidates []ResolutionCandidate) []ResolutionAssessment {
@@ -194,14 +276,14 @@ func Check(pkg manifest.Package, current Info) error {
 
 func Summary(info Info) string {
 	return fmt.Sprintf("device=%q architecture=%q resolution=%q resolution_source=%q firmware_raw=%q firmware=%q firmware_source=%q version_raw=%q version=%q version_source=%q",
-		info.Device, info.Arch, info.Resolution, info.ResolutionSource, info.FirmwareRaw, info.Firmware, info.FirmwareSource, info.VersionRaw, info.Version, info.VersionSource)
+		info.Device, info.Arch, info.Resolution, info.ResolutionSource, info.Evidence.FirmwareRaw, info.Firmware, info.Evidence.FirmwareSource, info.Evidence.VersionRaw, info.Version, info.Evidence.VersionSource)
 }
 
 func compatibilityError(field string, current Info, constraint string) error {
 	detected := fmt.Sprintf("device=%q architecture=%q resolution=%q resolution_source=%q firmware_raw=%q firmware=%q firmware_source=%q",
-		current.Device, current.Arch, current.Resolution, current.ResolutionSource, current.FirmwareRaw, current.Firmware, current.FirmwareSource)
+		current.Device, current.Arch, current.Resolution, current.ResolutionSource, current.Evidence.FirmwareRaw, current.Firmware, current.Evidence.FirmwareSource)
 	if field == "firmware_version" {
-		detected += fmt.Sprintf(" version_raw=%q version=%q version_source=%q", current.VersionRaw, current.Version, current.VersionSource)
+		detected += fmt.Sprintf(" version_raw=%q version=%q version_source=%q", current.Evidence.VersionRaw, current.Version, current.Evidence.VersionSource)
 	}
 	return fmt.Errorf("compatibility failed field=%s: detected %s; %s", field, detected, constraint)
 }

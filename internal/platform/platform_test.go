@@ -26,8 +26,8 @@ func TestDetectReadsKnulliDeviceAndFramebuffer(t *testing.T) {
 	write("boot/boot/knulli.board", "trimui-smart-pro\n")
 	write("etc/knulli-device", "legacy-device\n")
 	write("sys/class/graphics/fb0/virtual_size", "1280,720\n")
-	got := Detect(root)
-	if got.Firmware != "knulli" || got.FirmwareRaw != "knulli" || got.FirmwareSource != "/etc/os-release:OS_NAME" || got.Version != "scarab" || got.VersionRaw != "scarab 2026/05/10 14:23" || got.VersionSource != "/usr/share/knulli/knulli.version" || got.Device != "trimui-smart-pro" || got.Resolution != "1280x720" {
+	got := Resolve(root)
+	if got.Firmware != "knulli" || got.Evidence.FirmwareRaw != "knulli" || got.Evidence.FirmwareSource != "/etc/os-release:OS_NAME" || got.Version != "scarab" || got.Evidence.VersionRaw != "scarab 2026/05/10 14:23" || got.Evidence.VersionSource != "/usr/share/knulli/knulli.version" || got.Device != "trimui-smart-pro" || got.Resolution != "1280x720" {
 		t.Fatalf("unexpected detection: %#v", got)
 	}
 }
@@ -36,8 +36,8 @@ func TestDetectUsesDeterministicCurrentThenLegacyPriority(t *testing.T) {
 	root := t.TempDir()
 	writePlatformFile(t, root, "etc/os-release", "  OS_NAME = ' KNULLI '  \nOS_VERSION=\nOS_DATE=20260510\n")
 	writePlatformFile(t, root, "etc/knulli-release", "ID=knulli\nVERSION_ID=legacy\n")
-	got := Detect(root)
-	if got.Firmware != "knulli" || got.FirmwareSource != "/etc/os-release:OS_NAME" || got.Version != "20260510" || got.VersionSource != "/etc/os-release:OS_DATE" {
+	got := Resolve(root)
+	if got.Firmware != "knulli" || got.Evidence.FirmwareSource != "/etc/os-release:OS_NAME" || got.Version != "20260510" || got.Evidence.VersionSource != "/etc/os-release:OS_DATE" {
 		t.Fatalf("unexpected priority result: %#v", got)
 	}
 }
@@ -45,8 +45,8 @@ func TestDetectUsesDeterministicCurrentThenLegacyPriority(t *testing.T) {
 func TestDetectDoesNotTreatBuildrootOrMalformedVersionAsKnulli(t *testing.T) {
 	root := t.TempDir()
 	writePlatformFile(t, root, "etc/os-release", "ID=buildroot\nVERSION_ID=2025.02\nOS_NAME=other\nOS_VERSION=   \n")
-	got := Detect(root)
-	if got.Firmware != "" || got.FirmwareRaw != "other" || got.FirmwareSource != "/etc/os-release:OS_NAME" || got.Version != "" {
+	got := Resolve(root)
+	if got.Firmware != "" || got.Evidence.FirmwareRaw != "other" || got.Evidence.FirmwareSource != "/etc/os-release:OS_NAME" || got.Version != "" {
 		t.Fatalf("unknown firmware became compatible: %#v", got)
 	}
 }
@@ -55,8 +55,8 @@ func TestDetectUsesNarrowLegacyFallback(t *testing.T) {
 	root := t.TempDir()
 	writePlatformFile(t, root, "etc/os-release", "ID=buildroot\n")
 	writePlatformFile(t, root, "etc/knulli-release", "ID=KNULLI\nVERSION_ID=2025.2-dev-a1b2c3\n")
-	got := Detect(root)
-	if got.Firmware != "knulli" || got.FirmwareSource != "/etc/knulli-release:ID" || got.Version != "2025.2-dev-a1b2c3" {
+	got := Resolve(root)
+	if got.Firmware != "knulli" || got.Evidence.FirmwareSource != "/etc/knulli-release:ID" || got.Version != "2025.2-dev-a1b2c3" {
 		t.Fatalf("legacy fallback failed: %#v", got)
 	}
 }
@@ -115,7 +115,7 @@ func TestResolutionSelectionRejectsCorruptDisplayMode(t *testing.T) {
 		{Source: "SDL current display mode", Width: 1280, Height: 0x3333},
 		{Source: "/sys/class/graphics/fb0/virtual_size", Width: 1280, Height: 0x3333},
 	}
-	got := WithResolutionCandidates(Info{}, candidates)
+	got := Info{}.WithCandidates(candidates)
 	if got.Resolution != "1280x720" || got.ResolutionSource != "SDL renderer output" {
 		t.Fatalf("selected corrupt resolution: %#v", got)
 	}
@@ -131,7 +131,7 @@ func TestResolutionSelectionUsesValidatedFramebufferModeFallback(t *testing.T) {
 	root := t.TempDir()
 	writePlatformFile(t, root, "sys/class/graphics/fb0/mode", "U:1280x720p-60\n")
 	writePlatformFile(t, root, "sys/class/graphics/fb0/virtual_size", "1280,13107\n")
-	got := Detect(root)
+	got := Resolve(root)
 	if got.Resolution != "1280x720" || got.ResolutionSource != "/sys/class/graphics/fb0/mode" {
 		t.Fatalf("did not select framebuffer mode fallback: %#v", got)
 	}
@@ -143,7 +143,7 @@ func TestResolutionSelectionBlocksUnknownWhenEveryCandidateIsInvalid(t *testing.
 		{Source: "corrupt", Width: 1280, Height: 0x3333},
 		{Source: "query", Error: "display query failed"},
 	}
-	got := WithResolutionCandidates(Info{Resolution: "1280x720"}, candidates)
+	got := Info{Resolution: "1280x720"}.WithCandidates(candidates)
 	if got.Resolution != "" || got.ResolutionSource != "" {
 		t.Fatalf("invalid candidates became compatible: %#v", got)
 	}
@@ -178,7 +178,7 @@ func TestCheckRejectsUnknownCodenameOrderingForMinimumVersion(t *testing.T) {
 	pkg := manifest.Package{Compatibility: &manifest.Compatibility{
 		Firmware: "knulli", MinimumVersion: "2025.10", Architectures: []string{"aarch64"}, Devices: []string{"trimui-smart-pro"}, Resolutions: []string{"1280x720"},
 	}}
-	current := Info{Firmware: "knulli", FirmwareRaw: "knulli", FirmwareSource: "/etc/os-release:OS_NAME", Version: "scarab", VersionRaw: "scarab 2026/05/10 14:23", VersionSource: "/usr/share/knulli/knulli.version", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720"}
+	current := Info{Firmware: "knulli", Version: "scarab", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720", Evidence: Evidence{FirmwareRaw: "knulli", FirmwareSource: "/etc/os-release:OS_NAME", VersionRaw: "scarab 2026/05/10 14:23", VersionSource: "/usr/share/knulli/knulli.version"}}
 	err := Check(pkg, current)
 	for _, wanted := range []string{"field=firmware_version", `version_raw="scarab 2026/05/10 14:23"`, `version="scarab"`, `version_source="/usr/share/knulli/knulli.version"`, "ordering is unknown"} {
 		if err == nil || !strings.Contains(err.Error(), wanted) {
@@ -199,7 +199,7 @@ func TestCheckAllowsExperimentalCompatibilityWithoutInventedMinimum(t *testing.T
 
 func TestCheckFailureIncludesDetectedEvidenceAndConstraint(t *testing.T) {
 	pkg := manifest.Package{Compatibility: &manifest.Compatibility{Firmware: "knulli", Architectures: []string{"aarch64"}, Devices: []string{"trimui-smart-pro"}, Resolutions: []string{"1280x720"}}}
-	current := Info{FirmwareRaw: "buildroot", FirmwareSource: "/etc/os-release:ID", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720"}
+	current := Info{Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720", Evidence: Evidence{FirmwareRaw: "buildroot", FirmwareSource: "/etc/os-release:ID"}}
 	err := Check(pkg, current)
 	for _, wanted := range []string{"field=firmware", `device="trimui-smart-pro"`, `architecture="aarch64"`, `resolution="1280x720"`, `firmware_raw="buildroot"`, `firmware=""`, `firmware_source="/etc/os-release:ID"`, `requires firmware="knulli"`} {
 		if err == nil || !strings.Contains(err.Error(), wanted) {

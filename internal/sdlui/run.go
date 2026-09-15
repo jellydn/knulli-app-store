@@ -82,11 +82,11 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	runtimeCandidates := runtimeResolutionCandidates(window, renderer)
 	allCandidates := append([]platform.ResolutionCandidate(nil), runtimeCandidates...)
 	if options.Platform.ResolutionSource == "command-line override" {
-		allCandidates = append(append([]platform.ResolutionCandidate(nil), options.Platform.ResolutionCandidates...), runtimeCandidates...)
+		allCandidates = append(append([]platform.ResolutionCandidate(nil), options.Platform.Evidence.Candidates...), runtimeCandidates...)
 	} else {
-		allCandidates = append(allCandidates, options.Platform.ResolutionCandidates...)
+		allCandidates = append(allCandidates, options.Platform.Evidence.Candidates...)
 	}
-	options.Platform = platform.WithResolutionCandidates(options.Platform, allCandidates)
+	options.Platform = options.Platform.WithCandidates(allCandidates)
 	logResolutionCandidates(options.Diagnostics, platform.AssessResolutions(allCandidates), options.Platform)
 	backend.SetPlatform(options.Platform)
 	platformHeader := platform.DisplayHeader(options.Platform, 0, 0)

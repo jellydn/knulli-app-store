@@ -99,12 +99,12 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 	if err := writeIndexForTest(index, indexPath); err != nil {
 		t.Fatal(err)
 	}
-	detected := platform.Detect(root)
+	detected := platform.Resolve(root)
 	detected.Arch = "aarch64"
 	if detected.Resolution != "" {
 		t.Fatalf("corrupt framebuffer virtual size became compatible: %#v", detected)
 	}
-	detected = platform.WithResolutionCandidates(detected, append([]platform.ResolutionCandidate{{Source: "SDL renderer output", Width: 1280, Height: 720}}, detected.ResolutionCandidates...))
+	detected = detected.WithCandidates(append([]platform.ResolutionCandidate{{Source: "SDL renderer output", Width: 1280, Height: 720}}, detected.Evidence.Candidates...))
 	service, err := Open(indexPath, installer.Manager{Root: root}.WithPlatform(detected))
 	if err != nil {
 		t.Fatal(err)
@@ -133,7 +133,7 @@ func TestMagicXAllowsOnlyPlayTimeExperimentalPackage(t *testing.T) {
 	}
 	service, err := Open(indexPath, installer.Manager{Root: t.TempDir()}.WithPlatform(platform.Info{
 		Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", Device: "magicx-zero-28", Resolution: "640x480",
-		FirmwareRaw: "knulli", FirmwareSource: "/etc/os-release:OS_NAME", VersionRaw: "scarab 2026/08/19 16:06", VersionSource: "/usr/share/knulli/knulli.version", ResolutionSource: "SDL renderer output",
+		Evidence: platform.Evidence{FirmwareRaw: "knulli", FirmwareSource: "/etc/os-release:OS_NAME", VersionRaw: "scarab 2026/08/19 16:06", VersionSource: "/usr/share/knulli/knulli.version"}, ResolutionSource: "SDL renderer output",
 	}))
 	if err != nil {
 		t.Fatal(err)
