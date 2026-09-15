@@ -129,9 +129,9 @@ func run(arguments []string) error {
 			return fmt.Errorf("open diagnostics log: %w", err)
 		}
 		diagnosticLog.Event("startup", "component", "cli", "command", "uninstall")
-		outcome := installer.OperationOutcome{}
-		manager := installer.Manager{Root: *root, Diagnostics: diagnosticLog, Outcome: func(value installer.OperationOutcome) { outcome = value }}
-		if err := manager.UninstallContext(context.Background(), flags.Arg(0)); err != nil {
+		manager := installer.Manager{Root: *root, Diagnostics: diagnosticLog}
+		outcome, err := manager.Uninstall(context.Background(), flags.Arg(0))
+		if err != nil {
 			return err
 		}
 		fmt.Printf("uninstalled %s\n", flags.Arg(0))
@@ -202,18 +202,13 @@ func runApply(operation string, arguments []string) error {
 		diagnosticLog.Event("platform_detection_incomplete", "error", err.Error())
 		return err
 	}
-	outcome := installer.OperationOutcome{}
-	manager := installer.Manager{Root: *root, Platform: current, Diagnostics: diagnosticLog, Outcome: func(value installer.OperationOutcome) { outcome = value }}
-	switch operation {
-	case "install":
-		err = manager.Install(context.Background(), pkg)
-	case "adopt":
-		err = manager.Adopt(context.Background(), pkg)
-	case "update":
-		err = manager.Update(context.Background(), pkg)
-	case "repair":
-		err = manager.Repair(context.Background(), pkg)
+	ops := map[string]installer.Op{"install": installer.OpInstall, "adopt": installer.OpAdopt, "update": installer.OpUpdate, "repair": installer.OpRepair}
+	op, known := ops[operation]
+	if !known {
+		return fmt.Errorf("unknown operation %q", operation)
 	}
+	manager := installer.Manager{Root: *root, Diagnostics: diagnosticLog}.WithPlatform(current)
+	outcome, err := manager.Apply(context.Background(), op, pkg)
 	if err != nil {
 		return err
 	}

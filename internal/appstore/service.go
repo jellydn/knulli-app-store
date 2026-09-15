@@ -43,7 +43,7 @@ type Backend interface {
 }
 
 func (s *Service) SetPlatform(info platform.Info) {
-	s.manager.Platform = info
+	s.manager = s.manager.WithPlatform(info)
 }
 
 type Service struct {
@@ -67,24 +67,10 @@ func (s *Service) Items(ctx context.Context) ([]Item, error) {
 	}
 	items := make([]Item, 0, len(s.index.Packages))
 	for _, entry := range s.index.Packages {
-		status, err := s.manager.Status(entry.ID)
+		item, err := s.item(ctx, entry)
 		if err != nil {
-			return nil, fmt.Errorf("read %s status: %w", entry.ID, err)
+			return nil, err
 		}
-		item := Item{Package: entry.Package, Installed: status.Installed, InstalledVersion: status.Version, Healthy: status.Healthy}
-		item.DeviceTested = entry.Package.DeviceTested(s.manager.Platform.Firmware, s.manager.Platform.Arch, s.manager.Platform.Device, s.manager.Platform.Resolution)
-		if len(status.Issues) > 0 {
-			item.HealthReason = status.Issues[0].String()
-		}
-		if !item.Installed {
-			item.PreExisting, err = s.manager.PreExisting(entry.Package)
-			if err != nil {
-				return nil, fmt.Errorf("inspect %s destination: %w", entry.ID, err)
-			}
-		}
-		item.Compatible, item.Compatibility = compatibility(entry.Package, s.manager.Platform)
-		s.manager.Diagnostics.Event("compatibility_decision", "package", entry.ID, "allowed", fmt.Sprint(item.Compatible), "decision", item.Compatibility)
-		item.Actions = actions(item)
 		items = append(items, item)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Package.Name < items[j].Package.Name })
@@ -96,37 +82,28 @@ func (s *Service) Execute(ctx context.Context, id string, action Action, progres
 	if !found {
 		return fmt.Errorf("package %s is not in the catalogue", id)
 	}
-	items, err := s.Items(ctx)
+	item, err := s.item(ctx, entry)
 	if err != nil {
 		return err
 	}
-	var selected *Item
-	for index := range items {
-		if items[index].Package.ID == id {
-			selected = &items[index]
-			break
-		}
-	}
-	if selected == nil || !containsAction(selected.Actions, action) {
+	if !containsAction(item.Actions, action) {
 		return fmt.Errorf("%s is not available for %s", action, id)
 	}
 	message := operationMessage(action, entry.Package.Name)
 	progress(message)
 	s.manager.Diagnostics.Event("action_selected", "package", id, "action", string(action))
-	manager := s.manager
-	outcome := installer.OperationOutcome{}
-	manager.Outcome = func(value installer.OperationOutcome) { outcome = value }
+	var outcome installer.OperationOutcome
 	switch action {
 	case Install:
-		err = manager.Install(ctx, entry.Package)
+		outcome, err = s.manager.Apply(ctx, installer.OpInstall, entry.Package)
 	case Adopt:
-		err = manager.Adopt(ctx, entry.Package)
+		outcome, err = s.manager.Apply(ctx, installer.OpAdopt, entry.Package)
 	case Update:
-		err = manager.Update(ctx, entry.Package)
+		outcome, err = s.manager.Apply(ctx, installer.OpUpdate, entry.Package)
 	case Repair:
-		err = manager.Repair(ctx, entry.Package)
+		outcome, err = s.manager.Apply(ctx, installer.OpRepair, entry.Package)
 	case Uninstall:
-		err = manager.UninstallContext(ctx, id)
+		outcome, err = s.manager.Uninstall(ctx, id)
 	default:
 		return fmt.Errorf("unknown action %q", action)
 	}
@@ -141,7 +118,7 @@ func (s *Service) ExportDiagnostics(ctx context.Context) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	lines := []string{"Platform: " + platform.Summary(s.manager.Platform), fmt.Sprintf("Catalogue packages: %d", len(s.index.Packages))}
+	lines := []string{"Platform: " + platform.Summary(s.manager.Platform()), fmt.Sprintf("Catalogue packages: %d", len(s.index.Packages))}
 	for _, entry := range s.index.Packages {
 		lines = append(lines, strings.Join([]string{"Package:", entry.ID, entry.Package.Version, entry.Package.Review.Status}, " "))
 	}
@@ -160,6 +137,33 @@ func (s *Service) find(id string) (catalog.Entry, bool) {
 		}
 	}
 	return catalog.Entry{}, false
+}
+
+// item derives the catalogue item for one entry: status, compatibility, and
+// the actions the current package state allows.
+func (s *Service) item(ctx context.Context, entry catalog.Entry) (Item, error) {
+	if err := ctx.Err(); err != nil {
+		return Item{}, err
+	}
+	status, err := s.manager.Status(entry.ID)
+	if err != nil {
+		return Item{}, fmt.Errorf("read %s status: %w", entry.ID, err)
+	}
+	item := Item{Package: entry.Package, Installed: status.Installed, InstalledVersion: status.Version, Healthy: status.Healthy}
+	item.DeviceTested = entry.Package.DeviceTested(s.manager.Platform().Firmware, s.manager.Platform().Arch, s.manager.Platform().Device, s.manager.Platform().Resolution)
+	if len(status.Issues) > 0 {
+		item.HealthReason = status.Issues[0].String()
+	}
+	if !item.Installed {
+		item.PreExisting, err = s.manager.PreExisting(entry.Package)
+		if err != nil {
+			return Item{}, fmt.Errorf("inspect %s destination: %w", entry.ID, err)
+		}
+	}
+	item.Compatible, item.Compatibility = compatibility(entry.Package, s.manager.Platform())
+	s.manager.Diagnostics.Event("compatibility_decision", "package", entry.ID, "allowed", fmt.Sprint(item.Compatible), "decision", item.Compatibility)
+	item.Actions = actions(item)
+	return item, nil
 }
 
 func compatibility(pkg manifest.Package, current platform.Info) (bool, string) {

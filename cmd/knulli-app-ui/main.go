@@ -60,7 +60,7 @@ func run() error {
 		current.Arch = runtime.GOARCH
 	}
 	diagnosticLog.Event("platform_filesystem_detected", "details", platform.Summary(current))
-	manager := installer.Manager{Root: *root, Platform: current, Diagnostics: diagnosticLog}
+	manager := installer.Manager{Root: *root, Diagnostics: diagnosticLog}.WithPlatform(current)
 	service, err := appstore.Open(*catalogue, manager)
 	if err != nil {
 		diagnosticLog.Event("startup_error", "error", err.Error())

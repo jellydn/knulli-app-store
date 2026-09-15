@@ -21,9 +21,9 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 	if err := writeIndexForTest(index, indexPath); err != nil {
 		t.Fatal(err)
 	}
-	service, err := Open(indexPath, installer.Manager{Root: t.TempDir(), Platform: platform.Info{
+	service, err := Open(indexPath, installer.Manager{Root: t.TempDir()}.WithPlatform(platform.Info{
 		Firmware: "knulli", Version: "scarab", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720",
-	}})
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 		t.Fatalf("corrupt framebuffer virtual size became compatible: %#v", detected)
 	}
 	detected = platform.WithResolutionCandidates(detected, append([]platform.ResolutionCandidate{{Source: "SDL renderer output", Width: 1280, Height: 720}}, detected.ResolutionCandidates...))
-	service, err := Open(indexPath, installer.Manager{Root: root, Platform: detected})
+	service, err := Open(indexPath, installer.Manager{Root: root}.WithPlatform(detected))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,10 +131,10 @@ func TestMagicXAllowsOnlyPlayTimeExperimentalPackage(t *testing.T) {
 	if err := writeIndexForTest(index, indexPath); err != nil {
 		t.Fatal(err)
 	}
-	service, err := Open(indexPath, installer.Manager{Root: t.TempDir(), Platform: platform.Info{
+	service, err := Open(indexPath, installer.Manager{Root: t.TempDir()}.WithPlatform(platform.Info{
 		Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", Device: "magicx-zero-28", Resolution: "640x480",
 		FirmwareRaw: "knulli", FirmwareSource: "/etc/os-release:OS_NAME", VersionRaw: "scarab 2026/08/19 16:06", VersionSource: "/usr/share/knulli/knulli.version", ResolutionSource: "SDL renderer output",
-	}})
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
