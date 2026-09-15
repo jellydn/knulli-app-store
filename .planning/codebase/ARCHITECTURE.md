@@ -15,7 +15,7 @@
 ## Layers
 
 **Manifest and catalogue:**
-- Purpose: v1 data contract, semantic validation, deterministic signable index
+- Purpose: v1 data contract, semantic validation, deterministic signed index
 - Location: `internal/manifest`, `internal/catalog`, `schema/package-manifest-v1.schema.json`, `catalogue/`
 - Contains: package structs, review status, SHA-256 of canonical JSON
 - Depends on: encoding/json with `DisallowUnknownFields`
@@ -31,7 +31,7 @@
 **Safe filesystem and archives:**
 - Purpose: bound extraction and destination mutation
 - Location: `internal/archive`, `internal/safefs`
-- Contains: ZIP/`tar.gz` extractors, symlink rejection, atomic writes, transactions
+- Contains: ZIP/`tar.gz` extractors, symlink rejection, atomic writes, journaled transactions
 - Depends on: stdlib archive packages
 - Used by: `internal/installer`
 

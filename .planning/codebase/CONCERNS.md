@@ -4,23 +4,11 @@
 
 ## Tech Debt
 
-**Go 1.19 baseline:**
-- Issue: Language and CI are pinned to 1.19 / `staticcheck v0.3.3` / dual `// +build` lines
-- Files: `go.mod`, `.github/workflows/check.yml`, `internal/sdlui/*.go`, `cmd/knulli-app-ui/main.go`
-- Impact: Misses later Go security and toolchain fixes; SDL packages keep legacy build tags
-- Fix approach: Bump Go, staticcheck, and CI images together; drop `// +build` when the floor allows
-
-**Catalogue index signing is not implemented:**
-- Issue: `catalog.Build` is deterministic and hash-bound, but release automation does not yet sign the index
-- Files: `internal/catalog/catalog.go`, `docs/architecture.md`, `docs/adr/0002-declarative-reviewed-catalogue.md`
-- Impact: A replaced `catalog-index.json` on device is not cryptographically authenticated by this project
-- Fix approach: Add signing and key distribution in the trusted release workflow before calling the index trusted
-
-**Power-loss journal is missing:**
-- Issue: Transactions roll back in-process; restart after power loss is not recovered from a journal
-- Files: `internal/safefs/transaction.go`, `docs/security-model.md`
-- Impact: A kill during commit can leave backups and partial state that need manual repair
-- Fix approach: Persist a journal before mutation and resume or roll back on next start
+**Long-lived catalogue signing key:**
+- Issue: device artifacts sign with a per-build ed25519 key compiled into the binary
+- Files: `internal/catalog/sign.go`, `.github/workflows/check.yml`
+- Impact: an index update still needs a matching app build
+- Fix approach: add a production key and rotation policy if the index is distributed apart from the binary
 
 ## Known Bugs
 
@@ -110,10 +98,10 @@
 
 ## Dependencies at Risk
 
-**golang.org/x/image v0.7.0:**
-- Risk: old x/image line; only GUI text/scale usage
-- Impact: GUI compile if the module is yanked or incompatible with a Go bump
-- Migration plan: upgrade with the Go toolchain bump; keep CLI CGO-free and independent of this module
+**golang.org/x/image:**
+- Risk: GUI text and scale path only; keep it on a current module line with the Go baseline
+- Impact: GUI compile if the module is yanked or incompatible with a later Go bump
+- Migration plan: upgrade with the toolchain; keep the CLI CGO-free and independent of this module
 
 **SDL2 and glibc 2.34:**
 - Risk: Knulli does not publish this as a compatibility contract; CI uses Debian Bookworm
@@ -121,14 +109,6 @@
 - Migration plan: record real-device `ldd`/`readelf` evidence per Knulli release
 
 ## Missing Critical Features
-
-**Signed catalogue index:**
-- Problem: index is deterministic but unsigned
-- Blocks: treating device `catalog-index.json` as a trusted distribution artifact
-
-**Crash journal:**
-- Problem: no restart recovery for interrupted transactions
-- Blocks: guaranteed rollback after power loss
 
 **Package runtime sandbox:**
 - Problem: installed programs are not confined
@@ -152,11 +132,11 @@
 - Risk: operators must pass flags when detection is incomplete
 - Priority: Medium
 
-**Index signing and journal recovery:**
-- What's not tested: absent features
-- Files: `internal/catalog/catalog.go`, `internal/safefs/transaction.go`
-- Risk: operators may over-trust generated artifacts and crash behavior
-- Priority: High before a non-experimental release
+**Production catalogue key rotation:**
+- What's not tested: a long-lived release key and independent index updates
+- Files: `internal/catalog/sign.go`, `.github/workflows/check.yml`
+- Risk: operators may treat a per-build signature as a stable trust root
+- Priority: Medium until the index is shipped without a new binary
 
 ---
 

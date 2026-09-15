@@ -1,5 +1,4 @@
 //go:build sdl
-// +build sdl
 
 package main
 

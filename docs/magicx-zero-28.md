@@ -17,7 +17,7 @@ Download the `knulli-app-store-magicx-zero-28-experimental` Actions artifact. Ve
 
 The first launch for each device/controller identity opens a dedicated setup screen before the catalogue. Choose **Use Detected Mapping**, **Test Detected Mapping**, **Customize**, or **Safe Exit**. Customize assigns Up, Down, Left, Right, Confirm, Back, Details/Diagnostics, and Exit one at a time. Every detected button gets an Accept, Retry, Start Over, or Cancel review before progress continues. Conflicts stay on the current action. Custom and tested mappings require a complete preview before atomic save.
 
-Later launches load the saved mapping directly. Open Settings with the physical control shown beside **Settings** to run setup again, export diagnostics, reset the current mapping, or close. Hold the saved Back and Details/Diagnostics controls while launching to force setup. If no SDL GameController exists, a blocked screen shows the log and diagnostic paths and never opens the catalogue.
+Later launches load the saved mapping directly. Open Settings with the physical control shown beside **Settings** to run setup again, export diagnostics, reset the current mapping, or close. Hold the saved Back and Details/Diagnostics controls while launching to force setup. If no SDL GameController exists, a blocked screen shows the log and diagnostic paths and never opens the catalogue. Confirm exports diagnostics. Use the system exit control to leave.
 
 Mappings use this versioned file:
 

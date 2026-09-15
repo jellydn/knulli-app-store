@@ -1,5 +1,4 @@
 //go:build sdl
-// +build sdl
 
 package sdlui
 
@@ -104,7 +103,7 @@ func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName 
 		if diagnosticStatus != "" {
 			text(frame, 32, 279, statusColor, shorten(strings.ToUpper(diagnosticStatus), 78))
 		}
-		text(frame, 32, 316, palette.muted, "USE THE SYSTEM EXIT CONTROL TO LEAVE")
+		text(frame, 32, 316, palette.muted, "CONFIRM EXPORTS DIAGNOSTICS  USE THE SYSTEM EXIT CONTROL TO LEAVE")
 	case storeinput.Setup:
 		text(frame, 32, 174, palette.warning, "SETUP IS REQUIRED FOR SAFE CONTROLS")
 		for index, item := range storeinput.SetupItems {

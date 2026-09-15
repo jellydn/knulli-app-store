@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-09-15
+- Note: ADR 0007 replaced the Go 1.19 language baseline. The static CLI and Knulli-owned firmware detection still apply.
 
 ## Context
 
@@ -23,6 +24,6 @@ CI builds experimental Ports artifacts on Debian Bookworm with glibc symbols thr
 
 ### Negative
 
-- Go 1.19 and `golang.org/x/image v0.7.0` are behind current releases; upgrades need a coordinated CI and staticcheck change.
+- The original Go 1.19 and `golang.org/x/image v0.7.0` lines are superseded by ADR 0007.
 - H700 detection file names still need validation against real Knulli images.
 - The GUI glibc/SDL contract is evidenced by CI and one system binary, not a published Knulli compatibility guarantee.

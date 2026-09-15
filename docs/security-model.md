@@ -10,7 +10,7 @@
 
 ## Trust boundaries
 
-Catalogue review decides whether metadata is actionable. HTTPS provides transport security, while the reviewed SHA-256 binds the archive bytes. A checksum supplied only beside a mutable asset is not enough evidence for catalogue promotion.
+Catalogue review decides whether metadata is actionable. HTTPS provides transport security, while the reviewed SHA-256 binds the archive bytes. Device builds also verify an ed25519 signature over `catalog-index.json`. A checksum supplied only beside a mutable asset is not enough evidence for catalogue promotion.
 
 Upstream package code runs later when the user launches it. The installer does not sandbox that runtime. The `network` field tells users and future policy code whether the installed application needs network access; it does not grant or enforce an operating-system permission.
 
@@ -28,7 +28,7 @@ Upstream package code runs later when the user launches it. The installer does n
 - Keep manager state outside package write policy.
 - Serialize operations with a filesystem lock.
 - Atomically replace regular files and installed state.
-- Snapshot every changed file and roll back a failed operation in reverse order.
+- Snapshot every changed file, persist a journal before destination mutation, and roll back a failed operation in reverse order. Recover an open journal on the next locked start.
 - Keep a persistent backup when installation overwrites a file the package did not own.
 - Show a detected external copy as the row state **EXTERNAL** with the action **Manage existing**, then inventory it before adoption. Exact release-hash matches can become manager-owned; changed and unknown files are marked unmanaged and backed up because ownership is not proven.
 - Preserve declared configuration during repair, update, and uninstall.
@@ -40,10 +40,10 @@ Upstream package code runs later when the user launches it. The installer does n
 ## Non-goals and residual risks
 
 - There is no package runtime sandbox.
-- Catalogue-index signing and key distribution are future release-workflow tasks.
+- Device artifacts authenticate `catalog-index.json` with an ed25519 sidecar and a public key compiled into that build. A replaced index without a matching signature fails to load. A long-lived production key is still required if the index is shipped without a new binary.
 - Root can change files below approved `/userdata` paths despite installer checks.
 - Path checks do not defend against a hostile local process that races a checked directory into a symlink.
-- Power loss is not yet journal-recovered across process restarts. Atomic file replacement limits corruption, and synchronous failures roll back.
+- A corrupt transaction journal blocks the next locked operation until the leftover directory is inspected.
 - Empty directories can remain after rollback or uninstall.
 - Device detection reads the Knulli board identifier (`/boot/boot/knulli.board`), then `/etc/knulli-device`, then Batocera's board file. An unrecognized board shows `UNKNOWN DEVICE` and is blocked until the operator supplies explicit flags.
 - The GUI has one community-reported TrimUI Smart Pro test. Grout 5.1.0.0 is verified only for that declared device matrix. The report did not itemize lifecycle steps.

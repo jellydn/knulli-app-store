@@ -28,6 +28,6 @@ For ROM-download software, record a visible copyright warning and review every p
 
 ## Build the index
 
-`knulli-app catalogue` sorts packages by ID and hashes the canonical manifest representation. It omits timestamps so identical inputs produce identical bytes. Release automation can sign `build/catalog-index.json` with a separately managed key. Signature transport and key rotation are intentionally not part of manifest v1.
+`knulli-app catalogue` sorts packages by ID and hashes the canonical manifest representation. It omits timestamps so identical inputs produce identical bytes. Device CI signs the exact index bytes with ed25519 and ships `catalog-index.json.sig`. The public key is compiled into that device binary. Local `make catalogue` stays unsigned for review.
 
 The binary release asset remains upstream. The generated index contains metadata and hashes only.

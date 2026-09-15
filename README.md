@@ -6,7 +6,7 @@
   <a href="https://github.com/jellydn/knulli-app-store/actions/workflows/check.yml">
     <img alt="CI" src="https://github.com/jellydn/knulli-app-store/actions/workflows/check.yml/badge.svg" />
   </a>
-  <img alt="Go" src="https://img.shields.io/badge/Go-%3E%3D1.19-00ADD8.svg" />
+  <img alt="Go" src="https://img.shields.io/badge/Go-%3E%3D1.27-00ADD8.svg" />
   <a href="https://knulli.org/">
     <img alt="Knulli" src="https://img.shields.io/badge/Knulli-community-blue.svg" />
   </a>
@@ -25,7 +25,7 @@
 - Reviewable catalogue with separate community approval and technical status
 - Transactional installer that never runs a remote install script
 - Immutable HTTPS releases with exact size and SHA-256 checks
-- Writes below `/userdata` only, with snapshots and rollback
+- Writes below `/userdata` only, with snapshots, a crash journal, and rollback
 - Controller-only SDL2 GUI for TrimUI Smart Pro (1280×720) and MagicX Zero 28 (640×480)
 - Static `aarch64` CLI for review, install, repair, and uninstall
 - PortMaster as a featured external provider. This repo does not copy that catalogue
@@ -45,7 +45,7 @@
 
 ## Prerequisites
 
-- Go >= 1.19
+- Go >= 1.27
 - `libsdl2-dev` for the experimental GUI
 - A reviewed Knulli `aarch64` device for on-device use
 
@@ -73,7 +73,7 @@ GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o build/knulli-app-aar
 # Review one manifest without installing it.
 go run ./cmd/knulli-app validate catalogue/packages/io.github.unitreign.playtime.json
 
-# Build a deterministic index that release automation can sign.
+# Build a deterministic index. Device CI also writes catalog-index.json.sig.
 go run ./cmd/knulli-app catalogue -output build/catalog-index.json
 
 # Install an actionable local manifest. Flags fill values that detection cannot read.

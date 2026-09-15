@@ -5,7 +5,7 @@
 ## Test Framework
 
 **Runner:**
-- Go `testing` (toolchain 1.19)
+- Go `testing` (toolchain 1.27)
 - Config: none beyond `Makefile` and CI workflow
 
 **Assertion Library:**

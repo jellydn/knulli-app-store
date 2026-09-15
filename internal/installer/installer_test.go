@@ -519,6 +519,48 @@ func TestInstallRejectsAnExternalCopyAndNamesTheOnScreenAction(t *testing.T) {
 	}
 }
 
+func TestLockedOperationRecoversCrashedTransaction(t *testing.T) {
+	root := t.TempDir()
+	guard, err := safefs.NewGuard(root, []string{managerPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	managerHost, err := guard.Resolve(managerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(managerHost, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeRootFile(t, root, "userdata/system/knulli-app-store/existing", "before")
+	tx, err := safefs.Begin(guard, managerHost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Write(managerPath+"/existing", []byte("after"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Write(managerPath+"/crashed", []byte("partial"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, "userdata/system/knulli-app-store/existing", "after")
+	assertRootFile(t, root, "userdata/system/knulli-app-store/crashed", "partial")
+
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
+	if err := manager.Install(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, "userdata/system/knulli-app-store/existing", "before")
+	if _, err := os.Stat(filepath.Join(root, "userdata/system/knulli-app-store/crashed")); !os.IsNotExist(err) {
+		t.Fatalf("crashed file survived recovery: %v", err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "reviewed launcher")
+}
+
 func TestCandidateCannotBeInstalled(t *testing.T) {
 	pkg := testPackage("https://example.com/releases/download/v1/demo.zip", []byte("x"), "1.0.0")
 	pkg.Review.Status = "candidate"

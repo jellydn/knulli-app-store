@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 
 	"github.com/jellydn/knulli-app-store/internal/catalog"
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
@@ -19,6 +21,7 @@ const usage = `Knulli App Store installer core
 Usage:
   knulli-app validate MANIFEST
   knulli-app catalogue [-dir catalogue/packages] [-output build/catalog-index.json]
+                     [-signing-key KEY] [-generate-signing-key KEY]
   knulli-app install [platform flags] MANIFEST
   knulli-app adopt [platform flags] MANIFEST
   knulli-app update [platform flags] MANIFEST
@@ -59,8 +62,16 @@ func run(arguments []string) error {
 		flags := flag.NewFlagSet("catalogue", flag.ContinueOnError)
 		directory := flags.String("dir", "catalogue/packages", "manifest directory")
 		output := flags.String("output", "build/catalog-index.json", "index output path or -")
+		signingKey := flags.String("signing-key", "", "ed25519 private key hex file")
+		generateKey := flags.String("generate-signing-key", "", "write a new ed25519 key pair and sign the index")
 		if err := flags.Parse(arguments[1:]); err != nil {
 			return err
+		}
+		if *signingKey != "" && *generateKey != "" {
+			return fmt.Errorf("use only one of -signing-key or -generate-signing-key")
+		}
+		if (*signingKey != "" || *generateKey != "") && *output == "-" {
+			return fmt.Errorf("cannot sign catalogue output written to stdout")
 		}
 		index, err := catalog.Build(*directory)
 		if err != nil {
@@ -70,6 +81,37 @@ func run(arguments []string) error {
 			return err
 		}
 		fmt.Fprintf(os.Stderr, "wrote %d packages to %s\n", len(index.Packages), *output)
+		keyPath := *signingKey
+		if *generateKey != "" {
+			public, private, err := catalog.GenerateKey()
+			if err != nil {
+				return err
+			}
+			if err := writeNewFile(*generateKey, []byte(hex.EncodeToString(private)+"\n"), 0600); err != nil {
+				return err
+			}
+			if err := writeNewFile(*generateKey+".pub", []byte(hex.EncodeToString(public)+"\n"), 0644); err != nil {
+				os.Remove(*generateKey)
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "public key %s\n", hex.EncodeToString(public))
+			keyPath = *generateKey
+		}
+		if keyPath == "" {
+			return nil
+		}
+		raw, err := os.ReadFile(keyPath)
+		if err != nil {
+			return err
+		}
+		private, err := catalog.ParsePrivateKey(strings.TrimSpace(string(raw)))
+		if err != nil {
+			return err
+		}
+		if err := catalog.SignFile(*output, private); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "signed %s\n", catalog.SignaturePath(*output))
 		return nil
 	case "install", "adopt", "update", "repair":
 		return runApply(arguments[0], arguments[1:])
@@ -98,6 +140,23 @@ func run(arguments []string) error {
 	default:
 		return fmt.Errorf("unknown command %q", arguments[0])
 	}
+}
+
+func writeNewFile(path string, data []byte, mode os.FileMode) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
+	if err != nil {
+		return err
+	}
+	if _, err := file.Write(data); err != nil {
+		file.Close()
+		os.Remove(path)
+		return err
+	}
+	if err := file.Close(); err != nil {
+		os.Remove(path)
+		return err
+	}
+	return nil
 }
 
 func runApply(operation string, arguments []string) error {
