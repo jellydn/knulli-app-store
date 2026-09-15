@@ -25,6 +25,7 @@ CONTROLS
 D-pad: move through packages and actions
 SDL A: select or confirm
 SDL B: back or cancel
+SDL Y: export a redacted diagnostic text bundle
 
 With Knulli's default Ports layout, physical B (south) maps to SDL A and
 physical A (east) maps to SDL B. A per-game Xbox-layout setting reverses
@@ -51,5 +52,9 @@ TROUBLESHOOTING
 
 If the app returns to EmulationStation, inspect:
   /userdata/system/logs/knulli-app-store.log
+
+Press Y in the App Store to export platform, catalogue, and capped redacted
+logs to /userdata/system/knulli-app-store/diagnostics. The export does not
+include package credentials or private configuration files.
 
 Do not replace Knulli's SDL library with a desktop or stock TrimUI copy.

@@ -27,6 +27,7 @@ signed index (future)                  HTTPS download
 - `internal/manifest`: v1 data contract and semantic policy not expressible cleanly in JSON Schema.
 - `internal/catalog`: deterministic validation, sorting, and manifest hashing for a signable index.
 - `internal/platform`: platform detection and compatibility checks.
+- `internal/diagnostics`: timestamped, redacted, size-bounded event logs and user-requested diagnostic exports.
 - `internal/archive`: bounded ZIP and `tar.gz` extraction into staging.
 - `internal/safefs`: allowed-path resolution, symlink rejection, atomic files, free-space checks, and rollback snapshots.
 - `internal/installer`: download, lifecycle operations, installed state, backups, and XML menu integration.

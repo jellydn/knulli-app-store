@@ -60,7 +60,7 @@ func draw(model *storeui.Model, platformName string, controller bool) *image.RGB
 	if controller {
 		controllerStatus = "CONTROLLER: READY"
 	}
-	text(frame, 16, 345, palette.muted, "DPAD NAVIGATE   B SELECT   A BACK")
+	text(frame, 16, 345, palette.muted, "DPAD NAV   B SELECT   A BACK   Y EXPORT LOG")
 	text(frame, 436, 345, palette.muted, controllerStatus)
 	if platformName != "" {
 		text(frame, 16, 39, palette.muted, shorten(strings.ToUpper(platformName), 58))
@@ -181,7 +181,7 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item) {
 	if model.Focus == storeui.Confirm {
 		action := item.Actions[model.Action]
 		if item.Package.Experimental() && (action == appstore.Install || action == appstore.Adopt) {
-			fill(frame, image.Rect(250, 108, 616, 232), color.RGBA{R: 35, G: 46, B: 64, A: 255})
+			fill(frame, image.Rect(250, 108, 616, 252), color.RGBA{R: 35, G: 46, B: 64, A: 255})
 			text(frame, 266, 132, palette.warning, "EXPERIMENTAL PACKAGE TEST")
 			text(frame, 266, 151, palette.text, strings.ToUpper(string(action))+" "+shorten(strings.ToUpper(item.Package.Name), 24)+"?")
 			warning := strings.ToUpper(item.Package.Install.Warning)
@@ -213,7 +213,23 @@ func drawStatus(frame *image.RGBA, model *storeui.Model) {
 		return
 	}
 	if model.Message != "" {
-		text(frame, 252, 312, palette.accent, shorten(strings.ToUpper(model.Message), 50))
+		message := strings.ToUpper(model.Message)
+		if strings.HasPrefix(message, "DIAGNOSTICS SAVED TO ") {
+			fill(frame, image.Rect(248, 244, 618, 318), color.RGBA{R: 28, G: 55, B: 57, A: 255})
+			for index, line := range wrapText(message, 48) {
+				if index == 4 {
+					break
+				}
+				text(frame, 256, 261+index*15, palette.accent, line)
+			}
+			return
+		}
+		for index, line := range wrapText(message, 50) {
+			if index == 1 {
+				break
+			}
+			text(frame, 252, 312+index*15, palette.accent, line)
+		}
 	}
 }
 
@@ -231,6 +247,18 @@ func wrapText(value string, width int) []string {
 	var lines []string
 	current := ""
 	for _, word := range words {
+		if len(word) > width {
+			if current != "" {
+				lines = append(lines, current)
+				current = ""
+			}
+			for len(word) > width {
+				lines = append(lines, word[:width])
+				word = word[width:]
+			}
+			current = word
+			continue
+		}
 		if current == "" {
 			current = word
 			continue

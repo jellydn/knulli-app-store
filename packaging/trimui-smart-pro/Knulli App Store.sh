@@ -14,4 +14,4 @@ if [ ! -x ./knulli-app-ui ] || [ ! -r ./catalog-index.json ]; then
   exit 1
 fi
 
-exec ./knulli-app-ui -catalog ./catalog-index.json >>"$LOG_FILE" 2>&1
+exec ./knulli-app-ui -catalog ./catalog-index.json

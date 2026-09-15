@@ -25,8 +25,13 @@ func TestRenderRepresentativeStates(t *testing.T) {
 			Review:  manifest.Review{Status: "experimental", Approval: &manifest.Approval{Provenance: "community"}},
 			Install: &manifest.Install{Warning: "Unverified. Do not use Grout updater. Update only through Knulli App Store."},
 		},
-		PreExisting: true, Compatible: true, Compatibility: "Experimental test for detected platform", Actions: []appstore.Action{appstore.Adopt},
+		PreExisting: true, Compatible: true, Compatibility: "Experimental compatibility: Knulli identity confirmed from /etc/os-release:OS_NAME; no minimum version is claimed; device=trimui-smart-pro architecture=aarch64 resolution=1280x720 version=scarab", Actions: []appstore.Action{appstore.Adopt},
 	}
+	incompatible := experimental
+	incompatible.PreExisting = false
+	incompatible.Compatible = false
+	incompatible.Actions = nil
+	incompatible.Compatibility = `compatibility failed field=firmware: detected device="trimui-smart-pro" architecture="aarch64" resolution="1280x720" firmware_raw="buildroot" firmware="" firmware_source="/etc/os-release:ID"; package requires firmware="knulli"`
 	emuDrop := appstore.Item{
 		Package: manifest.Package{
 			ID: "io.github.ahmadteeb.emudrop", Name: "EmuDrop", Type: "utility", Summary: "Browses third-party sources and downloads ROM files and artwork.",
@@ -38,10 +43,12 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		Compatibility: "Community approved; installation is blocked by technical review",
 	}
 	states := map[string]*storeui.Model{
-		"browse":   {Items: []appstore.Item{emuDrop}},
-		"confirm":  {Items: []appstore.Item{experimental}, Focus: storeui.Confirm},
-		"error":    {Items: []appstore.Item{item}, Error: "SHA-256 mismatch; package files were not changed"},
-		"progress": {Items: []appstore.Item{experimental}, Busy: true, Message: "Downloading, verifying, and applying Grout"},
+		"browse":              {Items: []appstore.Item{emuDrop}},
+		"compatibility-error": {Items: []appstore.Item{incompatible}},
+		"confirm":             {Items: []appstore.Item{experimental}, Focus: storeui.Confirm},
+		"diagnostics":         {Items: []appstore.Item{experimental}, Message: "Diagnostics saved to /userdata/system/knulli-app-store/diagnostics/knulli-app-store-diagnostics-20260915T073500Z.txt"},
+		"error":               {Items: []appstore.Item{item}, Error: "SHA-256 mismatch; package files were not changed"},
+		"progress":            {Items: []appstore.Item{experimental}, Busy: true, Message: "Downloading, verifying, and applying Grout"},
 	}
 	directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR")
 	for name, model := range states {
@@ -56,6 +63,15 @@ func TestRenderRepresentativeStates(t *testing.T) {
 			if err := saveScreenshot(filepath.Join(directory, "trimui-smart-pro-gui-"+name+".png"), frame); err != nil {
 				t.Fatal(err)
 			}
+		}
+	}
+}
+
+func TestWrapTextBreaksLongDiagnosticPaths(t *testing.T) {
+	lines := wrapText("SAVED /userdata/system/knulli-app-store/diagnostics/knulli-app-store-diagnostics.txt", 20)
+	for _, line := range lines {
+		if len(line) > 20 {
+			t.Fatalf("line is wider than the panel: %q", line)
 		}
 	}
 }

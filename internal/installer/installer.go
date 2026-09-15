@@ -14,15 +14,17 @@ import (
 	"syscall"
 
 	storearchive "github.com/jellydn/knulli-app-store/internal/archive"
+	"github.com/jellydn/knulli-app-store/internal/diagnostics"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/platform"
 	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
 
 type Manager struct {
-	Root     string
-	Platform platform.Info
-	Client   *http.Client
+	Root        string
+	Platform    platform.Info
+	Client      *http.Client
+	Diagnostics *diagnostics.Log
 }
 
 func (m Manager) Install(ctx context.Context, pkg manifest.Package) error {
@@ -38,6 +40,12 @@ func (m Manager) Repair(ctx context.Context, pkg manifest.Package) error {
 }
 
 func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation string) (result error) {
+	m.event("operation_start", "package", pkg.ID, "action", operation)
+	defer func() {
+		if result != nil {
+			m.event("operation_error", "package", pkg.ID, "action", operation, "error", result.Error())
+		}
+	}()
 	if err := pkg.Validate(); err != nil {
 		return err
 	}
@@ -45,8 +53,10 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 		return fmt.Errorf("package %s is a candidate and cannot be installed", pkg.ID)
 	}
 	if err := platform.Check(pkg, m.Platform); err != nil {
+		m.event("compatibility_rejected", "package", pkg.ID, "decision", err.Error())
 		return err
 	}
+	m.event("compatibility_allowed", "package", pkg.ID, "status", pkg.Review.Status, "platform", platform.Summary(m.Platform))
 	if err := validateDownloadURL(pkg.Release.URL); err != nil {
 		return err
 	}
@@ -100,6 +110,7 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 		if err != nil {
 			return fmt.Errorf("inventory pre-existing installation: %w", err)
 		}
+		m.event("adoption_inventory", "package", pkg.ID, "files", fmt.Sprint(len(existing)), "bytes", fmt.Sprint(existingBytes))
 	}
 	available, err := safefs.AvailableBytes(destinationHost)
 	if err != nil {
@@ -119,9 +130,11 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	if client == nil {
 		client = defaultHTTPClient()
 	}
+	m.event("download_start", "package", pkg.ID, "url", pkg.Release.URL, "expected_bytes", fmt.Sprint(pkg.Release.Size))
 	if err := download(ctx, client, *pkg.Release, archivePath); err != nil {
 		return fmt.Errorf("download release: %w", err)
 	}
+	m.event("download_verified", "package", pkg.ID, "bytes", fmt.Sprint(pkg.Release.Size), "sha256", pkg.Release.SHA256)
 	files, err := storearchive.Extract(archivePath, pkg.Release.Format, filepath.Join(work, "staging"), pkg.Install.StripComponents, pkg.Release.InstalledSize)
 	if err != nil {
 		return fmt.Errorf("extract release: %w", err)
@@ -129,6 +142,7 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	if len(files) == 0 {
 		return fmt.Errorf("release archive contains no installable files")
 	}
+	m.event("extraction_complete", "package", pkg.ID, "format", pkg.Release.Format, "files", fmt.Sprint(len(files)))
 	if err := applyExecutableModes(files, pkg.Install.Executables); err != nil {
 		return err
 	}
@@ -140,10 +154,15 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	if err != nil {
 		return err
 	}
+	m.event("transaction_begin", "package", pkg.ID, "action", operation)
 	defer func() {
 		if result != nil {
+			m.event("rollback_start", "package", pkg.ID, "action", operation)
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
 				result = fmt.Errorf("%w; rollback also failed: %v", result, rollbackErr)
+				m.event("rollback_error", "package", pkg.ID, "error", rollbackErr.Error())
+			} else {
+				m.event("rollback_complete", "package", pkg.ID)
 			}
 		}
 	}()
@@ -151,6 +170,7 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	if err != nil {
 		return err
 	}
+	m.event("backup_complete", "package", pkg.ID, "originals", fmt.Sprint(len(state.Originals)))
 	if old != nil && old.Manifest.Install.Menu != nil && !sameMenu(old.Manifest.Install.Menu, pkg.Install.Menu) {
 		if err := applyMenu(tx, guard, *old.Manifest.Install.Menu, true); err != nil {
 			return err
@@ -171,6 +191,7 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+	m.event("operation_complete", "package", pkg.ID, "action", operation)
 	return nil
 }
 
@@ -280,6 +301,12 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 }
 
 func (m Manager) Uninstall(id string) (result error) {
+	m.event("operation_start", "package", id, "action", "uninstall")
+	defer func() {
+		if result != nil {
+			m.event("operation_error", "package", id, "action", "uninstall", "error", result.Error())
+		}
+	}()
 	baseGuard, err := safefs.NewGuard(m.root(), []string{managerPath})
 	if err != nil {
 		return err
@@ -313,10 +340,15 @@ func (m Manager) Uninstall(id string) (result error) {
 	if err != nil {
 		return err
 	}
+	m.event("transaction_begin", "package", id, "action", "uninstall")
 	defer func() {
 		if result != nil {
+			m.event("rollback_start", "package", id, "action", "uninstall")
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
 				result = fmt.Errorf("%w; rollback also failed: %v", result, rollbackErr)
+				m.event("rollback_error", "package", id, "error", rollbackErr.Error())
+			} else {
+				m.event("rollback_complete", "package", id)
 			}
 		}
 	}()
@@ -371,7 +403,17 @@ func (m Manager) Uninstall(id string) (result error) {
 	if err := tx.Remove(statePath(id)); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	m.event("operation_complete", "package", id, "action", "uninstall")
+	return nil
+}
+
+func (m Manager) event(name string, fields ...string) {
+	if m.Diagnostics != nil {
+		m.Diagnostics.Event(name, fields...)
+	}
 }
 
 const maximumAdoptionBytes = 512 << 20

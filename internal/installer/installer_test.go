@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jellydn/knulli-app-store/internal/diagnostics"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/platform"
 	"github.com/jellydn/knulli-app-store/internal/safefs"
@@ -22,6 +23,10 @@ import (
 
 func TestInstallRepairUpdateAndUninstallEndToEnd(t *testing.T) {
 	root := t.TempDir()
+	diagnosticLog, err := diagnostics.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
 	writeRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "original launcher")
 	writeRootFile(t, root, "userdata/roms/tools/demo/config.ini", "user configuration")
 	gamelist, err := os.ReadFile("testdata/gamelist.xml")
@@ -52,7 +57,7 @@ func TestInstallRepairUpdateAndUninstallEndToEnd(t *testing.T) {
 	}))
 	defer server.Close()
 
-	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
+	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server), Diagnostics: diagnosticLog}
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", v1, "1.0.0")
 	if err := manager.Install(context.Background(), pkg); err != nil {
 		t.Fatal(err)
@@ -95,6 +100,15 @@ func TestInstallRepairUpdateAndUninstallEndToEnd(t *testing.T) {
 	assertMissing(t, root, "userdata/system/knulli-app-store/installed/org.example.demo.json")
 	assertNotContains(t, root, "userdata/roms/tools/gamelist.xml", "./demo/launch.sh")
 	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<name>Existing Tool</name>")
+	logData, err := os.ReadFile(filepath.Join(root, "userdata/system/logs/knulli-app-store.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, event := range []string{"event=operation_start", "event=compatibility_allowed", "event=download_start", "event=download_verified", "event=extraction_complete", "event=transaction_begin", "event=backup_complete", "event=operation_complete"} {
+		if !strings.Contains(string(logData), event) {
+			t.Fatalf("operation log lacks %s: %s", event, logData)
+		}
+	}
 }
 
 func TestFailedGamelistUpdateRollsBackFiles(t *testing.T) {

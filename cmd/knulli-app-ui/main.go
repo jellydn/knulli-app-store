@@ -12,6 +12,7 @@ import (
 	"runtime"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
+	"github.com/jellydn/knulli-app-store/internal/diagnostics"
 	"github.com/jellydn/knulli-app-store/internal/installer"
 	"github.com/jellydn/knulli-app-store/internal/platform"
 	"github.com/jellydn/knulli-app-store/internal/sdlui"
@@ -41,21 +42,44 @@ func run() error {
 	screenshot := flag.String("screenshot", "", "save one rendered frame and exit")
 	flag.Parse()
 
+	diagnosticLog, err := diagnostics.Open(*root)
+	if err != nil {
+		return fmt.Errorf("open diagnostics log: %w", err)
+	}
+	diagnosticLog.Event("startup", "component", "gui")
 	current := platform.Detect(*root)
 	override(&current.Firmware, *firmware)
 	override(&current.Version, *version)
 	override(&current.Arch, *arch)
 	override(&current.Device, *device)
 	override(&current.Resolution, *resolution)
+	setOverrideEvidence(&current, *firmware, *version)
 	if current.Arch == "" {
 		current.Arch = runtime.GOARCH
 	}
-	manager := installer.Manager{Root: *root, Platform: current}
+	diagnosticLog.Event("platform_detected", "details", platform.Summary(current))
+	manager := installer.Manager{Root: *root, Platform: current, Diagnostics: diagnosticLog}
 	service, err := appstore.Open(*catalogue, manager)
 	if err != nil {
+		diagnosticLog.Event("startup_error", "error", err.Error())
 		return err
 	}
-	return sdlui.Run(context.Background(), service, sdlui.Options{Windowed: *windowed || *screenshot != "", Screenshot: *screenshot, Platform: current})
+	err = sdlui.Run(context.Background(), service, sdlui.Options{Windowed: *windowed || *screenshot != "", Screenshot: *screenshot, Platform: current})
+	if err != nil {
+		diagnosticLog.Event("final_error", "error", err.Error())
+	}
+	return err
+}
+
+func setOverrideEvidence(info *platform.Info, firmware, version string) {
+	if firmware != "" {
+		info.FirmwareRaw = firmware
+		info.FirmwareSource = "command-line override"
+	}
+	if version != "" {
+		info.VersionRaw = version
+		info.VersionSource = "command-line override"
+	}
 }
 
 func override(target *string, value string) {

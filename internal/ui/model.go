@@ -100,6 +100,19 @@ func (m *Model) Back() bool {
 	return false
 }
 
+func (m *Model) ExportDiagnostics(ctx context.Context) {
+	if m.Busy {
+		return
+	}
+	path, err := m.backend.ExportDiagnostics(ctx)
+	if err != nil {
+		m.Error = "Export diagnostics: " + err.Error()
+		return
+	}
+	m.Error = ""
+	m.Message = "Diagnostics saved to " + path
+}
+
 func (m *Model) Poll() bool {
 	changed := false
 	for {

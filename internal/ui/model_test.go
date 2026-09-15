@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +15,10 @@ type fakeBackend struct {
 	items  []appstore.Item
 	err    error
 	action appstore.Action
+}
+
+func (fake *fakeBackend) ExportDiagnostics(context.Context) (string, error) {
+	return "/userdata/system/knulli-app-store/diagnostics/test.txt", fake.err
 }
 
 func (fake *fakeBackend) Items(context.Context) ([]appstore.Item, error) {
@@ -81,6 +86,14 @@ func TestModelDoesNotOfferCandidateAction(t *testing.T) {
 	model.Select(context.Background())
 	if model.Focus != Browse || model.Message != "No safe action is available" {
 		t.Fatal("candidate should remain read-only")
+	}
+}
+
+func TestModelExportsDiagnosticsPath(t *testing.T) {
+	model := New(&fakeBackend{})
+	model.ExportDiagnostics(context.Background())
+	if model.Error != "" || !strings.Contains(model.Message, "/userdata/system/knulli-app-store/diagnostics/test.txt") {
+		t.Fatalf("diagnostics result was not useful: message=%q error=%q", model.Message, model.Error)
 	}
 }
 

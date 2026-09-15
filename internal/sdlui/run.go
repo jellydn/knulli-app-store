@@ -145,6 +145,8 @@ func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, 
 			model.Select(ctx)
 		case C.SDLK_ESCAPE:
 			return model.Back()
+		case C.SDLK_y:
+			model.ExportDiagnostics(ctx)
 		}
 	case C.SDL_CONTROLLERBUTTONDOWN:
 		switch C.event_controller_button(event) {
@@ -156,6 +158,8 @@ func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, 
 			model.Select(ctx)
 		case C.SDL_CONTROLLER_BUTTON_B:
 			return model.Back()
+		case C.SDL_CONTROLLER_BUTTON_Y:
+			model.ExportDiagnostics(ctx)
 		}
 	case C.SDL_CONTROLLERDEVICEREMOVED:
 		if *controller != nil {

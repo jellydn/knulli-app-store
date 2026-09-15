@@ -14,11 +14,15 @@ import (
 )
 
 type Info struct {
-	Firmware   string
-	Version    string
-	Arch       string
-	Device     string
-	Resolution string
+	Firmware       string
+	FirmwareRaw    string
+	FirmwareSource string
+	Version        string
+	VersionRaw     string
+	VersionSource  string
+	Arch           string
+	Device         string
+	Resolution     string
 }
 
 func Detect(root string) Info {
@@ -30,16 +34,46 @@ func Detect(root string) Info {
 		arch = "aarch64"
 	}
 	info := Info{Arch: arch}
-	for _, release := range []string{"etc/knulli-release", "etc/os-release"} {
-		values := readKeyValues(filepath.Join(root, release))
-		if info.Firmware == "" {
-			id := strings.ToLower(values["ID"])
-			if strings.Contains(id, "knulli") {
-				info.Firmware = "knulli"
-			}
+	osRelease := readKeyValues(filepath.Join(root, "etc/os-release"))
+	legacyRelease := readKeyValues(filepath.Join(root, "etc/knulli-release"))
+	firmwareSources := []struct {
+		path  string
+		key   string
+		value string
+	}{
+		{path: "/etc/os-release", key: "OS_NAME", value: osRelease["OS_NAME"]},
+		{path: "/etc/knulli-release", key: "OS_NAME", value: legacyRelease["OS_NAME"]},
+		{path: "/etc/knulli-release", key: "ID", value: legacyRelease["ID"]},
+		{path: "/etc/knulli-release", key: "NAME", value: legacyRelease["NAME"]},
+		{path: "/etc/os-release", key: "ID", value: osRelease["ID"]},
+	}
+	for _, source := range firmwareSources {
+		if strings.TrimSpace(source.value) != "" && info.FirmwareSource == "" {
+			info.FirmwareRaw = source.value
+			info.FirmwareSource = source.path + ":" + source.key
 		}
-		if info.Version == "" {
-			info.Version = values["VERSION_ID"]
+		if normalized := normalizeFirmware(source.value); normalized != "" {
+			info.Firmware = normalized
+			info.FirmwareRaw = source.value
+			info.FirmwareSource = source.path + ":" + source.key
+			break
+		}
+	}
+	versionSources := []struct {
+		path  string
+		value string
+	}{
+		{path: "/usr/share/knulli/knulli.version", value: readText(filepath.Join(root, "usr/share/knulli/knulli.version"))},
+		{path: "/etc/os-release:OS_VERSION", value: osRelease["OS_VERSION"]},
+		{path: "/etc/os-release:OS_DATE", value: osRelease["OS_DATE"]},
+		{path: "/etc/knulli-release:VERSION_ID", value: legacyRelease["VERSION_ID"]},
+	}
+	for _, source := range versionSources {
+		if normalized := normalizeVersion(source.value); normalized != "" {
+			info.Version = normalized
+			info.VersionRaw = source.value
+			info.VersionSource = source.path
+			break
 		}
 	}
 	for _, devicePath := range []string{"boot/boot/knulli.board", "etc/knulli-device", "boot/batocera.board"} {
@@ -78,28 +112,68 @@ func DisplayHeader(info Info, runtimeWidth, runtimeHeight int) string {
 func Check(pkg manifest.Package, current Info) error {
 	wanted := pkg.Compatibility
 	if wanted == nil {
-		return fmt.Errorf("package has no compatibility metadata")
+		return compatibilityError("metadata", current, "package has no compatibility metadata")
 	}
-	if current.Firmware != wanted.Firmware {
-		return fmt.Errorf("firmware %s is not supported; need %s", current.Firmware, wanted.Firmware)
+	if current.Firmware == "" || !strings.EqualFold(current.Firmware, wanted.Firmware) {
+		return compatibilityError("firmware", current, fmt.Sprintf("package requires firmware=%q", wanted.Firmware))
 	}
-	if wanted.MinimumVersion != "" && compareVersions(current.Version, wanted.MinimumVersion) < 0 {
-		return fmt.Errorf("firmware version %s is older than required %s", current.Version, wanted.MinimumVersion)
+	if wanted.MinimumVersion != "" {
+		constraint := fmt.Sprintf("package requires minimum_version=%q", wanted.MinimumVersion)
+		if current.Version == "" || !comparableVersions(current.Version, wanted.MinimumVersion) {
+			return compatibilityError("firmware_version", current, constraint+"; detected release ordering is unknown")
+		}
+		if compareVersions(current.Version, wanted.MinimumVersion) < 0 {
+			return compatibilityError("firmware_version", current, constraint)
+		}
 	}
 	if !includes(wanted.Architectures, current.Arch) {
-		return fmt.Errorf("architecture %s is not supported", current.Arch)
+		return compatibilityError("architecture", current, fmt.Sprintf("package allows architectures=%q", strings.Join(wanted.Architectures, ",")))
 	}
 	if !includes(wanted.Devices, current.Device) {
-		return fmt.Errorf("device %s is not supported", current.Device)
+		return compatibilityError("device", current, fmt.Sprintf("package allows devices=%q", strings.Join(wanted.Devices, ",")))
 	}
 	if !includes(wanted.Resolutions, current.Resolution) {
-		return fmt.Errorf("resolution %s is not supported", current.Resolution)
+		return compatibilityError("resolution", current, fmt.Sprintf("package allows resolutions=%q", strings.Join(wanted.Resolutions, ",")))
 	}
 	return nil
 }
 
+func Summary(info Info) string {
+	return fmt.Sprintf("device=%q architecture=%q resolution=%q firmware_raw=%q firmware=%q firmware_source=%q version_raw=%q version=%q version_source=%q",
+		info.Device, info.Arch, info.Resolution, info.FirmwareRaw, info.Firmware, info.FirmwareSource, info.VersionRaw, info.Version, info.VersionSource)
+}
+
+func compatibilityError(field string, current Info, constraint string) error {
+	detected := fmt.Sprintf("device=%q architecture=%q resolution=%q firmware_raw=%q firmware=%q firmware_source=%q",
+		current.Device, current.Arch, current.Resolution, current.FirmwareRaw, current.Firmware, current.FirmwareSource)
+	if field == "firmware_version" {
+		detected += fmt.Sprintf(" version_raw=%q version=%q version_source=%q", current.VersionRaw, current.Version, current.VersionSource)
+	}
+	return fmt.Errorf("compatibility failed field=%s: detected %s; %s", field, detected, constraint)
+}
+
 var versionPart = regexp.MustCompile(`[0-9]+|[a-zA-Z]+`)
 var resolutionPattern = regexp.MustCompile(`^[0-9]+x[0-9]+$`)
+var numericVersion = regexp.MustCompile(`^[0-9]`)
+
+func normalizeFirmware(value string) string {
+	if strings.EqualFold(strings.TrimSpace(value), "knulli") {
+		return "knulli"
+	}
+	return ""
+}
+
+func normalizeVersion(value string) string {
+	parts := strings.Fields(strings.TrimSpace(value))
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[0]
+}
+
+func comparableVersions(left, right string) bool {
+	return strings.EqualFold(left, right) || (numericVersion.MatchString(left) && numericVersion.MatchString(right))
+}
 
 func compareVersions(left, right string) int {
 	a := versionPart.FindAllString(strings.ToLower(left), -1)
@@ -149,8 +223,16 @@ func readKeyValues(path string) map[string]string {
 	for scanner.Scan() {
 		key, value, found := strings.Cut(scanner.Text(), "=")
 		if found {
-			values[key] = strings.Trim(strings.TrimSpace(value), `"'`)
+			values[strings.TrimSpace(key)] = strings.Trim(strings.TrimSpace(value), `"'`)
 		}
 	}
 	return values
+}
+
+func readText(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }

@@ -3,8 +3,8 @@ package appstore
 import (
 	"context"
 	"fmt"
-	"log"
 	"sort"
+	"strings"
 
 	"github.com/jellydn/knulli-app-store/internal/catalog"
 	"github.com/jellydn/knulli-app-store/internal/installer"
@@ -36,6 +36,7 @@ type Item struct {
 type Backend interface {
 	Items(context.Context) ([]Item, error)
 	Execute(context.Context, string, Action, func(string)) error
+	ExportDiagnostics(context.Context) (string, error)
 }
 
 type Service struct {
@@ -46,8 +47,10 @@ type Service struct {
 func Open(indexPath string, manager installer.Manager) (*Service, error) {
 	index, err := catalog.Load(indexPath)
 	if err != nil {
+		manager.Diagnostics.Event("catalogue_error", "path", indexPath, "error", err.Error())
 		return nil, err
 	}
+	manager.Diagnostics.Event("catalogue_loaded", "path", indexPath, "packages", fmt.Sprint(len(index.Packages)))
 	return &Service{index: index, manager: manager}, nil
 }
 
@@ -69,6 +72,7 @@ func (s *Service) Items(ctx context.Context) ([]Item, error) {
 			}
 		}
 		item.Compatible, item.Compatibility = compatibility(entry.Package, s.manager.Platform)
+		s.manager.Diagnostics.Event("compatibility_decision", "package", entry.ID, "allowed", fmt.Sprint(item.Compatible), "decision", item.Compatibility)
 		item.Actions = actions(item)
 		items = append(items, item)
 	}
@@ -97,7 +101,7 @@ func (s *Service) Execute(ctx context.Context, id string, action Action, progres
 	}
 	message := operationMessage(action, entry.Package.Name)
 	progress(message)
-	log.Printf("package operation started: id=%s action=%s", id, action)
+	s.manager.Diagnostics.Event("action_selected", "package", id, "action", string(action))
 	switch action {
 	case Install:
 		err = s.manager.Install(ctx, entry.Package)
@@ -113,12 +117,26 @@ func (s *Service) Execute(ctx context.Context, id string, action Action, progres
 		return fmt.Errorf("unknown action %q", action)
 	}
 	if err != nil {
-		log.Printf("package operation failed: id=%s action=%s error=%v", id, action, err)
 		return err
 	}
-	log.Printf("package operation completed: id=%s action=%s", id, action)
 	progress("Completed " + string(action))
 	return nil
+}
+
+func (s *Service) ExportDiagnostics(ctx context.Context) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	lines := []string{"Platform: " + platform.Summary(s.manager.Platform), fmt.Sprintf("Catalogue packages: %d", len(s.index.Packages))}
+	for _, entry := range s.index.Packages {
+		lines = append(lines, strings.Join([]string{"Package:", entry.ID, entry.Package.Version, entry.Package.Review.Status}, " "))
+	}
+	path, err := s.manager.Diagnostics.Export(lines)
+	if err != nil {
+		return "", err
+	}
+	s.manager.Diagnostics.Event("diagnostics_exported", "path", path)
+	return path, nil
 }
 
 func (s *Service) find(id string) (catalog.Entry, bool) {
@@ -141,7 +159,7 @@ func compatibility(pkg manifest.Package, current platform.Info) (bool, string) {
 		return false, err.Error()
 	}
 	if pkg.Experimental() {
-		return true, "Experimental test for detected platform"
+		return true, fmt.Sprintf("Experimental compatibility: Knulli identity confirmed from %s; no minimum version is claimed; device=%s architecture=%s resolution=%s version=%s", current.FirmwareSource, current.Device, current.Arch, current.Resolution, current.Version)
 	}
 	return true, "Compatible with detected platform"
 }

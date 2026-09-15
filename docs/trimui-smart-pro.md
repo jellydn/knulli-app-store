@@ -14,6 +14,8 @@ Authoritative Knulli sources establish these facts:
 - Knulli's [`shGenerator.py`](https://github.com/knulli-cfw/knulli-linux/blob/master/package/system/knulli-configgen/configgen/configgen/generators/sh/shGenerator.py) runs Ports entries with `/bin/bash` and exports the generated controller mapping.
 - The [game storage guide](https://knulli.org/play/add-games/game-storage/) defines `/userdata/roms/ports` for ports and `/userdata/system` for persistent settings.
 - Knulli writes the exact device identifier `trimui-smart-pro` to `/boot/boot/knulli.board`; generic A133 device-tree values are not unique enough for device naming.
+- Current Knulli leaves Buildroot's `ID=buildroot` in `/etc/os-release` and appends `OS_NAME="knulli"`, `OS_VERSION`, and `OS_DATE` in [`post-build-script.sh`](https://github.com/knulli-cfw/knulli-linux/blob/knulli-main/board/scripts/post-build-script.sh#L231-L257). Firmware detection must use the Knulli-owned `OS_NAME`, not `ID`.
+- Knulli's [`knulli-system.mk`](https://github.com/knulli-cfw/knulli-linux/blob/knulli-main/package/system/knulli-system/knulli-system.mk#L88-L102) writes `/usr/share/knulli/knulli.version` as a release identifier followed by build date and time. The detector preserves the full raw line and uses its first whitespace-delimited value, including development suffixes.
 
 The sources do not establish the general SDL2 package version, a third-party glibc contract, raw button numbers, or whether this binary works with the patched PowerVR backend. CI uses Debian Bookworm. The binary needs `libSDL2-2.0.so.0` and glibc symbols through 2.34. Knulli's bundled A133 `trimui_inputd` also imports glibc 2.34, but one system binary is evidence, not a published compatibility guarantee.
 
@@ -56,6 +58,10 @@ Use **Repair** to re-download, verify, and restore managed files. Use **Uninstal
 - PlayTime statistics and configuration: `/userdata/system/configs/playtime/`.
 - App Store log: `/userdata/system/logs/knulli-app-store.log`.
 
+The App Store writes concise UTC timestamped events for startup, platform and catalogue decisions, package actions, download verification, extraction, transactions, backup, rollback, and completion. The active log is capped at 512 KiB and one prior file is retained as `knulli-app-store.log.1`. URLs lose credentials, query strings, and fragments; common token and password fields are redacted.
+
+Press SDL Y anywhere in the GUI to create a text bundle under `/userdata/system/knulli-app-store/diagnostics/`. The screen shows the exact output path. The bundle contains detected platform fields, public package IDs and review states, and the bounded redacted logs. It does not include Grout credentials, PlayTime data, ROMs, or private configuration.
+
 Do not use Grout's built-in updater during this test. It has no supported disable setting and operates outside App Store rollback. Future Grout updates must use a newly reviewed manifest. These manifests do not edit `gamelist.xml`: after install or uninstall, refresh game lists or reboot. This avoids deleting or replacing an entry that may belong to a pre-existing manual installation.
 
 ## Controls
@@ -73,6 +79,7 @@ With Knulli's default Ports layout, physical B (south) maps to SDL A and physica
 - Confirm text, selection, trust state, and package details are readable with no clipping.
 - Confirm D-pad navigation, select, back, and exit with Knulli's default Ports layout.
 - Confirm the footer says `CONTROLLER: READY`; record the log if it does not.
+- Press SDL Y, confirm the saved diagnostic path appears without clipping, and inspect the bundle for the platform sources and compatibility decision. Do not send it if manual inspection finds private data.
 - Confirm the header shows `TRIMUI SMART PRO / 1280X720`. Unknown boards must show `UNKNOWN DEVICE`, and failed runtime-size detection must identify its fallback.
 - Confirm Grout and PlayTime show `APPROVED / EXPERIMENTAL`; the other four packages remain read-only.
 - Confirm EmuDrop shows the ROM copyright warning and remains `APPROVED / CANDIDATE`.
@@ -99,3 +106,11 @@ After this checklist passes, add linked `real-device-test` evidence for the GUI 
 5. If Grout existed before this test, repeat through Adopt and confirm credentials and configuration remain.
 
 Report install, launch, core function, Repair, Uninstall, and adoption results separately for each package. Until all relevant checks pass on hardware, both packages remain unverified.
+
+## Firmware-fix reproduction
+
+1. Update the App Store files from the new artifact and start it on current Knulli.
+2. Select Grout or PlayTime. Confirm compatibility says the Knulli identity came from `/etc/os-release:OS_NAME` and calls the decision experimental.
+3. Confirm Install or Adopt is available when the header shows TrimUI Smart Pro and runtime 1280×720.
+4. Press SDL Y and inspect the exported platform line. It should show raw firmware `knulli`, normalized firmware `knulli`, source `/etc/os-release:OS_NAME`, and the current release identifier from `/usr/share/knulli/knulli.version`.
+5. If an action remains unavailable, send the diagnostic bundle after checking it for private data. Unknown firmware must remain blocked.

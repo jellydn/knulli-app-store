@@ -2,6 +2,7 @@ package appstore
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -62,6 +63,49 @@ func TestApprovedCandidateRemainsReadOnly(t *testing.T) {
 	}
 	if actions(Item{Package: pkg}) != nil {
 		t.Fatal("approved candidate must remain read-only")
+	}
+}
+
+func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
+	root := t.TempDir()
+	for name, value := range map[string]string{
+		"etc/os-release":                      "NAME=Buildroot\nID=buildroot\nVERSION_ID=2025.02\nOS_NAME=\"knulli\"\nOS_VERSION=scarab\nOS_DATE=20260510\n",
+		"usr/share/knulli/knulli.version":     "scarab 2026/05/10 14:23\n",
+		"boot/boot/knulli.board":              "trimui-smart-pro\n",
+		"sys/class/graphics/fb0/virtual_size": "1280,720\n",
+	} {
+		host := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(host), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(host, []byte(value), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	index, err := catalogForTest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	indexPath := filepath.Join(t.TempDir(), "index.json")
+	if err := writeIndexForTest(index, indexPath); err != nil {
+		t.Fatal(err)
+	}
+	detected := platform.Detect(root)
+	detected.Arch = "aarch64"
+	service, err := Open(indexPath, installer.Manager{Root: root, Platform: detected})
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, err := service.Items(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range items {
+		if item.Package.Experimental() {
+			if !item.Compatible || len(item.Actions) != 1 || !strings.Contains(item.Compatibility, "no minimum version is claimed") || !strings.Contains(item.Compatibility, "/etc/os-release:OS_NAME") {
+				t.Fatalf("latest Knulli experimental decision is wrong: %#v", item)
+			}
+		}
 	}
 }
 

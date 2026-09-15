@@ -8,6 +8,7 @@ import (
 	"runtime"
 
 	"github.com/jellydn/knulli-app-store/internal/catalog"
+	"github.com/jellydn/knulli-app-store/internal/diagnostics"
 	"github.com/jellydn/knulli-app-store/internal/installer"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/platform"
@@ -80,7 +81,12 @@ func run(arguments []string) error {
 		if flags.NArg() != 1 {
 			return fmt.Errorf("uninstall requires one package id")
 		}
-		if err := (installer.Manager{Root: *root}).Uninstall(flags.Arg(0)); err != nil {
+		diagnosticLog, err := diagnostics.Open(*root)
+		if err != nil {
+			return fmt.Errorf("open diagnostics log: %w", err)
+		}
+		diagnosticLog.Event("startup", "component", "cli", "command", "uninstall")
+		if err := (installer.Manager{Root: *root, Diagnostics: diagnosticLog}).Uninstall(flags.Arg(0)); err != nil {
 			return err
 		}
 		fmt.Printf("uninstalled %s\n", flags.Arg(0))
@@ -104,23 +110,33 @@ func runApply(operation string, arguments []string) error {
 	if flags.NArg() != 1 {
 		return fmt.Errorf("%s requires one manifest path", operation)
 	}
+	diagnosticLog, err := diagnostics.Open(*root)
+	if err != nil {
+		return fmt.Errorf("open diagnostics log: %w", err)
+	}
+	diagnosticLog.Event("startup", "component", "cli", "command", operation)
 	current := platform.Detect(*root)
 	override(&current.Firmware, *firmware)
 	override(&current.Version, *version)
 	override(&current.Arch, *arch)
 	override(&current.Device, *device)
 	override(&current.Resolution, *resolution)
+	setOverrideEvidence(&current, *firmware, *version)
 	if current.Arch == "" {
 		current.Arch = runtime.GOARCH
 	}
-	if current.Firmware == "" || current.Version == "" || current.Device == "" || current.Resolution == "" {
-		return fmt.Errorf("platform detection is incomplete; supply firmware, firmware-version, device, and resolution flags")
-	}
+	diagnosticLog.Event("platform_detected", "details", platform.Summary(current))
 	pkg, err := manifest.Load(flags.Arg(0))
 	if err != nil {
+		diagnosticLog.Event("catalogue_error", "path", flags.Arg(0), "error", err.Error())
 		return err
 	}
-	manager := installer.Manager{Root: *root, Platform: current}
+	if current.Firmware == "" || current.Device == "" || current.Resolution == "" || (pkg.Compatibility != nil && pkg.Compatibility.MinimumVersion != "" && current.Version == "") {
+		err := fmt.Errorf("platform detection is incomplete: %s", platform.Summary(current))
+		diagnosticLog.Event("platform_detection_incomplete", "error", err.Error())
+		return err
+	}
+	manager := installer.Manager{Root: *root, Platform: current, Diagnostics: diagnosticLog}
 	switch operation {
 	case "install":
 		err = manager.Install(context.Background(), pkg)
@@ -139,5 +155,16 @@ func runApply(operation string, arguments []string) error {
 func override(target *string, value string) {
 	if value != "" {
 		*target = value
+	}
+}
+
+func setOverrideEvidence(info *platform.Info, firmware, version string) {
+	if firmware != "" {
+		info.FirmwareRaw = firmware
+		info.FirmwareSource = "command-line override"
+	}
+	if version != "" {
+		info.VersionRaw = version
+		info.VersionSource = "command-line override"
 	}
 }
