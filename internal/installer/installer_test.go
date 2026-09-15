@@ -177,6 +177,133 @@ func TestDeclarativeExecutablesAreRestoredAndRepaired(t *testing.T) {
 	}
 }
 
+func TestPlayTimeFirstLaunchHealthRepairAndUninstallOnExperimentalDevices(t *testing.T) {
+	asset := zipBytesWithModes(t, map[string]zipFixture{
+		"PlayTime/icons/playtime.png": {body: "icon", mode: 0644},
+		"PlayTime/playtime":           {body: "reviewed arm64 binary", mode: 0644},
+		"PlayTime/playtime.sh":        {body: "reviewed launcher", mode: 0644},
+	})
+	server := serveAsset(t, asset)
+	defer server.Close()
+
+	for _, current := range []platform.Info{
+		{Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720"},
+		{Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", Device: "magicx-zero-28", Resolution: "640x480"},
+	} {
+		t.Run(current.Device, func(t *testing.T) {
+			root := t.TempDir()
+			logger, err := diagnostics.Open(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pkg := playTimeTestPackage(t, asset)
+			manager := Manager{Root: root, Platform: current, Client: rewriteClient(t, server), Diagnostics: logger}
+
+			if err := manager.Install(context.Background(), pkg); err != nil {
+				t.Fatal(err)
+			}
+			baseGuard, err := safefs.NewGuard(root, []string{managerPath})
+			if err != nil {
+				t.Fatal(err)
+			}
+			state, err := loadState(baseGuard, pkg.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, file := range state.Files {
+				info, err := os.Stat(filepath.Join(root, strings.TrimPrefix(file.Path, "/")))
+				if err != nil || file.Mode != uint32(info.Mode().Perm()) {
+					t.Fatalf("state did not record destination mode for %s: state=%04o info=%v err=%v", file.Path, file.Mode, info, err)
+				}
+			}
+
+			// These files are created or changed by PlayTime at runtime and are not immutable release files.
+			writeRootFile(t, root, "userdata/system/configs/playtime/playtime.db", "play statistics")
+			writeRootFile(t, root, "userdata/system/scripts/playtime-hook.sh", "runtime hook")
+			writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList></gameList>")
+			status, err := manager.Status(pkg.ID)
+			if err != nil || !status.Healthy || len(status.Issues) != 0 {
+				t.Fatalf("normal first-launch files made PlayTime unhealthy: %#v, %v", status, err)
+			}
+
+			binary := filepath.Join(root, "userdata/roms/tools/PlayTime/playtime")
+			if err := os.WriteFile(binary, []byte("corrupt"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(binary, 0644); err != nil {
+				t.Fatal(err)
+			}
+			status, err = manager.Status(pkg.ID)
+			if err != nil || status.Healthy || len(status.Issues) < 2 || status.Issues[0].Check != "content changed" || status.Issues[1].Check != "mode changed" {
+				t.Fatalf("immutable corruption lacks useful health reasons: %#v, %v", status, err)
+			}
+			if err := manager.Repair(context.Background(), pkg); err != nil {
+				t.Fatal(err)
+			}
+			if status, err = manager.Status(pkg.ID); err != nil || !status.Healthy {
+				t.Fatalf("repair did not restore health: %#v, %v", status, err)
+			}
+			if err := manager.Uninstall(pkg.ID); err != nil {
+				t.Fatal(err)
+			}
+			assertRootFile(t, root, "userdata/system/configs/playtime/playtime.db", "play statistics")
+			assertRootFile(t, root, "userdata/system/scripts/playtime-hook.sh", "runtime hook")
+			logData, err := os.ReadFile(filepath.Join(root, "userdata/system/logs/knulli-app-store.log"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, wanted := range []string{"event=package_health_issue", `check="content changed"`, `check="mode changed"`, `path="/userdata/roms/tools/PlayTime/playtime"`} {
+				if !strings.Contains(string(logData), wanted) {
+					t.Fatalf("health log lacks %q: %s", wanted, logData)
+				}
+			}
+		})
+	}
+}
+
+func TestPlayTimeMagicXAdoptionAndUninstallPreserveExistingData(t *testing.T) {
+	root := t.TempDir()
+	writeRootFile(t, root, "userdata/roms/tools/PlayTime/local-note.txt", "existing note")
+	writeRootFile(t, root, "userdata/system/configs/playtime/playtime.db", "existing statistics")
+	asset := zipBytesWithModes(t, map[string]zipFixture{
+		"PlayTime/icons/playtime.png": {body: "icon", mode: 0644},
+		"PlayTime/playtime":           {body: "reviewed arm64 binary", mode: 0644},
+		"PlayTime/playtime.sh":        {body: "reviewed launcher", mode: 0644},
+	})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := playTimeTestPackage(t, asset)
+	manager := Manager{Root: root, Platform: platform.Info{Firmware: "knulli", Version: "scarab", Arch: "aarch64", Device: "magicx-zero-28", Resolution: "640x480"}, Client: rewriteClient(t, server)}
+	if existing, err := manager.PreExisting(pkg); err != nil || !existing {
+		t.Fatalf("MagicX PlayTime copy was not offered for adoption: existing=%v err=%v", existing, err)
+	}
+	if err := manager.Install(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
+		t.Fatalf("adopted PlayTime was not healthy: %#v, %v", status, err)
+	}
+	if err := manager.Uninstall(pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/PlayTime/local-note.txt", "existing note")
+	assertRootFile(t, root, "userdata/system/configs/playtime/playtime.db", "existing statistics")
+}
+
+func playTimeTestPackage(t *testing.T, asset []byte) manifest.Package {
+	t.Helper()
+	pkg, err := manifest.Load("../../catalogue/packages/io.github.unitreign.playtime.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(asset)
+	pkg.Release.URL = "https://github.com/unitreign/playtime/releases/download/v1.0.0/PlayTime.zip"
+	pkg.Release.SHA256 = hex.EncodeToString(digest[:])
+	pkg.Release.Size = int64(len(asset))
+	pkg.Release.InstalledSize = int64(len("icon") + len("reviewed arm64 binary") + len("reviewed launcher"))
+	return pkg
+}
+
 func TestAdoptBacksUpExistingFilesAndUninstallRestoresThem(t *testing.T) {
 	root := t.TempDir()
 	writeRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "old launcher")

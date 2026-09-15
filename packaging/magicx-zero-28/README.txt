@@ -1,8 +1,9 @@
 KNULLI APP STORE - MAGICX ZERO 28 EXPERIMENTAL BUILD
 
 Knulli source identifies this target as magicx-zero-28, AArch64 Cortex-A53,
-with a 640x480 display. The App Store and controller setup require real-device
-testing. The runtime controller GUID, name, and raw buttons are not published.
+with a 640x480 display. A real-device diagnostic confirms Knulli Scarab,
+aarch64, 640x480, and SDL GameController magicx-input with a nonzero GUID.
+Physical button assignments remain runtime data.
 
 INSTALL OR UPDATE
 
@@ -36,11 +37,16 @@ with neither is not saved. Corrupt files are retained with a .corrupt suffix.
 
 PACKAGE STATUS
 
-Grout 5.1.0.0 and PlayTime 1.0.0 remain blocked on MagicX Zero 28. Grout lacks
-evidence for Knulli MagicX orientation, input handling, SDL ABI, and 640x480 UI.
-PlayTime has adaptive 640x480 layout code, but its dynamic SDL ABI, accelerated
-renderer, and MagicX controller launch are not verified. A133 alone is not
-compatibility evidence. Neither package is verified.
+Grout 5.1.0.0 remains blocked on MagicX Zero 28. PlayTime 1.0.0 is a
+user-authorized experimental test package. Select Install or Adopt and confirm
+the unverified warning. Its reviewed ARM64 archive uses runtime display size
+and SDL GameController actions. Its accelerated renderer, launch, tracking,
+repair, and uninstall still need a real-device test. Neither package is
+verified.
+
+PlayTime data stays under /userdata/system/configs/playtime. Manager state and
+adoption backups are under /userdata/system/knulli-app-store. Package details
+and the log identify the exact managed file when Repair is required.
 
 TROUBLESHOOTING
 

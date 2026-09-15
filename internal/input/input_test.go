@@ -70,6 +70,40 @@ func TestStoreSeparatesDeviceAndControllerIdentities(t *testing.T) {
 	}
 }
 
+func TestSavedSwappedConfirmBackMappingControlsNormalAndSettingsScreens(t *testing.T) {
+	root := t.TempDir()
+	identity := Identity{Device: "magicx-zero-28", GUID: "swapped", Name: "magicx-input"}
+	mapping := AutoMapping()
+	mapping[Confirm], mapping[Back] = mapping[Back], mapping[Confirm]
+	if err := NewStore(root).Save(identity, mapping); err != nil {
+		t.Fatal(err)
+	}
+	session := NewSession(root, identity.Device)
+	session.Connect(identity, true)
+	if action, _ := session.HandleButton(mapping[Confirm]); action != Confirm {
+		t.Fatalf("mapped Confirm produced %q", action)
+	}
+	if action, _ := session.HandleButton(mapping[Back]); action != Back {
+		t.Fatalf("mapped Back produced %q", action)
+	}
+	if action, effect := session.HandleButton(mapping[Diagnostics]); action != "" || effect != NoEffect || session.Mode != Settings {
+		t.Fatalf("mapped Diagnostics did not open settings: action=%q effect=%q mode=%s", action, effect, session.Mode)
+	}
+	session.HandleButton(mapping[Down])
+	if _, effect := session.HandleButton(mapping[Confirm]); effect != ExportDiagnostics {
+		t.Fatalf("swapped Confirm did not select diagnostics export: %q", effect)
+	}
+	session.HandleButton(mapping[Back])
+	if session.Mode != Normal {
+		t.Fatalf("swapped Back did not close settings: %s", session.Mode)
+	}
+	session.OpenSetup()
+	session.HandleButton(mapping[Back])
+	if session.Mode != Settings {
+		t.Fatalf("optional setup bypassed mapped Back: %s", session.Mode)
+	}
+}
+
 func TestIdentityUsesDeviceScopedNameWhenGUIDIsMissing(t *testing.T) {
 	one, err := (Identity{Device: "magicx-zero-28", GUID: "00000000000000000000000000000000", Name: " Internal Pad "}).Key()
 	if err != nil {

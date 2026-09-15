@@ -27,6 +27,7 @@ type Item struct {
 	Installed        bool
 	InstalledVersion string
 	Healthy          bool
+	HealthReason     string
 	PreExisting      bool
 	Compatible       bool
 	Compatibility    string
@@ -70,6 +71,9 @@ func (s *Service) Items(ctx context.Context) ([]Item, error) {
 			return nil, fmt.Errorf("read %s status: %w", entry.ID, err)
 		}
 		item := Item{Package: entry.Package, Installed: status.Installed, InstalledVersion: status.Version, Healthy: status.Healthy}
+		if len(status.Issues) > 0 {
+			item.HealthReason = status.Issues[0].String()
+		}
 		if !item.Installed {
 			item.PreExisting, err = s.manager.PreExisting(entry.Package)
 			if err != nil {

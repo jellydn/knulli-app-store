@@ -13,10 +13,12 @@
       "provenance": "community"
     },
     "notes": [
-      "Experimental TrimUI Smart Pro test package; no minimum Knulli version or package-specific device result is claimed.",
+      "User-authorized experimental test package for TrimUI Smart Pro and MagicX Zero 28; this is not an upstream compatibility claim or a verified package.",
+      "A user reported successful install and launch on TrimUI Smart Pro, but tracking, relaunch, repair, adoption, and uninstall are not yet verified.",
+      "MagicX testing is authorized from confirmed Knulli, aarch64, 640x480, and SDL GameController runtime facts; package install and launch remain untested.",
       "The manager restores execute permission only for the reviewed playtime binary and playtime.sh launcher.",
       "PlayTime statistics remain outside the managed package directory under /userdata/system/configs/playtime.",
-      "MagicX Zero 28 remains blocked: 640x480 layout code exists, but the tagged dynamic SDL ABI, accelerated renderer, and controller launch are not verified on that device."
+      "The tagged UI derives its layout from the display size and falls back to 640x480. Accelerated SDL rendering and the MagicX controller remain real-device test requirements."
     ],
     "evidence": [
       {
@@ -26,7 +28,7 @@
       {
         "kind": "release-asset",
         "url": "https://github.com/unitreign/playtime/releases/download/v1.0.0/PlayTime.zip",
-        "note": "Version-pinned ZIP; 1,569,588 bytes compressed, 6,133,404 bytes extracted, SHA-256 7bc7480400693be09b841f3a0612a8d85cefec549a3f6e5d0edee3a73c80aed3."
+        "note": "Version-pinned ZIP; 1,569,588 bytes compressed, 3,066,702 bytes across extracted regular files, SHA-256 7bc7480400693be09b841f3a0612a8d85cefec549a3f6e5d0edee3a73c80aed3."
       },
       {
         "kind": "license",
@@ -42,6 +44,11 @@
         "kind": "filesystem-and-network-review",
         "url": "https://github.com/unitreign/playtime/blob/5f60c2090e0c456bfbf343d9d3b9c76f2a327135/main.go",
         "note": "Reviewed paths are /userdata/roms/tools/PlayTime, /userdata/roms/tools/gamelist.xml, /userdata/system/configs/playtime, and /userdata/system/scripts/playtime-hook.sh. The tagged launcher and binary use local files and do not download or execute remote code."
+      },
+      {
+        "kind": "magicx-experimental-review",
+        "url": "https://github.com/unitreign/playtime/blob/5f60c2090e0c456bfbf343d9d3b9c76f2a327135/internal/ui/ui.go",
+        "note": "The tagged code uses runtime display dimensions with a 640x480 fallback and SDL GameController actions. MagicX accelerated rendering and controller behavior are not yet package-tested."
       }
     ]
   },
@@ -49,22 +56,22 @@
     "url": "https://github.com/unitreign/playtime/releases/download/v1.0.0/PlayTime.zip",
     "sha256": "7bc7480400693be09b841f3a0612a8d85cefec549a3f6e5d0edee3a73c80aed3",
     "size": 1569588,
-    "installed_size": 6133404,
+    "installed_size": 3066702,
     "format": "zip",
     "immutable": true
   },
   "compatibility": {
     "firmware": "knulli",
     "architectures": ["aarch64"],
-    "devices": ["trimui-smart-pro"],
-    "resolutions": ["1280x720"]
+    "devices": ["trimui-smart-pro", "magicx-zero-28"],
+    "resolutions": ["1280x720", "640x480"]
   },
   "install": {
     "destination": "/userdata/roms/tools/PlayTime",
     "strip_components": 1,
     "launcher": "playtime.sh",
     "executables": ["playtime", "playtime.sh"],
-    "warning": "Unverified. Existing files are backed up. Statistics stay under /userdata/system.",
+    "warning": "Unverified experimental test on this device. Existing files are backed up. Statistics stay under /userdata/system.",
     "network": false,
     "allowed_write_paths": [
       "/userdata/roms/tools/PlayTime",

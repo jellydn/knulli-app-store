@@ -268,7 +268,11 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 		if err := tx.Copy(file.Path, virtual, file.Mode); err != nil {
 			return Installed{}, err
 		}
-		state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: file.SHA256, Mode: uint32(file.Mode.Perm()), Preserved: preserved})
+		installedInfo, err := os.Stat(host)
+		if err != nil {
+			return Installed{}, err
+		}
+		state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: file.SHA256, Mode: uint32(installedInfo.Mode().Perm()), Preserved: preserved})
 	}
 	if old != nil {
 		for _, stale := range old.Files {

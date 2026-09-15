@@ -39,6 +39,8 @@ An archive is fully downloaded, hashed, and staged before a destination file cha
 
 Update and repair share the same safe application path. Update can replace the manifest version and remove stale owned files. Repair reinstalls the declared release. Both leave existing declared configuration unchanged. Uninstall removes owned files, leaves preserved configuration, and restores files that existed before first ownership.
 
+Installed state records the mode observed after the destination copy. Health checks compare immutable managed files with that observed mode and the reviewed content hash. Runtime files outside the release inventory do not become manager-owned and do not make a package unhealthy. A failed check has a structured path, check type, expected value, and actual value for the GUI and redacted log.
+
 ## SDL2 boundary
 
 The GUI targets the TrimUI Smart Pro 1280×720 and MagicX Zero 28 640×480 displays. `internal/ui` is a pure-Go catalogue state machine that depends on the `appstore.Backend` interface. `internal/input` gates first-run catalogue access and owns semantic mappings, assignment review, preview, controller identity, and atomic persistence. `internal/appstore` validates the catalogue and calls `installer.Manager`. `internal/sdlui` adapts SDL events and renders setup as a dedicated screen. Tests use an in-memory fake, while the production adapter keeps every package side effect in the installer.

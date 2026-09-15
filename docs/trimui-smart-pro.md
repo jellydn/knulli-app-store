@@ -54,6 +54,8 @@ The manager restores execute mode only on reviewed paths. PlayTime needs `playti
 
 Use **Repair** to re-download, verify, and restore managed files. Use **Uninstall** to remove manager-owned files while preserving declared data. Exact pre-existing release files are removed after adoption; changed package files are restored because their ownership is uncertain. If an operation fails, the transaction rolls back. A retained backup can be restored by copying it back to the path recorded in the installed-state JSON. Do not edit that state by hand while the app is running.
 
+Health checks compare only immutable managed release files. PlayTime's database, generated hook, and other runtime data do not make the install unhealthy. The installed state records each destination file's observed mode because a target filesystem can normalize the requested mode. If Repair appears, the details panel and log identify every missing, changed, or mode-mismatched managed path.
+
 - Grout configuration: `/userdata/roms/tools/Grout/config.json`, `save_slots.json`, `.cache/`, and `logs/`.
 - PlayTime statistics and configuration: `/userdata/system/configs/playtime/`.
 - App Store log: `/userdata/system/logs/knulli-app-store.log`.

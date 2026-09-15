@@ -1,6 +1,6 @@
 # MagicX Zero 28 experimental test build
 
-This target is experimental. Knulli source confirms the board and display, but it does not publish the runtime controller identity or button table. A shared A133 family does not establish application or package compatibility.
+This target is experimental. Knulli source confirms the board and display. A real-device diagnostic also confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController name `magicx-input` with a nonzero GUID. The physical mapping remains device data. A shared A133 family alone does not establish application or package compatibility.
 
 ## Confirmed facts
 
@@ -9,7 +9,7 @@ This target is experimental. Knulli source confirms the board and display, but i
 - The device tree identifies `MagicX Zero 28` and configures a 640×480 rotated framebuffer: [`magicx-zero-28.dts`](https://github.com/knulli-cfw/knulli-linux/blob/knulli-main/package/boot/uboot-a133/magicx-zero-28/boot_package/magicx-zero-28.dts).
 - Knulli configgen matches active controllers by GUID and name and creates `SDL_GAMECONTROLLERCONFIG`: [`controller.py`](https://github.com/knulli-cfw/knulli-linux/blob/knulli-main/package/system/knulli-configgen/configgen/configgen/controller.py#L130-L163).
 
-No checked-in Knulli controller profile establishes the MagicX runtime SDL GUID, name, button indices, or generated mapping. The App Store records these values from SDL on the device. It does not invent them from the device tree.
+No checked-in Knulli controller profile establishes the MagicX button indices. The App Store records the runtime GUID, name, and mapping from SDL on the device. It does not invent them from the device tree.
 
 ## Install and controller setup
 
@@ -30,9 +30,9 @@ The key combines Knulli device ID and controller GUID. An all-zero or absent GUI
 ## Package status
 
 - **Grout 5.1.0.0 remains blocked.** Its tagged Knulli release does not establish MagicX orientation, input dispatch, SDL ABI, or readable 640×480 behavior. Its known Zero 28 handling is in a MinUI path that the Knulli launcher does not select.
-- **PlayTime 1.0.0 remains blocked.** Its tagged layout adapts to 640×480, but its dynamically linked SDL stack, mandatory accelerated renderer, and controller launch are not proven on MagicX Knulli.
+- **PlayTime 1.0.0 is a user-authorized experimental test.** The reviewed ARM64 archive uses the Knulli SDL2 libraries, runtime display dimensions with a 640×480 fallback, and SDL GameController actions. Select **Install** or **Adopt** and confirm the unverified warning. Its accelerated renderer, launch, tracking, and complete life cycle are not proven on MagicX.
 
-These are package-specific blockers. Successful App Store navigation does not remove them, and neither package is verified.
+Successful App Store navigation does not prove a package. Grout remains blocked, and PlayTime remains unverified.
 
 ## Test checklist
 
@@ -43,4 +43,9 @@ These are package-specific blockers. Successful App Store navigation does not re
 5. Restart and confirm the saved mapping loads. Reset it, confirm setup becomes required, and confirm only this controller/device record changes.
 6. Disconnect and reconnect the controller if the runtime permits it. Confirm the correct identity and mapping return.
 7. Export diagnostics. Confirm controller identity, mapping source, semantic events, and validation failure are present without private data.
-8. Confirm Grout and PlayTime show the MagicX device blocker and no install action.
+8. Confirm Grout shows the MagicX device blocker. Confirm PlayTime shows **Install** or **Adopt** with an experimental warning.
+9. Install PlayTime, refresh game lists or reboot, and launch it. Track a game, close it, and relaunch it.
+10. Confirm the App Store reports PlayTime healthy. Damage only a disposable managed test copy if you test Repair; confirm Repair restores it and keeps `/userdata/system/configs/playtime/`.
+11. Uninstall PlayTime and confirm its managed files are gone while `/userdata/system/configs/playtime/` remains. If you used Adopt, confirm uncertain original files are restored from `/userdata/system/knulli-app-store/originals/io.github.unitreign.playtime/`.
+
+The App Store log is `/userdata/system/logs/knulli-app-store.log`. Diagnostic exports are under `/userdata/system/knulli-app-store/diagnostics/`. Installed state and original-file backups are under `/userdata/system/knulli-app-store/`. If a test fails, stop the app, inspect the installed-state JSON, and restore a retained original to its recorded path. Do not send PlayTime data in a report.

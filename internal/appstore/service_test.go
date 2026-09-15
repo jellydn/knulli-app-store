@@ -113,6 +113,40 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 	}
 }
 
+func TestMagicXAllowsOnlyPlayTimeExperimentalPackage(t *testing.T) {
+	index, err := catalogForTest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	indexPath := filepath.Join(t.TempDir(), "index.json")
+	if err := writeIndexForTest(index, indexPath); err != nil {
+		t.Fatal(err)
+	}
+	service, err := Open(indexPath, installer.Manager{Root: t.TempDir(), Platform: platform.Info{
+		Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", Device: "magicx-zero-28", Resolution: "640x480",
+		FirmwareRaw: "knulli", FirmwareSource: "/etc/os-release:OS_NAME", VersionRaw: "scarab 2026/08/19 16:06", VersionSource: "/usr/share/knulli/knulli.version", ResolutionSource: "SDL renderer output",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, err := service.Items(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range items {
+		switch item.Package.ID {
+		case "io.github.unitreign.playtime":
+			if !item.Compatible || !item.Package.Experimental() || len(item.Actions) != 1 || item.Actions[0] != Install || !strings.Contains(strings.ToLower(item.Package.Install.Warning), "unverified") {
+				t.Fatalf("PlayTime was not offered as an unverified MagicX experiment: %#v", item)
+			}
+		case "app.romm.grout":
+			if item.Compatible || len(item.Actions) != 0 || !strings.Contains(item.Compatibility, "magicx-zero-28") {
+				t.Fatalf("Grout became actionable on MagicX: %#v", item)
+			}
+		}
+	}
+}
+
 func TestActionsReflectInstallStateAndHealth(t *testing.T) {
 	item := Item{Package: installablePackage(), Compatible: true}
 	assertActions(t, actions(item), Install)
@@ -121,6 +155,9 @@ func TestActionsReflectInstallStateAndHealth(t *testing.T) {
 	item.PreExisting = false
 	item.Installed = true
 	item.InstalledVersion = item.Package.Version
+	item.Healthy = true
+	assertActions(t, actions(item), Uninstall, Repair)
+	item.Healthy = false
 	assertActions(t, actions(item), Uninstall, Repair)
 	item.InstalledVersion = "0.9.0"
 	assertActions(t, actions(item), Update, Uninstall, Repair)

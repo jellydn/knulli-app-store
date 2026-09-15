@@ -49,6 +49,10 @@ statistics stay under /userdata/system/configs/playtime. Manager state and
 adoption backups are under /userdata/system/knulli-app-store. Refresh game
 lists or reboot after package install or uninstall.
 
+Health checks cover immutable managed release files. PlayTime runtime data does
+not cause Repair. If Repair appears, package details and the application log
+show the exact missing, changed, or mode-mismatched managed path.
+
 EmuDrop remains non-installable. It downloads ROMs; users must have the
 required rights and comply with local copyright law.
 

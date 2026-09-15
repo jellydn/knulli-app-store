@@ -62,7 +62,7 @@ func draw(model *storeui.Model, platformName string, controls *storeinput.Sessio
 		text(frame, 30, 75, palette.muted, "NO PACKAGES IN CATALOGUE")
 	} else {
 		drawList(frame, model)
-		drawDetails(frame, model)
+		drawDetails(frame, model, controls)
 	}
 	drawStatus(frame, model)
 	controllerStatus := "NO CONTROLLER"
@@ -225,7 +225,7 @@ func setupHelp(controls *storeinput.Session) string {
 	if controls.FirstRun {
 		mapping = storeinput.AutoMapping()
 	}
-	return storeinput.ButtonLabel(mapping[storeinput.Up]) + "/" + storeinput.ButtonLabel(mapping[storeinput.Down]) + " CHOOSE  " + storeinput.ButtonLabel(mapping[storeinput.Confirm]) + " SELECT  " + storeinput.ButtonLabel(mapping[storeinput.Exit]) + " SAFE EXIT"
+	return storeinput.Label(storeinput.Confirm) + " (" + storeinput.ButtonLabel(mapping[storeinput.Confirm]) + ") SELECT  " + storeinput.Label(storeinput.Back) + " (" + storeinput.ButtonLabel(mapping[storeinput.Back]) + ") CANCEL  " + storeinput.Label(storeinput.Exit) + " (" + storeinput.ButtonLabel(mapping[storeinput.Exit]) + ") SAFE EXIT"
 }
 
 func drawList(frame *image.RGBA, model *storeui.Model) {
@@ -261,7 +261,7 @@ func drawList(frame *image.RGBA, model *storeui.Model) {
 	}
 }
 
-func drawDetails(frame *image.RGBA, model *storeui.Model) {
+func drawDetails(frame *image.RGBA, model *storeui.Model, controls *storeinput.Session) {
 	item := model.Items[model.Selected]
 	text(frame, 258, 66, palette.text, shorten(strings.ToUpper(item.Package.Name), 38))
 	text(frame, 258, 84, palette.muted, strings.ToUpper(item.Package.Type)+"  /  "+reviewLabel(item.Package))
@@ -282,9 +282,23 @@ func drawDetails(frame *image.RGBA, model *storeui.Model) {
 	}
 	text(frame, 258, y, installedColor, installed)
 	y += 18
+	if item.HealthReason != "" {
+		for index, line := range wrapText(strings.ToUpper(item.HealthReason), 48) {
+			if index == 2 {
+				break
+			}
+			text(frame, 258, y, palette.error, line)
+			y += 15
+		}
+		y += 3
+	}
 	for _, line := range wrapText(strings.ToUpper(item.Package.Summary), 48) {
 		text(frame, 258, y, palette.text, line)
 		y += 15
+	}
+	if model.Error != "" {
+		drawActions(frame, model, item, controls)
+		return
 	}
 	y += 12
 	text(frame, 258, y, palette.muted, "TRUST AND COMPATIBILITY")
@@ -309,7 +323,7 @@ func drawDetails(frame *image.RGBA, model *storeui.Model) {
 			}
 		}
 	}
-	drawActions(frame, model, item)
+	drawActions(frame, model, item, controls)
 }
 
 func reviewLabel(pkg manifest.Package) string {
@@ -319,7 +333,7 @@ func reviewLabel(pkg manifest.Package) string {
 	return strings.ToUpper(pkg.Review.Status)
 }
 
-func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item) {
+func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item, controls *storeinput.Session) {
 	y := 278
 	if len(item.Actions) == 0 {
 		text(frame, 258, y, palette.warning, "READ ONLY - REVIEW REQUIRED")
@@ -351,14 +365,22 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item) {
 				}
 				text(frame, 266, 171+index*15, palette.warning, line)
 			}
-			text(frame, 266, 220, palette.muted, "B CONFIRM   A CANCEL")
+			text(frame, 266, 220, palette.muted, confirmationHelp(controls))
 		} else {
 			fill(frame, image.Rect(286, 126, 580, 214), color.RGBA{R: 35, G: 46, B: 64, A: 255})
 			text(frame, 304, 153, palette.warning, "CONFIRM PACKAGE CHANGE")
 			text(frame, 304, 176, palette.text, strings.ToUpper(string(action))+" "+shorten(strings.ToUpper(item.Package.Name), 24)+"?")
-			text(frame, 304, 199, palette.muted, "B CONFIRM   A CANCEL")
+			text(frame, 304, 199, palette.muted, confirmationHelp(controls))
 		}
 	}
+}
+
+func confirmationHelp(controls *storeinput.Session) string {
+	mapping := storeinput.AutoMapping()
+	if controls != nil {
+		mapping = controls.Mapping
+	}
+	return "CONFIRM (" + storeinput.ButtonLabel(mapping[storeinput.Confirm]) + ") ACCEPT  BACK (" + storeinput.ButtonLabel(mapping[storeinput.Back]) + ") CANCEL"
 }
 
 func drawStatus(frame *image.RGBA, model *storeui.Model) {

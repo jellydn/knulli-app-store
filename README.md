@@ -10,7 +10,7 @@ Knulli App Store is an early, safety-focused package manager for community Knull
 - ZIP and `tar.gz` release archives, up to 512 MiB compressed and installed
 - Writes below `/userdata` only
 
-The experimental GUI is functional on one community-tested TrimUI Smart Pro. MagicX Zero 28 support is source-backed but untested. This is not package evidence. Grout 5.1.0.0 and PlayTime 1.0.0 remain actionable only on Smart Pro and are blocked on MagicX. Neither package is verified.
+The experimental GUI is functional on one community-tested TrimUI Smart Pro. A real MagicX diagnostic confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController `magicx-input`; full GUI testing is still incomplete. PlayTime 1.0.0 is now a user-authorized experimental package on both devices. Grout 5.1.0.0 remains Smart Pro only. Neither package is verified.
 
 PortMaster is a featured external provider. Users open it through Knulli's official install and launch mechanism. This repository does not copy the PortMaster catalogue or implement another PortMaster installer. ROM-download sources, including EmuDrop, are outside the official catalogue policy.
 EmuDrop is one explicit community-approved exception. It remains non-installable and displays a copyright warning. This exception does not permit other ROM-download sources.
@@ -66,7 +66,7 @@ The catalogue contains two experimental packages and four non-actionable candida
 | Package | Status | Remaining blocker |
 | --- | --- | --- |
 | EmuDrop | Community approved | No license; launch-time updater bypasses manager verification and rollback; ROM/copyright risk |
-| PlayTime 1.0.0 | Experimental test | No package-specific Smart Pro result or minimum Knulli version evidence |
+| PlayTime 1.0.0 | Experimental test on Smart Pro and MagicX | Smart Pro install and launch passed; tracking, relaunch, repair, adoption, and uninstall are not complete; no MagicX package result |
 | Grout 5.1.0.0 | Experimental test | No linked Smart Pro result or minimum Knulli version; built-in updater cannot be disabled |
 | RAOfflineProxy | Not approved | Knulli asset is an unrestricted install script with no publisher checksum |
 | ETK Tool | Not approved | Release is script-based; system-space behavior is outside the initial policy |
@@ -79,6 +79,8 @@ These notes record evidence reviewed on 2026-09-15. Upstream facts can change. F
 The controller-native SDL2 GUI browses the catalogue, shows package details and separate approval/technical states, and presents only actions allowed by the installer service. On the first launch for each device/controller identity, a dedicated setup screen requires the user to use, test, or customize the detected mapping before the catalogue opens. It uses semantic actions and prefers Knulli's `SDL_GAMECONTROLLERCONFIG`. No universal physical A/B assumption remains.
 
 Current Knulli is identified through `OS_NAME="knulli"` in `/etc/os-release`, not its inherited `ID=buildroot`. The release identifier comes from `/usr/share/knulli/knulli.version`. Compatibility errors include the selected raw value, normalized value, source, and full detected device matrix. Use Settings to export a redacted diagnostic text bundle. The active log is capped at 512 KiB with one rotated copy at `/userdata/system/logs/knulli-app-store.log.1`.
+
+Package health checks now report the exact managed path and failed content or mode check. State records the mode that the destination filesystem applies, not only the requested staging mode. This prevents a false Repair state when a Knulli filesystem normalizes permissions. PlayTime's runtime database, hook, and other data outside its three immutable release files do not cause a health failure.
 
 The GUI validates SDL renderer, window, display-mode, and framebuffer resolution candidates before compatibility checks. It records the selected source and rejects corrupted or implausible dimensions instead of trusting `fb0/virtual_size`.
 

@@ -24,7 +24,7 @@ func TestRenderRepresentativeStates(t *testing.T) {
 	item := appstore.Item{
 		Package:   manifest.Package{ID: "org.example.demo", Name: "Demo Utility", Type: "utility", Summary: "A safe package used to verify action and error layouts.", Review: manifest.Review{Status: "installable"}},
 		Installed: true, InstalledVersion: "1.0.0", Healthy: false, Compatible: true,
-		Compatibility: "Compatible with detected platform", Actions: []appstore.Action{appstore.Repair, appstore.Uninstall},
+		HealthReason: "mode changed: /userdata/roms/tools/Demo/demo (expected 0755, got 0644)", Compatibility: "Compatible with detected platform", Actions: []appstore.Action{appstore.Repair, appstore.Uninstall},
 	}
 	experimental := appstore.Item{
 		Package: manifest.Package{
@@ -233,4 +233,69 @@ func TestControllerSetupLogsTransitionsWithoutRawButtonSpam(t *testing.T) {
 	if strings.Contains(logText, "controller_input") || strings.Contains(logText, "button=") {
 		t.Fatalf("raw button spam remains in setup log: %s", logText)
 	}
+}
+
+func TestSwappedConfirmBackMappingControlsCatalogueAndConfirmation(t *testing.T) {
+	for _, device := range []string{"trimui-smart-pro", "magicx-zero-28"} {
+		t.Run(device, func(t *testing.T) {
+			root := t.TempDir()
+			logger, err := diagnostics.Open(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			controls := storeinput.NewSession(root, device)
+			controls.Connected = true
+			controls.Mode = storeinput.Normal
+			controls.Mapping = storeinput.AutoMapping()
+			controls.Mapping[storeinput.Confirm], controls.Mapping[storeinput.Back] = controls.Mapping[storeinput.Back], controls.Mapping[storeinput.Confirm]
+			model := &storeui.Model{Items: []appstore.Item{{
+				Package:    manifest.Package{ID: "io.github.unitreign.playtime", Name: "PlayTime", Review: manifest.Review{Status: "experimental"}, Install: &manifest.Install{Warning: "Unverified experimental package."}},
+				Compatible: true, Actions: []appstore.Action{appstore.Install},
+			}}}
+
+			processButton(context.Background(), model, controls, controls.Mapping[storeinput.Confirm], logger)
+			if model.Focus != storeui.Actions {
+				t.Fatalf("swapped Confirm did not open package actions: %v", model.Focus)
+			}
+			processButton(context.Background(), model, controls, controls.Mapping[storeinput.Confirm], logger)
+			if model.Focus != storeui.Confirm {
+				t.Fatalf("swapped Confirm did not open package confirmation: %v", model.Focus)
+			}
+			help := confirmationHelp(controls)
+			if !strings.Contains(help, "CONFIRM (SDL B)") || !strings.Contains(help, "BACK (SDL A)") {
+				t.Fatalf("confirmation did not show active physical labels: %q", help)
+			}
+			width, height := targetSize(device)
+			frame := renderOutput(draw(model, platformHeader(device), controls), width, height)
+			if frame.Bounds().Dx() == 0 {
+				t.Fatal("confirmation failed to render")
+			}
+			if directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR"); directory != "" {
+				if err := os.MkdirAll(directory, 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := saveOutputScreenshot(filepath.Join(directory, device+"-playtime-swapped-controls.png"), draw(model, platformHeader(device), controls), width, height); err != nil {
+					t.Fatal(err)
+				}
+			}
+			processButton(context.Background(), model, controls, controls.Mapping[storeinput.Back], logger)
+			if model.Focus != storeui.Actions {
+				t.Fatalf("swapped Back did not cancel package confirmation: %v", model.Focus)
+			}
+		})
+	}
+}
+
+func platformHeader(device string) string {
+	if device == "magicx-zero-28" {
+		return "MagicX Zero 28 / 640x480"
+	}
+	return "TrimUI Smart Pro / 1280x720"
+}
+
+func targetSize(device string) (int, int) {
+	if device == "magicx-zero-28" {
+		return 640, 480
+	}
+	return 1280, 720
 }

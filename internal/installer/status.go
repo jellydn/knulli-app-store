@@ -1,16 +1,30 @@
 package installer
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
 
+type HealthIssue struct {
+	Path     string
+	Check    string
+	Expected string
+	Actual   string
+}
+
+func (issue HealthIssue) String() string {
+	return fmt.Sprintf("%s: %s (expected %s, got %s)", issue.Check, issue.Path, issue.Expected, issue.Actual)
+}
+
 type Status struct {
 	Installed bool
 	Version   string
 	Healthy   bool
+	Issues    []HealthIssue
 }
 
 func (m Manager) PreExisting(pkg manifest.Package) (bool, error) {
@@ -55,29 +69,47 @@ func (m Manager) Status(id string) (Status, error) {
 		if file.Preserved {
 			continue
 		}
+		destination := strings.TrimSuffix(state.Manifest.Install.Destination, "/")
+		if file.Path != destination && !strings.HasPrefix(file.Path, destination+"/") {
+			status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "unexpected managed path", Expected: destination, Actual: file.Path})
+			continue
+		}
 		host, err := guard.Resolve(file.Path)
 		if err != nil {
 			return Status{}, err
 		}
 		info, err := os.Stat(host)
 		if os.IsNotExist(err) {
-			status.Healthy = false
+			status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "missing", Expected: "regular file", Actual: "not found"})
 			continue
 		}
 		if err != nil {
 			return Status{}, err
 		}
 		digest, err := safefs.SHA256(host)
-		if os.IsNotExist(err) || (err == nil && digest != file.SHA256) {
-			status.Healthy = false
-			continue
-		}
 		if err != nil {
 			return Status{}, err
 		}
+		if digest != file.SHA256 {
+			status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "content changed", Expected: shortDigest(file.SHA256), Actual: shortDigest(digest)})
+		}
 		if info.Mode().Perm() != os.FileMode(file.Mode).Perm() {
-			status.Healthy = false
+			status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "mode changed", Expected: fmt.Sprintf("%04o", os.FileMode(file.Mode).Perm()), Actual: fmt.Sprintf("%04o", info.Mode().Perm())})
 		}
 	}
+	m.event("package_health_checked", "package", state.Manifest.ID, "healthy", fmt.Sprint(status.Healthy), "issues", fmt.Sprint(len(status.Issues)))
 	return status, nil
+}
+
+func (status *Status) addIssue(manager Manager, packageID string, issue HealthIssue) {
+	status.Healthy = false
+	status.Issues = append(status.Issues, issue)
+	manager.event("package_health_issue", "package", packageID, "path", issue.Path, "check", issue.Check, "expected", issue.Expected, "actual", issue.Actual)
+}
+
+func shortDigest(value string) string {
+	if len(value) <= 12 {
+		return value
+	}
+	return value[:12]
 }
