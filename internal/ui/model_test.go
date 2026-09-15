@@ -102,6 +102,32 @@ func TestModelShowsOperationFailure(t *testing.T) {
 	}
 }
 
+func TestForceReinstallRequiresTwoConfirmationSteps(t *testing.T) {
+	backend := &fakeBackend{items: []appstore.Item{{
+		Package: manifest.Package{ID: "org.example.alpha", Name: "Alpha"},
+		Actions: []appstore.Action{appstore.Adopt, appstore.ForceReinstall},
+	}}}
+	model := New(backend)
+	if err := model.Load(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	model.Select(context.Background())
+	model.Move(1)
+	model.Select(context.Background())
+	if model.Focus != Confirm || model.Busy {
+		t.Fatalf("force reinstall skipped first review: focus=%d busy=%v", model.Focus, model.Busy)
+	}
+	model.Select(context.Background())
+	if model.Focus != ForceConfirm || model.Busy {
+		t.Fatalf("force reinstall skipped second confirmation: focus=%d busy=%v", model.Focus, model.Busy)
+	}
+	model.Select(context.Background())
+	waitForModel(t, model)
+	if backend.action != appstore.ForceReinstall {
+		t.Fatalf("executed %q, want force reinstall", backend.action)
+	}
+}
+
 func TestModelDoesNotOfferCandidateAction(t *testing.T) {
 	backend := &fakeBackend{items: []appstore.Item{{Package: manifest.Package{ID: "org.example.candidate", Name: "Candidate"}}}}
 	model := New(backend)

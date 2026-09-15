@@ -3,6 +3,7 @@ package installer
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/jellydn/knulli-app-store/internal/manifest"
@@ -25,6 +26,48 @@ type Status struct {
 	Version   string
 	Healthy   bool
 	Issues    []HealthIssue
+}
+
+type RecoveryStatus struct {
+	Reason       string
+	ForceAllowed bool
+	Active       bool
+}
+
+func (m Manager) RecoveryStatus(pkg manifest.Package) (RecoveryStatus, error) {
+	if !pkg.Installable() || pkg.Install == nil {
+		return RecoveryStatus{}, nil
+	}
+	guard, err := safefs.NewGuard(m.root(), []string{managerPath})
+	if err != nil {
+		return RecoveryStatus{}, err
+	}
+	managerHost, err := guard.Resolve(managerPath)
+	if err != nil {
+		return RecoveryStatus{}, err
+	}
+	if err := os.MkdirAll(managerHost, 0700); err != nil {
+		return RecoveryStatus{}, err
+	}
+	lock, err := acquireLock(filepath.Join(managerHost, "lock"))
+	if err != nil {
+		if strings.Contains(err.Error(), "another package operation is active") {
+			return RecoveryStatus{Reason: err.Error(), Active: true}, nil
+		}
+		return RecoveryStatus{}, err
+	}
+	releaseLock(lock)
+	pending, err := safefs.PendingForPath(m.root(), managerHost, pkg.Install.Destination)
+	if err != nil {
+		return RecoveryStatus{}, fmt.Errorf("inspect transaction journal: %w", err)
+	}
+	if pending {
+		return RecoveryStatus{
+			Reason:       "Interrupted package transaction detected; the next operation will roll it back before changing files",
+			ForceAllowed: true,
+		}, nil
+	}
+	return RecoveryStatus{}, nil
 }
 
 func (m Manager) PreExisting(pkg manifest.Package) (bool, error) {

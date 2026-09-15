@@ -2,9 +2,11 @@ package appstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/jellydn/knulli-app-store/internal/catalog"
 	"github.com/jellydn/knulli-app-store/internal/installer"
@@ -15,11 +17,12 @@ import (
 type Action string
 
 const (
-	Install   Action = "install"
-	Adopt     Action = "adopt"
-	Update    Action = "update"
-	Repair    Action = "repair"
-	Uninstall Action = "uninstall"
+	Install        Action = "install"
+	Adopt          Action = "adopt"
+	Update         Action = "update"
+	Repair         Action = "repair"
+	ForceReinstall Action = "force-reinstall"
+	Uninstall      Action = "uninstall"
 )
 
 type Item struct {
@@ -33,6 +36,10 @@ type Item struct {
 	Compatible       bool
 	Compatibility    string
 	Actions          []Action
+	RecoveryReason   string
+	RecoverySummary  string
+	RecoveryAllowed  bool
+	RecoveryActive   bool
 }
 
 type Backend interface {
@@ -47,8 +54,15 @@ func (s *Service) SetPlatform(info platform.Info) {
 }
 
 type Service struct {
-	index   catalog.Index
-	manager installer.Manager
+	index          catalog.Index
+	manager        installer.Manager
+	recoveryMu     sync.Mutex
+	recoveryReason map[string]recoveryFailure
+}
+
+type recoveryFailure struct {
+	reason       string
+	forceAllowed bool
 }
 
 func Open(indexPath string, manager installer.Manager) (*Service, error) {
@@ -58,7 +72,7 @@ func Open(indexPath string, manager installer.Manager) (*Service, error) {
 		return nil, err
 	}
 	manager.Diagnostics.Event("catalogue_loaded", "path", indexPath, "packages", fmt.Sprint(len(index.Packages)))
-	return &Service{index: index, manager: manager}, nil
+	return &Service{index: index, manager: manager, recoveryReason: make(map[string]recoveryFailure)}, nil
 }
 
 func (s *Service) Items(ctx context.Context) ([]Item, error) {
@@ -81,8 +95,31 @@ func (s *Service) Items(ctx context.Context) ([]Item, error) {
 			if err != nil {
 				return nil, fmt.Errorf("inspect %s destination: %w", entry.ID, err)
 			}
+			if item.PreExisting {
+				recovery, recoveryErr := s.manager.RecoveryStatus(entry.Package)
+				if recoveryErr != nil {
+					return nil, fmt.Errorf("inspect %s recovery state: %w", entry.ID, recoveryErr)
+				}
+				item.RecoveryReason = recovery.Reason
+				item.RecoveryAllowed = recovery.ForceAllowed
+				item.RecoveryActive = recovery.Active
+			}
 		}
 		item.Compatible, item.Compatibility = compatibility(entry.Package, s.manager.Platform)
+		s.recoveryMu.Lock()
+		failure := s.recoveryReason[entry.ID]
+		s.recoveryMu.Unlock()
+		if failure.reason != "" {
+			item.RecoveryReason = failure.reason
+			item.RecoveryAllowed = failure.forceAllowed
+		}
+		if item.RecoveryReason != "" {
+			preserved := 0
+			if entry.Package.Install != nil {
+				preserved = len(entry.Package.Install.Preserve)
+			}
+			item.RecoverySummary = fmt.Sprintf("Replaces reviewed app files; preserves %d declared data paths; backs up the complete existing destination for manual restore.", preserved)
+		}
 		s.manager.Diagnostics.Event("compatibility_decision", "package", entry.ID, "allowed", fmt.Sprint(item.Compatible), "decision", item.Compatibility)
 		item.Actions = actions(item)
 		items = append(items, item)
@@ -121,10 +158,17 @@ func (s *Service) Execute(ctx context.Context, id string, action Action, progres
 		err = manager.Install(ctx, entry.Package)
 	case Adopt:
 		err = manager.Adopt(ctx, entry.Package)
+		if err != nil {
+			s.recoveryMu.Lock()
+			s.recoveryReason[id] = recoveryFailure{reason: err.Error(), forceAllowed: recoverableAdoptionFailure(err)}
+			s.recoveryMu.Unlock()
+		}
 	case Update:
 		err = manager.Update(ctx, entry.Package)
 	case Repair:
 		err = manager.Repair(ctx, entry.Package)
+	case ForceReinstall:
+		err = manager.ForceReinstall(ctx, entry.Package)
 	case Uninstall:
 		err = manager.UninstallContext(ctx, id)
 	default:
@@ -132,6 +176,11 @@ func (s *Service) Execute(ctx context.Context, id string, action Action, progres
 	}
 	if err != nil {
 		return err
+	}
+	if action == Adopt || action == ForceReinstall {
+		s.recoveryMu.Lock()
+		delete(s.recoveryReason, id)
+		s.recoveryMu.Unlock()
 	}
 	progress(completionMessage(action, outcome))
 	return nil
@@ -191,6 +240,12 @@ func actions(item Item) []Action {
 	}
 	if item.Package.Installable() && item.Compatible {
 		if item.PreExisting {
+			if item.RecoveryActive {
+				return nil
+			}
+			if item.RecoveryAllowed {
+				return []Action{Adopt, ForceReinstall}
+			}
 			return []Action{Adopt}
 		}
 		return []Action{Install}
@@ -198,11 +253,16 @@ func actions(item Item) []Action {
 	return nil
 }
 
+func recoverableAdoptionFailure(err error) bool {
+	var conflict *installer.AdoptionConflictError
+	return errors.As(err, &conflict)
+}
+
 func operationMessage(action Action, name string) string {
 	if action == Adopt {
 		return "Inventorying and backing up existing " + name
 	}
-	if action == Install || action == Update || action == Repair {
+	if action == Install || action == Update || action == Repair || action == ForceReinstall {
 		return "Downloading, verifying, and applying " + name
 	}
 	return "Removing managed files and restoring backups for " + name
@@ -222,6 +282,9 @@ func completionMessage(action Action, outcome installer.OperationOutcome) string
 func actionLabel(action Action) string {
 	if action == Adopt {
 		return "Manage existing install"
+	}
+	if action == ForceReinstall {
+		return "Force reinstall"
 	}
 	value := string(action)
 	if value == "" {

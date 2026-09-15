@@ -48,7 +48,7 @@ The launcher appends diagnostics to `/userdata/system/logs/knulli-app-store.log`
 
 ## Experimental package operations
 
-Only Grout 5.1.0.0 and PlayTime 1.0.0 are actionable. Grout is verified for this Smart Pro matrix. PlayTime remains experimental because MagicX is untested. Select **Install** for a new copy. If the App Store detects an external copy, the row shows **EXTERNAL** and the action becomes **Manage existing**. Details explain that this inventories the copy and records safe ownership without reinstalling it. Exact release matches become manager-owned. Changed and unknown files stay unmanaged and are backed up under `/userdata/system/knulli-app-store/originals/<package-id>/` before a later Repair can replace them. State is stored under `/userdata/system/knulli-app-store/installed/`.
+Grout 5.2.0.0 and PlayTime 1.0.0 are broad experimental packages. This Smart Pro has exact PlayTime 1.0.0 evidence, but the Grout report is for 5.1.0.0. Select **Install** for a new copy. If the App Store detects an external copy, the row shows **EXTERNAL** and the action becomes **Manage existing**. Details explain that this inventories the copy and records safe ownership without reinstalling it. Exact release matches become manager-owned. Changed and unknown files stay unmanaged and are backed up under `/userdata/system/knulli-app-store/originals/<package-id>/` before a later Repair can replace them. State is stored under `/userdata/system/knulli-app-store/installed/`.
 
 The manager restores execute mode only on reviewed paths. PlayTime needs `playtime` and `playtime.sh` to be executable so Knulli can start the launcher and its local binary. Grout needs `Grout.sh` and `grout` for the same reason. No downloaded script is executed during installation.
 
@@ -66,7 +66,7 @@ Resolution selection records every candidate with its source, dimensions, valida
 
 Use Settings > Export Diagnostics to create a text bundle under `/userdata/system/knulli-app-store/diagnostics/`. The screen shows the exact output path. The bundle contains detected platform fields, public package IDs and review states, and the bounded redacted logs. It does not include Grout credentials, PlayTime data, ROMs, or private configuration.
 
-Do not use Grout's built-in updater during this test. It has no supported disable setting and operates outside App Store rollback. Future Grout updates must use a newly reviewed manifest. The manager adds a `gamelist.xml` entry only when the exact launcher path is absent. It removes only an unchanged entry that its state proves it created. Shared, pre-existing, and modified entries remain. After a committed change, it asks Knulli's loopback `/reloadgames` endpoint to queue a refresh. If Knulli does not accept the request, the GUI says **Restart required**; it never claims that a queued refresh completed.
+Grout has no supported updater-disable setting. The Store therefore changes the reviewed updater metadata URL to a reserved `.invalid` URL during staging and verifies the transformed binary SHA-256. Use only Store update and repair. The manager adds a `gamelist.xml` entry only when the exact launcher path is absent. It removes only an unchanged entry that its state proves it created. Shared, pre-existing, and modified entries remain. After a committed change, it asks Knulli's loopback `/reloadgames` endpoint to queue a refresh. If Knulli does not accept the request, the GUI says **Restart required**; it never claims that a queued refresh completed.
 
 ## Controls
 
@@ -83,7 +83,7 @@ If SDL exposes no GameController, the setup screen stays blocked, automatically 
 - Confirm the footer shows the active semantic controls and mapping source; record the log if no controller appears.
 - Open Settings with its displayed physical label, export diagnostics, and inspect the bundle for platform and mapping decisions. Do not send it if manual inspection finds private data.
 - Confirm the header shows `TRIMUI SMART PRO / 1280X720`. Unknown boards must show `UNKNOWN DEVICE`, and failed runtime-size detection must identify its fallback.
-- Confirm Grout shows `VERIFIED`, PlayTime shows its Smart Pro test state, and the other two packages remain read-only.
+- Confirm Grout shows `EXPERIMENTAL`, PlayTime shows `DEVICE TESTED`, and the other two packages remain read-only.
 - Confirm returning to EmulationStation works and a second launch also works.
 - Confirm Wi-Fi disabled and enabled produce the same catalogue because this artifact reads its bundled index.
 - Send the log, firmware version, observed controls, and a photo or screenshot with the result. Do not include credentials or private network data.
@@ -98,15 +98,18 @@ After this checklist passes, add linked `real-device-test` evidence for the GUI 
 4. Run Uninstall and confirm managed files are gone while `/userdata/system/configs/playtime/` remains.
 5. If PlayTime existed before this test, use **Manage existing** and confirm its statistics remain.
 
-### Grout 5.1.0.0
+### Grout 5.2.0.0
 
-1. Install, refresh game lists or reboot, and launch Grout without using its updater.
+1. Install, refresh game lists or reboot, and launch Grout. Confirm no self-update action can obtain metadata.
 2. Connect to a test RomM server and confirm one core browse or sync operation. Do not include credentials in the report.
 3. Run Repair and confirm `config.json`, `save_slots.json`, `.cache/`, and `logs/` remain.
 4. Run Uninstall and confirm managed files are gone while the preserved paths remain.
 5. If Grout existed before this test, use **Manage existing** and confirm credentials and configuration remain.
 
-Report install, launch, core function, Repair, Uninstall, and adoption results separately for each package. The current report says both package tests were good but does not itemize these steps. PlayTime stays experimental until its MagicX matrix is tested.
+6. Test update from 5.1.0.0 and confirm all four preserved paths remain. Test a failed update and confirm rollback restores 5.1.0.0 exactly.
+7. Cause a disposable **Manage existing** failure. Confirm the recovery screen shows the exact reason, **Retry manage**, **Force reinstall**, diagnostics, and cancel. Complete both force confirmations and inspect the timestamped backup manifest.
+
+Report install, launch, core function, update, rollback, Repair, Uninstall, adoption, and force-reinstall results separately for each package. A passing Smart Pro result does not verify another device.
 
 ## Firmware-fix reproduction
 

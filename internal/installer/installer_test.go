@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +15,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	storearchive "github.com/jellydn/knulli-app-store/internal/archive"
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/platform"
@@ -301,8 +304,8 @@ func TestPlayTimeFirstLaunchHealthRepairAndUninstallOnExperimentalDevices(t *tes
 	defer server.Close()
 
 	for _, current := range []platform.Info{
-		{Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720"},
-		{Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", Device: "magicx-zero-28", Resolution: "640x480"},
+		{Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc", "libresolv", "libpthread"}, Device: "trimui-smart-pro", Resolution: "1280x720"},
+		{Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc", "libresolv", "libpthread"}, Device: "magicx-zero-28", Resolution: "640x480"},
 	} {
 		t.Run(current.Device, func(t *testing.T) {
 			root := t.TempDir()
@@ -387,7 +390,7 @@ func TestPlayTimeMagicXAdoptionAndUninstallPreserveExistingData(t *testing.T) {
 	server := serveAsset(t, asset)
 	defer server.Close()
 	pkg := playTimeTestPackage(t, asset)
-	manager := Manager{Root: root, Platform: platform.Info{Firmware: "knulli", Version: "scarab", Arch: "aarch64", Device: "magicx-zero-28", Resolution: "640x480"}, Client: rewriteClient(t, server)}
+	manager := Manager{Root: root, Platform: platform.Info{Firmware: "knulli", Version: "scarab", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc"}, Device: "magicx-zero-28", Resolution: "640x480"}, Client: rewriteClient(t, server)}
 	if existing, err := manager.PreExisting(pkg); err != nil || !existing {
 		t.Fatalf("MagicX PlayTime copy was not offered for adoption: existing=%v err=%v", existing, err)
 	}
@@ -409,6 +412,69 @@ func TestPlayTimeMagicXAdoptionAndUninstallPreserveExistingData(t *testing.T) {
 	}
 	assertRootFile(t, root, "userdata/roms/tools/PlayTime/local-note.txt", "existing note")
 	assertRootFile(t, root, "userdata/system/configs/playtime/playtime.db", "existing statistics")
+}
+
+func TestGroutPreviousVersionUpdateRepairRollbackAndUninstallPreserveState(t *testing.T) {
+	root := t.TempDir()
+	v51 := zipBytes(t, map[string]string{"Grout.sh": "launcher 5.1", "grout": "binary 5.1"})
+	v52 := zipBytes(t, map[string]string{"Grout.sh": "launcher 5.2", "grout": "binary 5.2"})
+	assets := map[string][]byte{"/example/demo/releases/download/v5.1/grout.zip": v51, "/example/demo/releases/download/v5.2/grout.zip": v52}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		data, ok := assets[request.URL.Path]
+		if !ok {
+			http.NotFound(writer, request)
+			return
+		}
+		writer.Header().Set("Content-Length", strconv.Itoa(len(data)))
+		writer.Write(data)
+	}))
+	defer server.Close()
+	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
+	old := groutTestPackage(v51, "https://github.com/example/demo/releases/download/v5.1/grout.zip", "5.1.0.0")
+	if err := manager.Install(context.Background(), old); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"config.json": "credentials", "save_slots.json": "slots", ".cache/grout.db": "cache", "logs/grout.log": "log"} {
+		writeRootFile(t, root, "userdata/roms/tools/Grout/"+name, body)
+	}
+	current := groutTestPackage(v52, "https://github.com/example/demo/releases/download/v5.2/grout.zip", "5.2.0.0")
+	writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList><broken></gameList>")
+	if err := manager.Update(context.Background(), current); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
+		t.Fatalf("expected update rollback trigger, got %v", err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/Grout/grout", "binary 5.1")
+	for name, body := range map[string]string{"config.json": "credentials", "save_slots.json": "slots", ".cache/grout.db": "cache", "logs/grout.log": "log"} {
+		assertRootFile(t, root, "userdata/roms/tools/Grout/"+name, body)
+	}
+	writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList></gameList>")
+	if err := manager.Update(context.Background(), current); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/Grout/grout", "binary 5.2")
+	writeRootFile(t, root, "userdata/roms/tools/Grout/grout", "damaged")
+	if err := manager.Repair(context.Background(), current); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/Grout/grout", "binary 5.2")
+	if err := manager.Uninstall(current.ID); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"config.json": "credentials", "save_slots.json": "slots", ".cache/grout.db": "cache", "logs/grout.log": "log"} {
+		assertRootFile(t, root, "userdata/roms/tools/Grout/"+name, body)
+	}
+}
+
+func groutTestPackage(asset []byte, url, version string) manifest.Package {
+	pkg := testPackage(url, asset, version)
+	pkg.ID = "app.romm.grout"
+	pkg.Name = "Grout"
+	pkg.Install.Destination = "/userdata/roms/tools/Grout"
+	pkg.Install.Launcher = "Grout.sh"
+	pkg.Install.Executables = []string{"Grout.sh", "grout"}
+	pkg.Install.Preserve = []string{"config.json", "save_slots.json", ".cache", "logs"}
+	pkg.Install.AllowedWritePaths = []string{"/userdata/roms/tools/Grout", "/userdata/roms/tools/gamelist.xml"}
+	pkg.Install.Menu = &manifest.Menu{Gamelist: "/userdata/roms/tools/gamelist.xml", Path: "./Grout/Grout.sh", Name: "Grout"}
+	return pkg
 }
 
 func playTimeTestPackage(t *testing.T, asset []byte) manifest.Package {
@@ -519,6 +585,187 @@ func TestInstallRejectsAnExternalCopyAndNamesTheOnScreenAction(t *testing.T) {
 	}
 }
 
+func TestForceReinstallBacksUpEverythingPreservesDataAndCanRepeat(t *testing.T) {
+	root := t.TempDir()
+	writeRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "damaged launcher")
+	writeRootFile(t, root, "userdata/roms/tools/demo/config.ini", "user configuration")
+	writeRootFile(t, root, "userdata/roms/tools/demo/unknown/cache.db", "unknown data")
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher", "config.ini": "default configuration"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	now := time.Date(2026, 9, 15, 23, 1, 2, 3, time.UTC)
+	refreshes := 0
+	refreshServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		refreshes++
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	defer refreshServer.Close()
+	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server), Now: func() time.Time { return now }, RefreshClient: refreshServer.Client(), RefreshURL: refreshServer.URL}
+	if err := manager.ForceReinstall(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "reviewed launcher")
+	assertRootFile(t, root, "userdata/roms/tools/demo/config.ini", "user configuration")
+	assertRootFile(t, root, "userdata/roms/tools/demo/unknown/cache.db", "unknown data")
+	backupDirectory := filepath.Join(root, "userdata/system/knulli-app-store/recovery-backups/org.example.demo/20260915T230102.000000003Z")
+	data, err := os.ReadFile(filepath.Join(backupDirectory, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var backup recoveryBackup
+	if err := json.Unmarshal(data, &backup); err != nil {
+		t.Fatal(err)
+	}
+	if backup.PackageID != pkg.ID || len(backup.Files) != 3 {
+		t.Fatalf("recovery inventory is incomplete: %#v", backup)
+	}
+	for _, file := range backup.Files {
+		if file.OriginalPath == "" || file.SHA256 == "" || file.BackupPath == "" {
+			t.Fatalf("recovery entry lacks path/hash evidence: %#v", file)
+		}
+		assertRootFile(t, root, strings.TrimPrefix(file.BackupPath, "/"), map[string]string{
+			"/userdata/roms/tools/demo/launch.sh":        "damaged launcher",
+			"/userdata/roms/tools/demo/config.ini":       "user configuration",
+			"/userdata/roms/tools/demo/unknown/cache.db": "unknown data",
+		}[file.OriginalPath])
+	}
+	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
+		t.Fatalf("force reinstall did not create clean state: %#v, %v", status, err)
+	}
+	now = now.Add(time.Second)
+	if err := manager.ForceReinstall(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	backups, err := filepath.Glob(filepath.Join(root, "userdata/system/knulli-app-store/recovery-backups/org.example.demo/*/manifest.json"))
+	if err != nil || len(backups) != 2 {
+		t.Fatalf("repeated force reinstall did not retain separate backups: %v, %v", backups, err)
+	}
+	if refreshes != 2 {
+		t.Fatalf("game list refresh count = %d, want 2 for two proven owned-entry writes", refreshes)
+	}
+}
+
+func TestForceReinstallMandatoryChecksCannotBeBypassed(t *testing.T) {
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
+	tests := []struct {
+		name   string
+		change func(*manifest.Package, *Manager, string)
+		want   string
+	}{
+		{name: "checksum", change: func(pkg *manifest.Package, _ *Manager, _ string) { pkg.Release.SHA256 = strings.Repeat("0", 64) }, want: "SHA-256 mismatch"},
+		{name: "compatibility", change: func(_ *manifest.Package, manager *Manager, _ string) { manager.Platform.Arch = "x86_64" }, want: "field=architecture"},
+		{name: "insufficient space", change: func(_ *manifest.Package, manager *Manager, _ string) {
+			manager.AvailableBytes = func(string) (uint64, error) { return 1, nil }
+		}, want: "not enough free space"},
+		{name: "patch source", change: func(pkg *manifest.Package, _ *Manager, _ string) {
+			pkg.Install.BinaryPatches = []manifest.BinaryPatch{{Path: "launch.sh", Offset: 0, BeforeHex: "00", AfterHex: "01", SHA256: strings.Repeat("a", 64)}}
+		}, want: "binary patch source mismatch"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "original")
+			server := serveAsset(t, asset)
+			defer server.Close()
+			pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+			manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
+			test.change(&pkg, &manager, root)
+			err := manager.ForceReinstall(context.Background(), pkg)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("force reinstall bypassed %s: %v", test.name, err)
+			}
+			assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "original")
+			backups, _ := filepath.Glob(filepath.Join(root, "userdata/system/knulli-app-store/recovery-backups/org.example.demo/*"))
+			if len(backups) != 0 {
+				t.Fatalf("failed pre-write check retained a backup: %v", backups)
+			}
+		})
+	}
+}
+
+func TestBinaryPatchAppliesReviewedBytesAndFinalHash(t *testing.T) {
+	before := []byte("prefix-https://grout.romm.app/versions.json-suffix")
+	afterURL := "https://self-update.disabled.invalid"
+	expected := []byte("prefix-" + afterURL + "-suffix")
+	digest := sha256.Sum256(expected)
+	host := filepath.Join(t.TempDir(), "grout")
+	if err := os.WriteFile(host, before, 0755); err != nil {
+		t.Fatal(err)
+	}
+	files := []storearchive.File{{Path: host, Relative: "grout", Mode: 0755}}
+	patches := []manifest.BinaryPatch{{
+		Path: "grout", Offset: int64(len("prefix-")),
+		BeforeHex: hex.EncodeToString([]byte("https://grout.romm.app/versions.json")),
+		AfterHex:  hex.EncodeToString([]byte(afterURL)), SHA256: hex.EncodeToString(digest[:]),
+	}}
+	if err := applyBinaryPatches(files, patches); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(host)
+	if err != nil || !bytes.Equal(data, expected) || files[0].SHA256 != patches[0].SHA256 {
+		t.Fatalf("verified updater patch result = %q, sha=%s, err=%v", data, files[0].SHA256, err)
+	}
+}
+
+func TestForceReinstallRejectsArchiveTraversalAndLinks(t *testing.T) {
+	for name, mode := range map[string]os.FileMode{"../outside": 0644, "unsafe-link": os.ModeSymlink | 0777} {
+		t.Run(strings.ReplaceAll(name, "/", "_"), func(t *testing.T) {
+			root := t.TempDir()
+			writeRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "original")
+			asset := zipBytesWithModes(t, map[string]zipFixture{name: {body: "unsafe", mode: mode}})
+			server := serveAsset(t, asset)
+			defer server.Close()
+			pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+			manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
+			if err := manager.ForceReinstall(context.Background(), pkg); err == nil {
+				t.Fatal("unsafe archive passed force-reinstall validation")
+			}
+			assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "original")
+		})
+	}
+}
+
+func TestForceReinstallRollbackAndPowerLossRecoveryRestoreExactState(t *testing.T) {
+	root := t.TempDir()
+	writeRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "before crash")
+	writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList><broken></gameList>")
+	guard, err := safefs.NewGuard(root, []string{managerPath, "/userdata/roms/tools/demo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	managerHost, err := guard.Resolve(managerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(managerHost, 0700); err != nil {
+		t.Fatal(err)
+	}
+	crashed, err := safefs.Begin(guard, managerHost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := crashed.Write("/userdata/roms/tools/demo/launch.sh", []byte("partial adoption"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "partial adoption")
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server), Now: func() time.Time { return time.Date(2026, 9, 15, 23, 2, 0, 0, time.UTC) }}
+	if err := manager.ForceReinstall(context.Background(), pkg); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
+		t.Fatalf("expected recovered transaction followed by transactional failure, got %v", err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "before crash")
+	assertRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList><broken></gameList>")
+	assertMissing(t, root, "userdata/system/knulli-app-store/installed/org.example.demo.json")
+	backups, _ := filepath.Glob(filepath.Join(root, "userdata/system/knulli-app-store/recovery-backups/org.example.demo/*"))
+	if len(backups) != 0 {
+		t.Fatalf("rolled-back recovery backup survived: %v", backups)
+	}
+}
+
 func TestLockedOperationRecoversCrashedTransaction(t *testing.T) {
 	root := t.TempDir()
 	guard, err := safefs.NewGuard(root, []string{managerPath})
@@ -561,6 +808,44 @@ func TestLockedOperationRecoversCrashedTransaction(t *testing.T) {
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "reviewed launcher")
 }
 
+func TestRecoveryStatusDistinguishesInterruptedAndActiveTransactions(t *testing.T) {
+	root := t.TempDir()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", zipBytes(t, map[string]string{"launch.sh": "reviewed"}), "1.0.0")
+	writeRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "before")
+	guard, err := safefs.NewGuard(root, []string{managerPath, pkg.Install.Destination})
+	if err != nil {
+		t.Fatal(err)
+	}
+	managerHost, err := guard.Resolve(managerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(managerHost, 0700); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := safefs.Begin(guard, managerHost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Write(pkg.Install.Destination+"/launch.sh", []byte("partial"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	manager := Manager{Root: root}
+	status, err := manager.RecoveryStatus(pkg)
+	if err != nil || !status.ForceAllowed || status.Active || !strings.Contains(status.Reason, "Interrupted") {
+		t.Fatalf("stale transaction status = %#v, %v", status, err)
+	}
+	lock, err := acquireLock(filepath.Join(managerHost, "lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer releaseLock(lock)
+	status, err = manager.RecoveryStatus(pkg)
+	if err != nil || status.ForceAllowed || !status.Active || status.Reason != "another package operation is active" {
+		t.Fatalf("active transaction status = %#v, %v", status, err)
+	}
+}
+
 func TestCandidateCannotBeInstalled(t *testing.T) {
 	pkg := testPackage("https://example.com/releases/download/v1/demo.zip", []byte("x"), "1.0.0")
 	pkg.Review.Status = "candidate"
@@ -589,7 +874,7 @@ func testPackage(url string, asset []byte, version string) manifest.Package {
 		Type: "utility", Summary: "Test fixture.", Repository: "https://github.com/example/demo", License: "MIT",
 		Review:        manifest.Review{Status: "installable"},
 		Release:       &manifest.Release{URL: url, SHA256: hex.EncodeToString(digest[:]), Size: int64(len(asset)), InstalledSize: installedSize, Format: "zip", Immutable: true},
-		Compatibility: &manifest.Compatibility{Firmware: "knulli", MinimumVersion: "2025.1", Architectures: []string{"aarch64"}, Devices: []string{"h700"}, Resolutions: []string{"640x480"}},
+		Compatibility: &manifest.Compatibility{Firmware: "knulli", MinimumVersion: "2025.1", Architectures: []string{"aarch64"}, ABIs: []string{"linux-aarch64-glibc"}, Dependencies: []string{"sdl2"}, Devices: []string{"h700"}, Resolutions: []string{"640x480"}},
 		Install: &manifest.Install{
 			Destination: "/userdata/roms/tools/demo", Launcher: "launch.sh", Preserve: []string{"config.ini"},
 			AllowedWritePaths: []string{"/userdata/roms/tools/demo", "/userdata/roms/tools/gamelist.xml"},
@@ -599,7 +884,7 @@ func testPackage(url string, asset []byte, version string) manifest.Package {
 }
 
 func testPlatform() platform.Info {
-	return platform.Info{Firmware: "knulli", Version: "2025.2", Arch: "aarch64", Device: "h700", Resolution: "640x480"}
+	return platform.Info{Firmware: "knulli", Version: "2025.2", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc", "libresolv", "libpthread"}, Device: "h700", Resolution: "640x480"}
 }
 
 func serveAsset(t *testing.T, asset []byte) *httptest.Server {

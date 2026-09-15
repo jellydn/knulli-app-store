@@ -43,6 +43,10 @@ func TestRenderRepresentativeStates(t *testing.T) {
 	external := experimental
 	external.PreExisting = true
 	external.Actions = []appstore.Action{appstore.Adopt}
+	recovery := external
+	recovery.RecoveryReason = "adoption backup already exists for /userdata/roms/tools/PlayTime/playtime"
+	recovery.RecoverySummary = "Replaces reviewed app files; preserves declared data; backs up the complete existing destination for manual restore."
+	recovery.Actions = []appstore.Action{appstore.Adopt, appstore.ForceReinstall}
 	incompatible := experimental
 	incompatible.Compatible = false
 	incompatible.Actions = nil
@@ -59,6 +63,9 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		"experimental":        {Items: []appstore.Item{experimental}, Focus: storeui.Actions},
 		"external":            {Items: []appstore.Item{external}, Focus: storeui.Actions},
 		"external-confirm":    {Items: []appstore.Item{external}, Focus: storeui.Confirm},
+		"recovery":            {Items: []appstore.Item{recovery}, Focus: storeui.Actions, Error: recovery.RecoveryReason},
+		"force-review":        {Items: []appstore.Item{recovery}, Focus: storeui.Confirm, Action: 1},
+		"force-confirm":       {Items: []appstore.Item{recovery}, Focus: storeui.ForceConfirm, Action: 1},
 		"issue":               {Items: []appstore.Item{issue}},
 		"issue-details":       {Items: []appstore.Item{issue}, Focus: storeui.Actions},
 		"compatibility-error": {Items: []appstore.Item{incompatible}, Focus: storeui.Actions},

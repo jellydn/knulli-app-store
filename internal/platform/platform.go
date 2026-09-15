@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -25,6 +26,9 @@ type Info struct {
 	Resolution           string
 	ResolutionSource     string
 	ResolutionCandidates []ResolutionCandidate
+	ABI                  string
+	GLIBCVersion         string
+	Dependencies         []string
 }
 
 type ResolutionCandidate struct {
@@ -99,6 +103,9 @@ func Detect(root string) Info {
 	}
 	info.ResolutionCandidates = filesystemResolutionCandidates(root)
 	info = WithResolutionCandidates(info, info.ResolutionCandidates)
+	info.ABI = detectABI(root, info.Arch)
+	info.GLIBCVersion = detectGLIBCVersion(root)
+	info.Dependencies = detectDependencies(root)
 	return info
 }
 
@@ -183,27 +190,102 @@ func Check(pkg manifest.Package, current Info) error {
 	if !includes(wanted.Architectures, current.Arch) {
 		return compatibilityError("architecture", current, fmt.Sprintf("package allows architectures=%q", strings.Join(wanted.Architectures, ",")))
 	}
-	if !includes(wanted.Devices, current.Device) {
+	if len(wanted.ABIs) > 0 && !includes(wanted.ABIs, current.ABI) {
+		return compatibilityError("abi", current, fmt.Sprintf("package requires one of abis=%q", strings.Join(wanted.ABIs, ",")))
+	}
+	if wanted.MinimumGLIBC != "" && (current.GLIBCVersion == "" || compareVersions(current.GLIBCVersion, wanted.MinimumGLIBC) < 0) {
+		return compatibilityError("abi", current, fmt.Sprintf("package requires glibc>=%q", wanted.MinimumGLIBC))
+	}
+	for _, dependency := range wanted.Dependencies {
+		if !includes(current.Dependencies, dependency) {
+			return compatibilityError("dependency", current, fmt.Sprintf("package requires runtime dependency=%q", dependency))
+		}
+	}
+	if current.Device == "" {
+		return compatibilityError("device", current, "detected device identity is empty")
+	}
+	if wanted.DeviceScope != "any" && !includes(wanted.Devices, current.Device) {
 		return compatibilityError("device", current, fmt.Sprintf("package allows devices=%q", strings.Join(wanted.Devices, ",")))
 	}
-	if !includes(wanted.Resolutions, current.Resolution) {
+	if current.Resolution == "" {
+		return compatibilityError("resolution", current, "no validated display resolution was detected")
+	}
+	if wanted.DisplayBounds != nil {
+		var width, height int
+		if _, err := fmt.Sscanf(current.Resolution, "%dx%d", &width, &height); err != nil || width < wanted.DisplayBounds.MinimumWidth || height < wanted.DisplayBounds.MinimumHeight || width > wanted.DisplayBounds.MaximumWidth || height > wanted.DisplayBounds.MaximumHeight {
+			return compatibilityError("resolution", current, fmt.Sprintf("package allows display bounds=%dx%d..%dx%d", wanted.DisplayBounds.MinimumWidth, wanted.DisplayBounds.MinimumHeight, wanted.DisplayBounds.MaximumWidth, wanted.DisplayBounds.MaximumHeight))
+		}
+	} else if !includes(wanted.Resolutions, current.Resolution) {
 		return compatibilityError("resolution", current, fmt.Sprintf("package allows resolutions=%q", strings.Join(wanted.Resolutions, ",")))
 	}
 	return nil
 }
 
 func Summary(info Info) string {
-	return fmt.Sprintf("device=%q architecture=%q resolution=%q resolution_source=%q firmware_raw=%q firmware=%q firmware_source=%q version_raw=%q version=%q version_source=%q",
-		info.Device, info.Arch, info.Resolution, info.ResolutionSource, info.FirmwareRaw, info.Firmware, info.FirmwareSource, info.VersionRaw, info.Version, info.VersionSource)
+	return fmt.Sprintf("device=%q architecture=%q abi=%q glibc=%q dependencies=%q resolution=%q resolution_source=%q firmware_raw=%q firmware=%q firmware_source=%q version_raw=%q version=%q version_source=%q",
+		info.Device, info.Arch, info.ABI, info.GLIBCVersion, strings.Join(info.Dependencies, ","), info.Resolution, info.ResolutionSource, info.FirmwareRaw, info.Firmware, info.FirmwareSource, info.VersionRaw, info.Version, info.VersionSource)
 }
 
 func compatibilityError(field string, current Info, constraint string) error {
-	detected := fmt.Sprintf("device=%q architecture=%q resolution=%q resolution_source=%q firmware_raw=%q firmware=%q firmware_source=%q",
-		current.Device, current.Arch, current.Resolution, current.ResolutionSource, current.FirmwareRaw, current.Firmware, current.FirmwareSource)
+	detected := fmt.Sprintf("device=%q architecture=%q abi=%q glibc=%q dependencies=%q resolution=%q resolution_source=%q firmware_raw=%q firmware=%q firmware_source=%q",
+		current.Device, current.Arch, current.ABI, current.GLIBCVersion, strings.Join(current.Dependencies, ","), current.Resolution, current.ResolutionSource, current.FirmwareRaw, current.Firmware, current.FirmwareSource)
 	if field == "firmware_version" {
 		detected += fmt.Sprintf(" version_raw=%q version=%q version_source=%q", current.VersionRaw, current.Version, current.VersionSource)
 	}
 	return fmt.Errorf("compatibility failed field=%s: detected %s; %s", field, detected, constraint)
+}
+
+func detectABI(root, architecture string) string {
+	if architecture != "aarch64" {
+		return ""
+	}
+	for _, name := range []string{"lib/ld-linux-aarch64.so.1", "lib64/ld-linux-aarch64.so.1"} {
+		if info, err := os.Stat(filepath.Join(root, name)); err == nil && info.Mode().IsRegular() {
+			return "linux-aarch64-glibc"
+		}
+	}
+	return ""
+}
+
+func detectGLIBCVersion(root string) string {
+	matcher := regexp.MustCompile(`GLIBC_([0-9]+\.[0-9]+)`)
+	for _, name := range []string{"lib/libc.so.6", "lib64/libc.so.6", "usr/lib/libc.so.6"} {
+		data, err := os.ReadFile(filepath.Join(root, name))
+		if err != nil {
+			continue
+		}
+		latest := ""
+		for _, match := range matcher.FindAllSubmatch(data, -1) {
+			version := string(match[1])
+			if latest == "" || compareVersions(version, latest) > 0 {
+				latest = version
+			}
+		}
+		return latest
+	}
+	return ""
+}
+
+func detectDependencies(root string) []string {
+	wanted := map[string][]string{
+		"sdl2":       {"usr/lib/libSDL2-2.0.so.0", "lib/libSDL2-2.0.so.0"},
+		"sdl2-image": {"usr/lib/libSDL2_image-2.0.so.0", "lib/libSDL2_image-2.0.so.0"},
+		"sdl2-ttf":   {"usr/lib/libSDL2_ttf-2.0.so.0", "lib/libSDL2_ttf-2.0.so.0"},
+		"libc":       {"lib/libc.so.6", "lib64/libc.so.6", "usr/lib/libc.so.6"},
+		"libresolv":  {"lib/libresolv.so.2", "lib64/libresolv.so.2", "usr/lib/libresolv.so.2"},
+		"libpthread": {"lib/libpthread.so.0", "lib64/libpthread.so.0", "usr/lib/libpthread.so.0"},
+	}
+	var found []string
+	for dependency, paths := range wanted {
+		for _, name := range paths {
+			if _, err := os.Stat(filepath.Join(root, name)); err == nil {
+				found = append(found, dependency)
+				break
+			}
+		}
+	}
+	sort.Strings(found)
+	return found
 }
 
 var versionPart = regexp.MustCompile(`[0-9]+|[a-zA-Z]+`)

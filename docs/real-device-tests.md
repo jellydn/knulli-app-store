@@ -9,4 +9,4 @@
 - Report: “Tested Grout and Playtime. All good.”
 - Provenance: Slack report relayed through the project Puck thread
 
-This report confirms a successful package test in the immediate Smart Pro context. It does not list separate install, launch, repair, adoption, or uninstall results. It does not confirm PlayTime on MagicX Zero 28. Grout is verified only for its declared Smart Pro matrix. PlayTime remains experimental because its declared matrix also includes MagicX.
+This report confirms a successful package test in the immediate Smart Pro context. It does not list separate install, launch, repair, adoption, or uninstall results. It does not confirm PlayTime on MagicX Zero 28. It applies to Grout 5.1.0.0, not the current 5.2.0.0 release. PlayTime 1.0.0 can show a device-tested badge only for this exact Smart Pro matrix. Both catalogue packages remain broad experimental packages elsewhere.

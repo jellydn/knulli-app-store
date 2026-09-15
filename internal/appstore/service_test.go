@@ -2,6 +2,7 @@ package appstore
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +23,7 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 		t.Fatal(err)
 	}
 	service, err := Open(indexPath, installer.Manager{Root: t.TempDir(), Platform: platform.Info{
-		Firmware: "knulli", Version: "scarab", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720",
+		Firmware: "knulli", Version: "scarab", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc", "libresolv", "libpthread"}, Device: "trimui-smart-pro", Resolution: "1280x720",
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +38,7 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 	experimental := 0
 	verified := 0
 	for _, item := range items {
-		if (item.Package.ID == "app.romm.grout" || item.Package.ID == "io.github.unitreign.playtime") && !item.DeviceTested {
+		if item.Package.ID == "io.github.unitreign.playtime" && !item.DeviceTested {
 			t.Fatalf("Smart Pro test evidence was not matched for %s", item.Package.ID)
 		}
 		if item.Package.Installable() {
@@ -57,8 +58,8 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 			t.Fatalf("candidate became actionable: %#v", item)
 		}
 	}
-	if experimental != 1 || verified != 1 {
-		t.Fatalf("expected one experimental and one verified package, got %d and %d", experimental, verified)
+	if experimental != 2 || verified != 0 {
+		t.Fatalf("expected two experimental and no universally verified packages, got %d and %d", experimental, verified)
 	}
 }
 
@@ -101,6 +102,9 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 	}
 	detected := platform.Detect(root)
 	detected.Arch = "aarch64"
+	detected.ABI = "linux-aarch64-glibc"
+	detected.GLIBCVersion = "2.40"
+	detected.Dependencies = []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc", "libresolv", "libpthread"}
 	if detected.Resolution != "" {
 		t.Fatalf("corrupt framebuffer virtual size became compatible: %#v", detected)
 	}
@@ -132,7 +136,7 @@ func TestMagicXAllowsOnlyPlayTimeExperimentalPackage(t *testing.T) {
 		t.Fatal(err)
 	}
 	service, err := Open(indexPath, installer.Manager{Root: t.TempDir(), Platform: platform.Info{
-		Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", Device: "magicx-zero-28", Resolution: "640x480",
+		Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc", "libresolv", "libpthread"}, Device: "magicx-zero-28", Resolution: "640x480",
 		FirmwareRaw: "knulli", FirmwareSource: "/etc/os-release:OS_NAME", VersionRaw: "scarab 2026/08/19 16:06", VersionSource: "/usr/share/knulli/knulli.version", ResolutionSource: "SDL renderer output",
 	}})
 	if err != nil {
@@ -149,8 +153,8 @@ func TestMagicXAllowsOnlyPlayTimeExperimentalPackage(t *testing.T) {
 				t.Fatalf("PlayTime was not offered as an unverified MagicX experiment: %#v", item)
 			}
 		case "app.romm.grout":
-			if item.Compatible || len(item.Actions) != 0 || !strings.Contains(item.Compatibility, "magicx-zero-28") {
-				t.Fatalf("Grout became actionable on MagicX: %#v", item)
+			if !item.Compatible || item.DeviceTested || len(item.Actions) != 1 || item.Actions[0] != Install {
+				t.Fatalf("Grout was not offered as an unverified MagicX experiment: %#v", item)
 			}
 		}
 	}
@@ -161,6 +165,15 @@ func TestActionsReflectInstallStateAndHealth(t *testing.T) {
 	assertActions(t, actions(item), Install)
 	item.PreExisting = true
 	assertActions(t, actions(item), Adopt)
+	item.RecoveryReason = "checksum mismatch"
+	assertActions(t, actions(item), Adopt)
+	item.RecoveryAllowed = true
+	assertActions(t, actions(item), Adopt, ForceReinstall)
+	item.RecoveryActive = true
+	assertActions(t, actions(item))
+	item.RecoveryReason = ""
+	item.RecoveryAllowed = false
+	item.RecoveryActive = false
 	item.PreExisting = false
 	item.Installed = true
 	item.InstalledVersion = item.Package.Version
@@ -172,6 +185,24 @@ func TestActionsReflectInstallStateAndHealth(t *testing.T) {
 	assertActions(t, actions(item), Update, Uninstall, Repair)
 	item.Compatible = false
 	assertActions(t, actions(item), Uninstall)
+}
+
+func TestOnlyRecoverableAdoptionFailuresAllowForceReinstall(t *testing.T) {
+	for _, test := range []struct {
+		err     error
+		allowed bool
+	}{
+		{err: &installer.AdoptionConflictError{Path: "/userdata/roms/tools/demo/run.sh"}, allowed: true},
+		{err: errors.New("download release: SHA-256 mismatch"), allowed: false},
+		{err: errors.New("compatibility failed field=architecture"), allowed: false},
+		{err: errors.New("not enough free space"), allowed: false},
+		{err: errors.New("archive path escapes destination"), allowed: false},
+		{err: errors.New("catalogue signature is invalid"), allowed: false},
+	} {
+		if got := recoverableAdoptionFailure(test.err); got != test.allowed {
+			t.Fatalf("recoverableAdoptionFailure(%q) = %v, want %v", test.err, got, test.allowed)
+		}
+	}
 }
 
 func TestCompletionMessageReportsRefreshOrRestartPrecisely(t *testing.T) {

@@ -13,6 +13,7 @@ const (
 	Browse Focus = iota
 	Actions
 	Confirm
+	ForceConfirm
 )
 
 type Model struct {
@@ -79,6 +80,12 @@ func (m *Model) Select(ctx context.Context) {
 	case Actions:
 		m.Focus = Confirm
 	case Confirm:
+		if m.selectedAction() == appstore.ForceReinstall {
+			m.Focus = ForceConfirm
+			return
+		}
+		m.start(ctx)
+	case ForceConfirm:
 		m.start(ctx)
 	}
 }
@@ -88,6 +95,8 @@ func (m *Model) Back() bool {
 		return false
 	}
 	switch m.Focus {
+	case ForceConfirm:
+		m.Focus = Confirm
 	case Confirm:
 		m.Focus = Actions
 	case Actions:
@@ -125,12 +134,14 @@ func (m *Model) Poll() bool {
 			if event.done {
 				m.Busy = false
 				m.Focus = Browse
+				if len(event.items) > 0 {
+					m.Items = event.items
+					m.clamp()
+				}
 				if event.err != nil {
 					m.Error = event.err.Error()
 				} else {
-					m.Items = event.items
 					m.Error = ""
-					m.clamp()
 				}
 			}
 		default:
@@ -164,9 +175,12 @@ func (m *Model) start(ctx context.Context) {
 			case <-ctx.Done():
 			}
 		})
-		var items []appstore.Item
-		if err == nil {
-			items, err = m.backend.Items(ctx)
+		operationErr := err
+		items, refreshErr := m.backend.Items(ctx)
+		if operationErr == nil && refreshErr != nil {
+			err = refreshErr
+		} else {
+			err = operationErr
 		}
 		message := completion
 		if err != nil {
@@ -177,6 +191,14 @@ func (m *Model) start(ctx context.Context) {
 		case <-ctx.Done():
 		}
 	}()
+}
+
+func (m *Model) selectedAction() appstore.Action {
+	item := m.current()
+	if m.Action < 0 || m.Action >= len(item.Actions) {
+		return ""
+	}
+	return item.Actions[m.Action]
 }
 
 func (m *Model) clamp() {
