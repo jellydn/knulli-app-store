@@ -10,7 +10,7 @@
 
 ## Trust boundaries
 
-Catalogue review decides whether metadata is actionable. HTTPS provides transport security, while the reviewed SHA-256 binds the archive bytes. A checksum supplied only beside a mutable asset is not enough evidence for catalogue promotion.
+Catalogue review decides whether metadata is actionable. HTTPS provides transport security, while the reviewed SHA-256 binds the archive bytes. Device builds also verify an ed25519 signature over `catalog-index.json`. A checksum supplied only beside a mutable asset is not enough evidence for catalogue promotion.
 
 Upstream package code runs later when the user launches it. The installer does not sandbox that runtime. The `network` field tells users and future policy code whether the installed application needs network access; it does not grant or enforce an operating-system permission.
 
@@ -40,7 +40,7 @@ Upstream package code runs later when the user launches it. The installer does n
 ## Non-goals and residual risks
 
 - There is no package runtime sandbox.
-- Catalogue-index signing and key distribution are future release-workflow tasks.
+- Device artifacts authenticate `catalog-index.json` with an ed25519 sidecar and a public key compiled into that build. A replaced index without a matching signature fails to load. A long-lived production key is still required if the index is shipped without a new binary.
 - Root can change files below approved `/userdata` paths despite installer checks.
 - Path checks do not defend against a hostile local process that races a checked directory into a symlink.
 - A corrupt transaction journal blocks the next locked operation until the leftover directory is inspected.

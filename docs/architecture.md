@@ -6,7 +6,7 @@ The installer owns policy and side effects. Every front end calls the same Go se
 manifest JSON ──▶ strict validation ──▶ compatibility check
                                               │
                                               ▼
-signed index (future)                  HTTPS download
+signed index                           HTTPS download
                                               │
                                               ▼
                                       size + SHA-256
@@ -25,7 +25,7 @@ signed index (future)                  HTTPS download
 ## Modules
 
 - `internal/manifest`: v1 data contract and semantic policy not expressible cleanly in JSON Schema.
-- `internal/catalog`: deterministic validation, sorting, and manifest hashing for a signable index.
+- `internal/catalog`: deterministic validation, sorting, manifest hashing, and ed25519 index signatures.
 - `internal/platform`: platform detection and compatibility checks.
 - `internal/diagnostics`: timestamped, redacted, size-bounded event logs and user-requested diagnostic exports.
 - `internal/archive`: bounded ZIP and `tar.gz` extraction into staging.
