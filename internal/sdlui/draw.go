@@ -49,6 +49,13 @@ func draw(model *storeui.Model, platformName string, controls *storeinput.Sessio
 	fill(frame, frame.Bounds(), palette.background)
 	text(frame, 16, 25, palette.text, "KNULLI APP STORE")
 	text(frame, 472, 25, palette.warning, "EXPERIMENTAL")
+	if platformName != "" {
+		text(frame, 16, 39, palette.muted, shorten(strings.ToUpper(platformName), 58))
+	}
+	if controls != nil && controls.Mode != storeinput.Normal {
+		drawControllerScreen(frame, model, platformName, controls)
+		return frame
+	}
 	fill(frame, image.Rect(16, 42, 230, 322), palette.panel)
 	fill(frame, image.Rect(242, 42, 624, 322), palette.panel)
 	if len(model.Items) == 0 {
@@ -66,27 +73,57 @@ func draw(model *storeui.Model, platformName string, controls *storeinput.Sessio
 	}
 	text(frame, 16, 345, palette.muted, shorten(controlHelp, 57))
 	text(frame, 474, 345, palette.muted, shorten(controllerStatus, 20))
-	if platformName != "" {
-		text(frame, 16, 39, palette.muted, shorten(strings.ToUpper(platformName), 58))
-	}
-	drawControllerOverlay(frame, controls)
 	return frame
 }
 
-func drawControllerOverlay(frame *image.RGBA, controls *storeinput.Session) {
-	if controls == nil || controls.Mode == storeinput.Normal {
-		return
+func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName string, controls *storeinput.Session) {
+	fill(frame, image.Rect(16, 50, 624, 338), palette.panel)
+	text(frame, 32, 76, palette.accent, "CONTROLLER SETUP")
+	text(frame, 32, 96, palette.text, "DEVICE  "+shorten(strings.ToUpper(platformName), 70))
+	controllerName := strings.TrimSpace(controls.Identity.Name)
+	if controllerName == "" {
+		controllerName = "UNAVAILABLE"
 	}
-	fill(frame, image.Rect(242, 42, 624, 322), color.RGBA{R: 25, G: 34, B: 49, A: 255})
-	text(frame, 258, 68, palette.accent, "CONTROLLER SETUP")
-	text(frame, 258, 88, palette.muted, shorten(strings.ToUpper(controls.Identity.Name), 44))
+	text(frame, 32, 113, palette.text, "CONTROLLER  "+shorten(strings.ToUpper(controllerName), 60))
+	text(frame, 32, 130, palette.muted, "IDENTITY  "+controllerIdentityStatus(controls))
+	mappingSource := controls.Source
+	if controls.Mode == storeinput.Setup {
+		mappingSource = controls.AutoSource
+	}
+	text(frame, 32, 147, palette.muted, "SOURCE  "+shorten(strings.ToUpper(mappingSource), 64))
+	text(frame, 32, 160, palette.muted, controllerSetupProgress(controls))
 	switch controls.Mode {
-	case storeinput.Startup:
-		text(frame, 258, 126, palette.text, "PRESS ANY CONTROLLER BUTTON TO CALIBRATE")
-		text(frame, 258, 150, palette.muted, "OR WAIT 8 SECONDS TO USE KNULLI / SDL AUTO")
-		text(frame, 258, 180, palette.warning, "NO KEYBOARD IS REQUIRED")
+	case storeinput.Blocked:
+		text(frame, 32, 178, palette.warning, "SETUP CANNOT CONTINUE WITHOUT AN SDL GAMECONTROLLER")
+		text(frame, 32, 201, palette.text, "RECONNECT A CONTROLLER, THEN RESTART OR WAIT FOR DETECTION.")
+		text(frame, 32, 231, palette.muted, "LOG  /USERDATA/SYSTEM/LOGS/KNULLI-APP-STORE.LOG")
+		text(frame, 32, 250, palette.muted, "DIAGNOSTICS  /USERDATA/SYSTEM/KNULLI-APP-STORE/DIAGNOSTICS/")
+		diagnosticStatus := model.Message
+		statusColor := palette.accent
+		if model.Error != "" {
+			diagnosticStatus = model.Error
+			statusColor = palette.error
+		}
+		if diagnosticStatus != "" {
+			text(frame, 32, 279, statusColor, shorten(strings.ToUpper(diagnosticStatus), 78))
+		}
+		text(frame, 32, 316, palette.muted, "USE THE SYSTEM EXIT CONTROL TO RETURN SAFELY")
+	case storeinput.Setup:
+		text(frame, 32, 174, palette.warning, "SETUP IS REQUIRED SO CONTROLS ARE SAFE AND PREDICTABLE")
+		for index, item := range storeinput.SetupItems {
+			prefix := "  "
+			shade := palette.text
+			if index == controls.SetupIndex {
+				prefix = "> "
+				shade = palette.accent
+			}
+			text(frame, 48, 205+index*25, shade, prefix+item)
+		}
+		text(frame, 344, 205, palette.muted, "DETECTED CONTROLS")
+		drawMappingSummary(frame, storeinput.AutoMapping(), nil, 344, 225, 140, 18)
+		text(frame, 32, 316, palette.muted, setupHelp(controls))
 	case storeinput.Settings:
-		text(frame, 258, 112, palette.text, "SETTINGS")
+		text(frame, 32, 178, palette.warning, "CONTROLLER SETTINGS")
 		for index, item := range storeinput.SettingsItems {
 			prefix := "  "
 			shade := palette.text
@@ -94,31 +131,101 @@ func drawControllerOverlay(frame *image.RGBA, controls *storeinput.Session) {
 				prefix = "> "
 				shade = palette.accent
 			}
-			text(frame, 270, 140+index*28, shade, prefix+item)
+			text(frame, 48, 207+index*25, shade, prefix+item)
 		}
+		text(frame, 344, 207, palette.muted, "ACTIVE CONTROLS")
+		drawMappingSummary(frame, controls.Mapping, nil, 344, 227, 140, 18)
+		text(frame, 32, 316, palette.muted, setupHelp(controls))
 	case storeinput.Calibrating:
 		action, _ := controls.Calibration.Current()
-		text(frame, 258, 116, palette.warning, "PRESS A PHYSICAL BUTTON FOR")
-		text(frame, 258, 145, palette.text, storeinput.Label(action))
-		text(frame, 258, 177, palette.muted, fmt.Sprintf("STEP %d OF %d", controls.Calibration.Index+1, len(storeinput.Actions)))
-		text(frame, 258, 205, palette.muted, "CURRENT AUTO EXIT BUTTON CANCELS")
-	case storeinput.Preview:
-		text(frame, 258, 108, palette.warning, "TEST EVERY CONTROL BEFORE SAVE")
-		for index, action := range storeinput.Actions {
-			mark := "[ ]"
-			if controls.Calibration.Tested[action] {
-				mark = "[X]"
+		text(frame, 32, 176, palette.warning, "PRESS ONE PHYSICAL BUTTON FOR")
+		text(frame, 32, 205, palette.text, storeinput.Label(action))
+		text(frame, 32, 226, palette.muted, fmt.Sprintf("ACTION %d OF %d", controls.Calibration.Index+1, len(storeinput.Actions)))
+		text(frame, 32, 252, palette.muted, "CONFLICTS STAY ON THIS ACTION FOR A SAFE RETRY")
+		text(frame, 32, 281, palette.muted, "THE NEXT SCREEN OFFERS RETRY, START OVER, OR CANCEL")
+		text(frame, 344, 176, palette.muted, "COMPLETED ACTIONS")
+		drawMappingSummary(frame, controls.Calibration.Mapping, nil, 344, 196, 140, 18)
+	case storeinput.Review:
+		lastAction := storeinput.Actions[controls.Calibration.Index-1]
+		text(frame, 32, 176, palette.warning, "DETECTED  "+storeinput.ButtonLabel(controls.Calibration.Mapping[lastAction]))
+		text(frame, 32, 199, palette.text, "FOR  "+storeinput.Label(lastAction))
+		text(frame, 32, 216, palette.muted, fmt.Sprintf("ACTION %d OF %d", controls.Calibration.Index, len(storeinput.Actions)))
+		for index, item := range storeinput.ReviewItems {
+			prefix := "  "
+			shade := palette.text
+			if index == controls.ReviewIndex {
+				prefix = "> "
+				shade = palette.accent
 			}
-			column := index / 4
-			row := index % 4
-			text(frame, 258+column*180, 138+row*28, palette.text, shorten(mark+" "+storeinput.Label(action)+" "+storeinput.ButtonLabel(controls.Calibration.Mapping[action]), 25))
+			text(frame, 48, 230+index*21, shade, prefix+item)
 		}
+		text(frame, 344, 176, palette.muted, "CURRENT ASSIGNMENTS")
+		drawMappingSummary(frame, controls.Calibration.Mapping, nil, 344, 196, 140, 18)
+	case storeinput.Preview:
+		text(frame, 32, 176, palette.warning, "TEST EVERY ACTION - SAVE OCCURS ONLY AFTER ALL PASS")
+		drawMappingSummary(frame, controls.Calibration.Mapping, controls.Calibration.Tested, 48, 205, 280, 36)
+		text(frame, 32, 316, palette.muted, "PRESS EACH SHOWN CONTROL; UNRECOGNIZED BUTTONS ARE IGNORED")
 	}
 	if controls.ValidationError != "" {
-		text(frame, 258, 292, palette.error, shorten(strings.ToUpper(controls.ValidationError), 48))
+		text(frame, 32, 332, palette.error, shorten(strings.ToUpper(controls.ValidationError), 78))
 	} else if controls.Message != "" {
-		text(frame, 258, 292, palette.muted, shorten(strings.ToUpper(controls.Message), 48))
+		text(frame, 32, 332, palette.muted, shorten(strings.ToUpper(controls.Message), 78))
 	}
+}
+
+func drawMappingSummary(frame *image.RGBA, mapping storeinput.Mapping, tested map[storeinput.Action]bool, x, y, columnWidth, maximumCharacters int) {
+	for index, action := range storeinput.Actions {
+		button, assigned := mapping[action]
+		if !assigned {
+			continue
+		}
+		mark := ""
+		if tested != nil {
+			mark = "[X] "
+			if !tested[action] {
+				mark = "[ ] "
+			}
+		}
+		column := index / 4
+		row := index % 4
+		label := storeinput.Label(action)
+		if action == storeinput.Diagnostics {
+			label = "DETAILS"
+		}
+		text(frame, x+column*columnWidth, y+row*22, palette.text, shorten(mark+label+": "+storeinput.ButtonLabel(button), maximumCharacters))
+	}
+}
+
+func controllerIdentityStatus(controls *storeinput.Session) string {
+	guid := strings.TrimSpace(controls.Identity.GUID)
+	if guid == "" || strings.Trim(guid, "0") == "" {
+		if controls.Identity.Name == "" {
+			return "MISSING - MAPPING CANNOT BE SAVED"
+		}
+		return "GUID UNAVAILABLE - DEVICE + NAME FALLBACK"
+	}
+	return "GUID " + shorten(strings.ToUpper(guid), 32)
+}
+
+func controllerSetupProgress(controls *storeinput.Session) string {
+	completed := 0
+	if controls.Mode == storeinput.Normal || controls.Mode == storeinput.Settings {
+		completed = len(storeinput.Actions)
+	} else if controls.Calibration != nil {
+		completed = controls.Calibration.Index
+		if controls.Mode == storeinput.Preview {
+			completed = len(controls.Calibration.Tested)
+		}
+	}
+	return fmt.Sprintf("PROGRESS  %d OF %d ACTIONS", completed, len(storeinput.Actions))
+}
+
+func setupHelp(controls *storeinput.Session) string {
+	mapping := controls.Mapping
+	if controls.FirstRun {
+		mapping = storeinput.AutoMapping()
+	}
+	return storeinput.ButtonLabel(mapping[storeinput.Up]) + "/" + storeinput.ButtonLabel(mapping[storeinput.Down]) + " CHOOSE  " + storeinput.ButtonLabel(mapping[storeinput.Confirm]) + " SELECT  " + storeinput.ButtonLabel(mapping[storeinput.Exit]) + " SAFE EXIT"
 }
 
 func drawList(frame *image.RGBA, model *storeui.Model) {

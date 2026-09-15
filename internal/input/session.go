@@ -1,14 +1,14 @@
 package input
 
-import "time"
-
 type Mode string
 
 const (
 	Normal      Mode = "normal"
-	Startup     Mode = "startup"
+	Setup       Mode = "setup"
+	Blocked     Mode = "blocked"
 	Settings    Mode = "settings"
 	Calibrating Mode = "calibration"
+	Review      Mode = "assignment-review"
 	Preview     Mode = "preview"
 )
 
@@ -19,7 +19,11 @@ const (
 	ExportDiagnostics Effect = "export-diagnostics"
 )
 
-var SettingsItems = []string{"SET UP CONTROLLER", "EXPORT DIAGNOSTICS", "RESET TO AUTO", "CLOSE SETTINGS"}
+var (
+	SetupItems    = []string{"USE DETECTED MAPPING", "TEST DETECTED MAPPING", "CUSTOMIZE", "SAFE EXIT"}
+	ReviewItems   = []string{"ACCEPT", "RETRY", "START OVER", "CANCEL"}
+	SettingsItems = []string{"SET UP CONTROLLER", "EXPORT DIAGNOSTICS", "RESET MAPPING", "CLOSE SETTINGS"}
+)
 
 type Session struct {
 	Store           Store
@@ -30,110 +34,90 @@ type Session struct {
 	AutoSource      string
 	Mode            Mode
 	Connected       bool
+	FirstRun        bool
+	SetupIndex      int
+	ReviewIndex     int
 	SettingsIndex   int
 	Calibration     *Calibration
-	Deadline        time.Time
+	PendingSource   string
 	Message         string
 	ValidationError string
 }
 
 func NewSession(root, device string) *Session {
-	return &Session{Store: NewStore(root), Device: device, Mapping: AutoMapping(), Source: "no controller", Mode: Normal}
+	return &Session{
+		Store:    NewStore(root),
+		Device:   device,
+		Mapping:  AutoMapping(),
+		Source:   "no controller",
+		Mode:     Blocked,
+		FirstRun: true,
+		Message:  "No SDL GameController is available",
+	}
 }
 
-func (session *Session) Connect(identity Identity, knulliMapping bool, now time.Time) {
+func (session *Session) Connect(identity Identity, knulliMapping bool) {
 	identity.Device = session.Device
 	session.Identity = identity
 	session.Connected = true
 	session.Mapping = AutoMapping()
-	session.Source = "SDL GameController auto mapping"
+	session.Source = "SDL GameController mapping"
 	if knulliMapping {
 		session.Source = "Knulli SDL_GAMECONTROLLERCONFIG"
 	}
 	session.AutoSource = session.Source
 	session.ValidationError = ""
-	saved, found, err := session.Store.Load(identity)
-	if err != nil {
-		session.ValidationError = err.Error()
+	saved, found, loadErr := session.Store.Load(identity)
+	if loadErr != nil {
+		session.ValidationError = loadErr.Error()
 	} else if found {
 		session.Mapping = saved
-		session.Source = "saved calibration"
+		session.Source = "saved controller mapping"
 		session.Mode = Normal
+		session.FirstRun = false
 		session.Message = "Saved controller mapping loaded"
 		return
 	}
-	session.Mode = Startup
-	session.Deadline = now.Add(8 * time.Second)
-	session.Message = "Press any controller button to start setup, or wait for automatic mapping"
+	session.openSetup(true)
+	if loadErr != nil {
+		session.ValidationError = loadErr.Error()
+	}
 }
 
 func (session *Session) Disconnect() {
 	session.Connected = false
 	session.Source = "no controller"
-	session.Mode = Normal
+	session.Mode = Blocked
 	session.Calibration = nil
-	session.Message = "Controller disconnected"
+	session.FirstRun = true
+	session.Message = "No SDL GameController is available"
 }
 
-func (session *Session) Tick(now time.Time) {
-	if session.Deadline.IsZero() || now.Before(session.Deadline) {
+func (session *Session) OpenSetup() {
+	if !session.Connected {
+		session.Mode = Blocked
 		return
 	}
-	switch session.Mode {
-	case Startup:
-		session.Mode = Normal
-		session.Message = "Automatic controller mapping active"
-	case Calibrating, Preview:
-		session.Mode = Settings
-		session.Calibration = nil
-		session.Message = "Controller setup timed out; previous mapping kept"
-	}
-	session.Deadline = time.Time{}
+	session.openSetup(false)
 }
 
-func (session *Session) HandleButton(button int, now time.Time) (Action, Effect) {
+func (session *Session) HandleButton(button int) (Action, Effect) {
 	if !session.Connected {
 		return "", NoEffect
 	}
 	switch session.Mode {
-	case Startup:
-		session.startCalibration(now)
-		return "", NoEffect
+	case Setup:
+		return session.handleSetup(button)
 	case Calibrating:
-		current, _ := session.Calibration.Current()
-		if current != Exit && button == session.Mapping[Exit] {
-			session.cancelCalibration()
-			return "", NoEffect
-		}
-		if err := session.Calibration.Assign(button); err == nil {
-			session.ValidationError = ""
-			session.Deadline = now.Add(20 * time.Second)
-			if session.Calibration.Preview {
-				session.Mode = Preview
-				session.Deadline = now.Add(30 * time.Second)
-				session.Message = "Test every mapped control to save"
-			}
-		} else {
-			session.ValidationError = session.Calibration.Error
-		}
-		return "", NoEffect
+		return session.handleCalibration(button)
+	case Review:
+		return session.handleReview(button)
 	case Preview:
-		if session.Calibration.Test(button) {
-			if err := session.Store.Save(session.Identity, session.Calibration.Mapping); err != nil {
-				session.ValidationError = err.Error()
-				session.Mode = Settings
-			} else {
-				session.Mapping = session.Calibration.Mapping.Clone()
-				session.Source = "saved calibration"
-				session.Mode = Normal
-				session.Message = "Controller mapping tested and saved"
-			}
-			session.Calibration = nil
-			session.Deadline = time.Time{}
-		}
-		return "", NoEffect
+		return session.handlePreview(button)
 	case Settings:
-		return session.handleSettings(button, now)
+		return session.handleSettings(button)
+	case Blocked:
+		return "", NoEffect
 	default:
 		action, ok := session.Mapping.Action(button)
 		if !ok {
@@ -149,7 +133,101 @@ func (session *Session) HandleButton(button int, now time.Time) (Action, Effect)
 	}
 }
 
-func (session *Session) handleSettings(button int, now time.Time) (Action, Effect) {
+func (session *Session) handleSetup(button int) (Action, Effect) {
+	controls := session.Mapping
+	if session.FirstRun {
+		controls = AutoMapping()
+	}
+	action, ok := controls.Action(button)
+	if !ok {
+		return "", NoEffect
+	}
+	switch action {
+	case Up, Left:
+		session.SetupIndex = wrap(session.SetupIndex-1, len(SetupItems))
+	case Down, Right:
+		session.SetupIndex = wrap(session.SetupIndex+1, len(SetupItems))
+	case Back, Exit:
+		if session.FirstRun {
+			return Exit, NoEffect
+		}
+		session.Mode = Settings
+	case Confirm:
+		switch session.SetupIndex {
+		case 0:
+			if session.saveMapping(AutoMapping(), "saved detected mapping") {
+				session.Message = "Detected mapping saved"
+			}
+		case 1:
+			session.startPreview(AutoMapping(), "tested detected mapping")
+		case 2:
+			session.startCalibration()
+		case 3:
+			return Exit, NoEffect
+		}
+	}
+	return "", NoEffect
+}
+
+func (session *Session) handleCalibration(button int) (Action, Effect) {
+	if err := session.Calibration.Assign(button); err == nil {
+		session.ValidationError = ""
+		session.Mode = Review
+		session.ReviewIndex = 0
+		session.Message = "Detected physical control: " + ButtonLabel(button)
+	} else {
+		session.ValidationError = session.Calibration.Error
+		session.Message = "Retry with a different physical button"
+	}
+	return "", NoEffect
+}
+
+func (session *Session) handleReview(button int) (Action, Effect) {
+	action, ok := session.Mapping.Action(button)
+	if !ok {
+		return "", NoEffect
+	}
+	switch action {
+	case Up, Left:
+		session.ReviewIndex = wrap(session.ReviewIndex-1, len(ReviewItems))
+	case Down, Right:
+		session.ReviewIndex = wrap(session.ReviewIndex+1, len(ReviewItems))
+	case Back, Exit:
+		session.cancelCalibration()
+	case Confirm:
+		switch session.ReviewIndex {
+		case 0:
+			if session.Calibration.Preview {
+				session.Mode = Preview
+				session.PendingSource = "saved custom mapping"
+				session.Message = "Test every mapped action before save"
+			} else {
+				session.Mode = Calibrating
+				session.Message = "Press one physical button for the shown action"
+			}
+		case 1:
+			session.retryAssignment()
+		case 2:
+			session.startCalibration()
+			session.Message = "Controller setup started over"
+		case 3:
+			session.cancelCalibration()
+		}
+	}
+	return "", NoEffect
+}
+
+func (session *Session) handlePreview(button int) (Action, Effect) {
+	if session.Calibration.Test(button) {
+		if session.saveMapping(session.Calibration.Mapping, session.PendingSource) {
+			session.Message = "Controller mapping tested and saved"
+		}
+		session.Calibration = nil
+	}
+	return "", NoEffect
+}
+
+func (session *Session) handleSettings(button int) (Action, Effect) {
 	action, ok := session.Mapping.Action(button)
 	if !ok {
 		return "", NoEffect
@@ -164,7 +242,7 @@ func (session *Session) handleSettings(button int, now time.Time) (Action, Effec
 	case Confirm:
 		switch session.SettingsIndex {
 		case 0:
-			session.startCalibration(now)
+			session.openSetup(false)
 		case 1:
 			return "", ExportDiagnostics
 		case 2:
@@ -173,7 +251,8 @@ func (session *Session) handleSettings(button int, now time.Time) (Action, Effec
 			} else {
 				session.Mapping = AutoMapping()
 				session.Source = session.AutoSource
-				session.Message = "Saved mapping removed; automatic mapping active"
+				session.openSetup(true)
+				session.Message = "Saved mapping removed; choose and test a mapping"
 			}
 		case 3:
 			session.Mode = Normal
@@ -182,19 +261,66 @@ func (session *Session) handleSettings(button int, now time.Time) (Action, Effec
 	return "", NoEffect
 }
 
-func (session *Session) startCalibration(now time.Time) {
+func (session *Session) openSetup(firstRun bool) {
+	session.Mode = Setup
+	session.FirstRun = firstRun
+	session.SetupIndex = 0
+	session.Calibration = nil
+	session.ValidationError = ""
+	session.Message = "Choose how to configure this controller"
+}
+
+func (session *Session) startCalibration() {
 	session.Mode = Calibrating
 	session.Calibration = NewCalibration()
+	session.PendingSource = "saved custom mapping"
 	session.ValidationError = ""
-	session.Deadline = now.Add(20 * time.Second)
-	session.Message = "Assign each semantic action; the current Exit control cancels until the Exit step"
+	session.Message = "Press one physical button for the shown action"
+}
+
+func (session *Session) startPreview(mapping Mapping, source string) {
+	session.Mode = Preview
+	session.Calibration = NewPreview(mapping)
+	session.PendingSource = source
+	session.ValidationError = ""
+	session.Message = "Test every mapped action before save"
+}
+
+func (session *Session) retryAssignment() {
+	if session.Calibration.Index > 0 {
+		session.Calibration.Index--
+		action := Actions[session.Calibration.Index]
+		delete(session.Calibration.Mapping, action)
+		session.Calibration.Preview = false
+	}
+	session.Mode = Calibrating
+	session.ValidationError = ""
+	session.Message = "Retry: press a different physical button"
 }
 
 func (session *Session) cancelCalibration() {
-	session.Mode = Settings
 	session.Calibration = nil
-	session.Deadline = time.Time{}
+	session.ValidationError = ""
+	if session.FirstRun {
+		session.Mode = Setup
+	} else {
+		session.Mode = Settings
+	}
 	session.Message = "Controller setup cancelled; previous mapping kept"
+}
+
+func (session *Session) saveMapping(mapping Mapping, source string) bool {
+	if err := session.Store.Save(session.Identity, mapping); err != nil {
+		session.ValidationError = err.Error()
+		session.Mode = Setup
+		return false
+	}
+	session.Mapping = mapping.Clone()
+	session.Source = source
+	session.Mode = Normal
+	session.FirstRun = false
+	session.ValidationError = ""
+	return true
 }
 
 func wrap(value, length int) int {

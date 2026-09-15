@@ -15,16 +15,18 @@ INSTALL OR UPDATE
 
 CONTROLLER SETUP
 
-The first startup uses Knulli's SDL_GAMECONTROLLERCONFIG when available.
-Press any controller button during the eight-second startup prompt to begin
-setup, or wait to keep automatic mapping. Assign Up, Down, Left, Right,
-Confirm, Back, Details/Diagnostics, and Exit. Conflicting buttons are rejected.
-Test every action before the mapping is saved.
+The first launch for each device/controller identity uses a dedicated screen
+before the catalogue. Choose Use Detected Mapping, Test Detected Mapping,
+Customize, or Safe Exit. Customize assigns one semantic action at a time. Each
+detected button has Accept, Retry, Start Over, and Cancel choices. Conflicts
+stay on the current action. Tested and custom mappings require a complete
+eight-action preview before atomic save. No timeout skips setup.
 
 Open Settings with the displayed Details/Diagnostics control. Settings can
-rerun setup, export diagnostics, reset the active controller to automatic
-mapping, or close. Instructions show semantic actions and SDL labels; they do
-not assume physical A/B positions.
+rerun setup, export diagnostics, reset the active mapping, or close. Hold the
+saved Back and Details/Diagnostics controls while launching to force setup.
+Instructions do not assume physical A/B positions. A missing SDL GameController
+shows a blocked screen and diagnostic locations instead of the catalogue.
 
 Mappings are stored by Knulli device plus controller GUID under:
   /userdata/system/configs/knulli-app-store/controller-mappings.json

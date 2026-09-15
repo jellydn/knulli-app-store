@@ -14,6 +14,10 @@ func NewCalibration() *Calibration {
 	return &Calibration{Mapping: make(Mapping), Tested: make(map[Action]bool)}
 }
 
+func NewPreview(mapping Mapping) *Calibration {
+	return &Calibration{Mapping: mapping.Clone(), Preview: true, Tested: make(map[Action]bool)}
+}
+
 func (calibration *Calibration) Current() (Action, bool) {
 	if calibration.Preview || calibration.Index >= len(Actions) {
 		return "", false

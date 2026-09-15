@@ -4,12 +4,13 @@
 package sdlui
 
 import (
+	"bytes"
+	"context"
 	"image"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
@@ -77,30 +78,104 @@ func TestRenderRepresentativeStates(t *testing.T) {
 	}
 }
 
-func TestRenderControllerSetupAtMagicXResolution(t *testing.T) {
+func TestRenderDedicatedFirstRunSetupAtBothTargetResolutions(t *testing.T) {
 	model := &storeui.Model{Items: []appstore.Item{{Package: manifest.Package{Name: "PlayTime", Review: manifest.Review{Status: "experimental"}}, Compatibility: "Blocked: MagicX runtime ABI is not yet verified"}}}
-	controls := storeinput.NewSession(t.TempDir(), "magicx-zero-28")
-	controls.Connect(storeinput.Identity{GUID: "03000000", Name: "MagicX runtime controller"}, true, time.Unix(100, 0))
-	controls.HandleButton(0, time.Unix(101, 0))
-	frame := draw(model, "MagicX Zero 28 / 640x480", controls)
-	output := renderOutput(frame, 640, 480)
-	if output.Bounds() != image.Rect(0, 0, 640, 480) || outputRectangle(640, 480) != image.Rect(0, 60, 640, 420) {
-		t.Fatalf("unexpected MagicX output layout: bounds=%v viewport=%v", output.Bounds(), outputRectangle(640, 480))
+	tests := []struct {
+		device   string
+		header   string
+		width    int
+		height   int
+		viewport image.Rectangle
+	}{
+		{device: "trimui-smart-pro", header: "TrimUI Smart Pro / 1280x720", width: 1280, height: 720, viewport: image.Rect(0, 0, 1280, 720)},
+		{device: "magicx-zero-28", header: "MagicX Zero 28 / 640x480", width: 640, height: 480, viewport: image.Rect(0, 60, 640, 420)},
+	}
+	for _, test := range tests {
+		t.Run(test.device, func(t *testing.T) {
+			controls := storeinput.NewSession(t.TempDir(), test.device)
+			controls.Connect(storeinput.Identity{GUID: "03000000", Name: "Runtime controller"}, true)
+			frame := draw(model, test.header, controls)
+			withoutCatalogue := draw(&storeui.Model{}, test.header, controls)
+			if !bytes.Equal(frame.Pix, withoutCatalogue.Pix) {
+				t.Fatal("catalogue content was rendered behind required setup")
+			}
+			output := renderOutput(frame, test.width, test.height)
+			if output.Bounds() != image.Rect(0, 0, test.width, test.height) || outputRectangle(test.width, test.height) != test.viewport {
+				t.Fatalf("unexpected output layout: bounds=%v viewport=%v", output.Bounds(), outputRectangle(test.width, test.height))
+			}
+			if directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR"); directory != "" {
+				if err := os.MkdirAll(directory, 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := saveOutputScreenshot(filepath.Join(directory, test.device+"-first-run-controller-setup.png"), frame, test.width, test.height); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+func TestRenderControllerPreviewAndBlockedState(t *testing.T) {
+	model := &storeui.Model{Message: "Diagnostics saved to /userdata/system/knulli-app-store/diagnostics/report.txt"}
+	blocked := storeinput.NewSession(t.TempDir(), "magicx-zero-28")
+	frame := draw(model, "MagicX Zero 28 / 640x480", blocked)
+	if frame.Bounds() != image.Rect(0, 0, canvasWidth, canvasHeight) {
+		t.Fatalf("blocked frame failed: %v", frame.Bounds())
+	}
+
+	preview := storeinput.NewSession(t.TempDir(), "trimui-smart-pro")
+	preview.Connect(storeinput.Identity{GUID: "03000000", Name: "Runtime controller"}, true)
+	preview.HandleButton(storeinput.AutoMapping()[storeinput.Down])
+	preview.HandleButton(storeinput.AutoMapping()[storeinput.Confirm])
+	if preview.Mode != storeinput.Preview {
+		t.Fatalf("test did not create preview: %s", preview.Mode)
+	}
+	frame = draw(&storeui.Model{}, "TrimUI Smart Pro / 1280x720", preview)
+	if frame.Bounds() != image.Rect(0, 0, canvasWidth, canvasHeight) {
+		t.Fatalf("preview frame failed: %v", frame.Bounds())
 	}
 	if directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR"); directory != "" {
 		if err := os.MkdirAll(directory, 0755); err != nil {
 			t.Fatal(err)
 		}
-		if err := saveOutputScreenshot(filepath.Join(directory, "magicx-zero-28-controller-setup.png"), frame, 640, 480); err != nil {
+		if err := saveOutputScreenshot(filepath.Join(directory, "trimui-smart-pro-controller-preview.png"), frame, 1280, 720); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	review := storeinput.NewSession(t.TempDir(), "magicx-zero-28")
+	review.Connect(storeinput.Identity{GUID: "03000000", Name: "Runtime controller"}, true)
+	review.HandleButton(storeinput.AutoMapping()[storeinput.Down])
+	review.HandleButton(storeinput.AutoMapping()[storeinput.Down])
+	review.HandleButton(storeinput.AutoMapping()[storeinput.Confirm])
+	review.HandleButton(2)
+	if review.Mode != storeinput.Review {
+		t.Fatalf("test did not create assignment review: %s", review.Mode)
+	}
+	frame = draw(&storeui.Model{}, "MagicX Zero 28 / 640x480", review)
+	output := renderOutput(frame, 640, 480)
+	if output.Bounds() != image.Rect(0, 0, 640, 480) {
+		t.Fatalf("assignment review frame failed: %v", output.Bounds())
+	}
+	if directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR"); directory != "" {
+		if err := saveOutputScreenshot(filepath.Join(directory, "magicx-zero-28-controller-assignment-review.png"), frame, 640, 480); err != nil {
 			t.Fatal(err)
 		}
 	}
 }
 
-func TestRenderNoControllerState(t *testing.T) {
-	frame := draw(&storeui.Model{}, "MagicX Zero 28 / 640x480", storeinput.NewSession(t.TempDir(), "magicx-zero-28"))
-	if frame.Bounds() != image.Rect(0, 0, canvasWidth, canvasHeight) {
-		t.Fatalf("no-controller frame failed: %v", frame.Bounds())
+func TestControllerSetupProgress(t *testing.T) {
+	controls := storeinput.NewSession(t.TempDir(), "magicx-zero-28")
+	if got := controllerSetupProgress(controls); got != "PROGRESS  0 OF 8 ACTIONS" {
+		t.Fatalf("unexpected blocked progress: %q", got)
+	}
+	controls.Connect(storeinput.Identity{GUID: "one", Name: "Pad"}, true)
+	controls.Mode = storeinput.Preview
+	controls.Calibration = storeinput.NewPreview(storeinput.AutoMapping())
+	controls.Calibration.Test(storeinput.AutoMapping()[storeinput.Up])
+	controls.Calibration.Test(storeinput.AutoMapping()[storeinput.Confirm])
+	if got := controllerSetupProgress(controls); got != "PROGRESS  2 OF 8 ACTIONS" {
+		t.Fatalf("unexpected preview progress: %q", got)
 	}
 }
 
@@ -133,5 +208,29 @@ func TestResolutionCandidateLoggingIncludesRejectionAndSelection(t *testing.T) {
 		if !strings.Contains(string(data), wanted) {
 			t.Fatalf("resolution log lacks %q: %s", wanted, data)
 		}
+	}
+}
+
+func TestControllerSetupLogsTransitionsWithoutRawButtonSpam(t *testing.T) {
+	root := t.TempDir()
+	logger, err := diagnostics.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controls := storeinput.NewSession(root, "magicx-zero-28")
+	controls.Connect(storeinput.Identity{GUID: "03000000", Name: "Runtime controller"}, true)
+	model := &storeui.Model{}
+	processButton(context.Background(), model, controls, storeinput.AutoMapping()[storeinput.Down], logger)
+	processButton(context.Background(), model, controls, storeinput.AutoMapping()[storeinput.Confirm], logger)
+	data, err := os.ReadFile(filepath.Join(root, "userdata/system/logs/knulli-app-store.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	logText := string(data)
+	if !strings.Contains(logText, `event=controller_screen_transition from="setup" to="preview"`) {
+		t.Fatalf("setup transition was not logged: %s", logText)
+	}
+	if strings.Contains(logText, "controller_input") || strings.Contains(logText, "button=") {
+		t.Fatalf("raw button spam remains in setup log: %s", logText)
 	}
 }

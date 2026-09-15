@@ -15,9 +15,9 @@ No checked-in Knulli controller profile establishes the MagicX runtime SDL GUID,
 
 Download the `knulli-app-store-magicx-zero-28-experimental` Actions artifact. Verify `SHA256SUMS.txt`, shut down Knulli, then extract the inner ZIP into `/userdata/roms/ports`. Replace the old App Store files only when updating.
 
-On first startup, wait eight seconds to keep Knulli's generated SDL mapping, or press any controller button to start setup. Setup asks for Up, Down, Left, Right, Confirm, Back, Details/Diagnostics, and Exit. Each required action must use a different button. Test all eight controls before the mapping is saved. The current automatic Exit button cancels setup, except while assigning Exit. Each setup or preview stage times out without changing the prior mapping.
+The first launch for each device/controller identity opens a dedicated setup screen before the catalogue. Choose **Use Detected Mapping**, **Test Detected Mapping**, **Customize**, or **Safe Exit**. Customize assigns Up, Down, Left, Right, Confirm, Back, Details/Diagnostics, and Exit one at a time. Every detected button gets an Accept, Retry, Start Over, or Cancel review before progress continues. Conflicts stay on the current action. Custom and tested mappings require a complete preview before atomic save.
 
-Open Settings with the physical control shown beside **Settings** in the footer. Settings can start setup again, export diagnostics, reset the current identity to automatic mapping, or close.
+Later launches load the saved mapping directly. Open Settings with the physical control shown beside **Settings** to run setup again, export diagnostics, reset the current mapping, or close. Hold the saved Back and Details/Diagnostics controls while launching to force setup. If no SDL GameController exists, a blocked screen shows the log and diagnostic paths and never opens the catalogue.
 
 Mappings use this versioned file:
 
@@ -38,9 +38,9 @@ These are package-specific blockers. Successful App Store navigation does not re
 
 1. Record Knulli version, hardware revision, and the displayed SDL controller name/GUID.
 2. Confirm the header says `MagicX Zero 28 / 640x480`, with readable letterboxed content and no clipping.
-3. Wait for automatic mapping. Test navigation, Confirm, Back, Settings, and Exit.
+3. Confirm first launch stays on the dedicated screen. Test Use Detected Mapping, then reset and test Customize.
 4. Run setup, intentionally create one conflict, retry, assign all actions, and test all actions before save.
-5. Restart and confirm the saved mapping loads. Reset to automatic mapping and confirm only this controller/device record changes.
+5. Restart and confirm the saved mapping loads. Reset it, confirm setup becomes required, and confirm only this controller/device record changes.
 6. Disconnect and reconnect the controller if the runtime permits it. Confirm the correct identity and mapping return.
 7. Export diagnostics. Confirm controller identity, mapping source, semantic events, and validation failure are present without private data.
 8. Confirm Grout and PlayTime show the MagicX device blocker and no install action.

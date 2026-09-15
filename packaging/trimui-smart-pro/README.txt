@@ -22,11 +22,16 @@ and knulli-app-store files. Manager state under /userdata/system is retained.
 
 CONTROLS
 
-The footer shows semantic Confirm, Back, and Settings actions with their active
-SDL labels. It does not assume physical A/B positions. At first startup, press
-any controller button within eight seconds to calibrate, or wait to keep the
-Knulli/SDL automatic mapping. Settings can rerun setup, export diagnostics, or
-reset the active controller mapping.
+The first launch for each device/controller identity opens Controller Setup
+before the catalogue. Choose Use Detected Mapping, Test Detected Mapping,
+Customize, or Safe Exit. Customize reviews each detected button and offers
+Accept, Retry, Start Over, and Cancel. Tested and custom mappings require a
+complete eight-action preview before atomic save. No timeout skips setup.
+
+Later launches load the saved mapping. Settings can rerun setup, export
+diagnostics, or reset the active mapping. Hold the saved Back and
+Details/Diagnostics controls while launching to force setup. If no SDL
+GameController exists, a blocked screen shows log and diagnostic paths.
 
 Mappings are stored by device and controller identity under:
   /userdata/system/configs/knulli-app-store/controller-mappings.json

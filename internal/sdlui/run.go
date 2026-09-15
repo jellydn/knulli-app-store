@@ -17,6 +17,9 @@ static SDL_JoystickID event_device_which(SDL_Event *event) { return event->cdevi
 static void controller_guid(SDL_GameController *controller, char *output, int size) {
     SDL_JoystickGetGUIDString(SDL_JoystickGetGUID(SDL_GameControllerGetJoystick(controller)), output, size);
 }
+static Uint8 controller_button(SDL_GameController *controller, int button) {
+    return SDL_GameControllerGetButton(controller, (SDL_GameControllerButton)button);
+}
 */
 import "C"
 
@@ -104,6 +107,12 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	controls := storeinput.NewSession(options.Root, options.Platform.Device)
 	controller := openController()
 	connectController(controls, controller, options.Diagnostics)
+	if controller == nil {
+		model.ExportDiagnostics(ctx)
+	} else if controls.Mode == storeinput.Normal && startupOverride(controller, controls.Mapping) {
+		controls.OpenSetup()
+		options.Diagnostics.Event("controller_setup_override", "result", "opened", "gesture", "back+diagnostics")
+	}
 	defer func() {
 		if controller != nil {
 			C.SDL_GameControllerClose(controller.handle)
@@ -119,7 +128,6 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 			}
 		}
 		model.Poll()
-		controls.Tick(time.Now())
 		frame := draw(model, platformHeader, controls)
 		if C.SDL_UpdateTexture(texture, nil, unsafe.Pointer(&frame.Pix[0]), C.int(frame.Stride)) != 0 {
 			return sdlError("upload UI frame")
@@ -179,45 +187,52 @@ func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, 
 		if C.event_key_repeat(event) != 0 {
 			return false
 		}
-		switch C.event_key(event) {
-		case C.SDLK_UP, C.SDLK_LEFT:
-			model.Move(-1)
-		case C.SDLK_DOWN, C.SDLK_RIGHT:
-			model.Move(1)
-		case C.SDLK_RETURN, C.SDLK_SPACE:
-			model.Select(ctx)
-		case C.SDLK_ESCAPE:
-			return model.Back()
-		case C.SDLK_y:
-			model.ExportDiagnostics(ctx)
+		if controls.Mode == storeinput.Blocked {
+			if C.event_key(event) == C.SDLK_y {
+				model.ExportDiagnostics(ctx)
+			}
+			return C.event_key(event) == C.SDLK_ESCAPE
 		}
+		var action storeinput.Action
+		switch C.event_key(event) {
+		case C.SDLK_UP:
+			action = storeinput.Up
+		case C.SDLK_LEFT:
+			action = storeinput.Left
+		case C.SDLK_DOWN:
+			action = storeinput.Down
+		case C.SDLK_RIGHT:
+			action = storeinput.Right
+		case C.SDLK_RETURN, C.SDLK_SPACE:
+			action = storeinput.Confirm
+		case C.SDLK_ESCAPE:
+			action = storeinput.Back
+		case C.SDLK_y:
+			action = storeinput.Diagnostics
+		case C.SDLK_q:
+			action = storeinput.Exit
+		}
+		if action == "" {
+			return false
+		}
+		mapping := controls.Mapping
+		if controls.FirstRun {
+			mapping = storeinput.AutoMapping()
+		}
+		return processButton(ctx, model, controls, mapping[action], logger)
 	case C.SDL_CONTROLLERBUTTONDOWN:
 		if *controller == nil || C.event_controller_which(event) != (*controller).instanceID {
 			return false
 		}
-		button := int(C.event_controller_button(event))
-		before := controls.Mode
-		beforeSource := controls.Source
-		action, effect := controls.HandleButton(button, time.Now())
-		logger.Event("controller_input", "button", storeinput.ButtonLabel(button), "semantic_action", string(action), "mode", string(before))
-		if controls.Mode != before || controls.Source != beforeSource {
-			logger.Event("controller_mapping_decision", "from_mode", string(before), "to_mode", string(controls.Mode), "source", controls.Source, "message", controls.Message)
-		}
-		if controls.ValidationError != "" {
-			logger.Event("controller_mapping_validation_failed", "error", controls.ValidationError)
-		}
-		if effect == storeinput.ExportDiagnostics {
-			model.ExportDiagnostics(ctx)
-		}
-		if dispatchAction(ctx, model, action) {
-			return true
-		}
+		return processButton(ctx, model, controls, int(C.event_controller_button(event)), logger)
 	case C.SDL_CONTROLLERDEVICEREMOVED:
 		if *controller != nil && C.event_device_which(event) == (*controller).instanceID {
 			logger.Event("controller_disconnected", "name", (*controller).identity.Name, "guid", (*controller).identity.GUID)
 			C.SDL_GameControllerClose((*controller).handle)
 			*controller = nil
+			beforeMode, beforeSource := controls.Mode, controls.Source
 			controls.Disconnect()
+			logControllerTransition(logger, controls, beforeMode, beforeSource)
 		}
 	case C.SDL_CONTROLLERDEVICEADDED:
 		if *controller == nil {
@@ -255,11 +270,58 @@ func connectController(controls *storeinput.Session, controller *controllerState
 		logger.Event("controller_unavailable", "device", controls.Device)
 		return
 	}
-	controls.Connect(controller.identity, os.Getenv("SDL_GAMECONTROLLERCONFIG") != "", time.Now())
+	beforeMode, beforeSource := controls.Mode, controls.Source
+	controls.Connect(controller.identity, os.Getenv("SDL_GAMECONTROLLERCONFIG") != "")
 	logger.Event("controller_connected", "device", controls.Device, "name", controller.identity.Name, "guid", controller.identity.GUID, "mapping_source", controls.Source)
+	logControllerTransition(logger, controls, beforeMode, beforeSource)
 	if controls.ValidationError != "" {
 		logger.Event("controller_mapping_validation_failed", "error", controls.ValidationError)
 	}
+}
+
+func startupOverride(controller *controllerState, mapping storeinput.Mapping) bool {
+	return C.controller_button(controller.handle, C.int(mapping[storeinput.Back])) != 0 &&
+		C.controller_button(controller.handle, C.int(mapping[storeinput.Diagnostics])) != 0
+}
+
+func processButton(ctx context.Context, model *storeui.Model, controls *storeinput.Session, button int, logger *diagnostics.Log) bool {
+	beforeMode := controls.Mode
+	beforeSource := controls.Source
+	beforeError := controls.ValidationError
+	beforeIndex, beforeTested := setupProgress(controls)
+	action, effect := controls.HandleButton(button)
+	afterIndex, afterTested := setupProgress(controls)
+	logControllerTransition(logger, controls, beforeMode, beforeSource)
+	if afterIndex != beforeIndex && afterIndex >= 0 {
+		logger.Event("controller_setup_progress", "completed", fmt.Sprint(afterIndex), "total", fmt.Sprint(len(storeinput.Actions)))
+	}
+	if afterTested != beforeTested && afterTested >= 0 {
+		logger.Event("controller_preview_progress", "tested", fmt.Sprint(afterTested), "total", fmt.Sprint(len(storeinput.Actions)))
+	}
+	if controls.ValidationError != "" && controls.ValidationError != beforeError {
+		logger.Event("controller_mapping_validation_failed", "error", controls.ValidationError)
+	}
+	if action != "" {
+		logger.Event("controller_semantic_action", "action", string(action), "screen", string(beforeMode))
+	}
+	if effect == storeinput.ExportDiagnostics {
+		logger.Event("controller_setup_action", "action", "export-diagnostics")
+		model.ExportDiagnostics(ctx)
+	}
+	return dispatchAction(ctx, model, action)
+}
+
+func logControllerTransition(logger *diagnostics.Log, controls *storeinput.Session, beforeMode storeinput.Mode, beforeSource string) {
+	if controls.Mode != beforeMode || controls.Source != beforeSource {
+		logger.Event("controller_screen_transition", "from", string(beforeMode), "to", string(controls.Mode), "mapping_source", controls.Source, "message", controls.Message)
+	}
+}
+
+func setupProgress(controls *storeinput.Session) (int, int) {
+	if controls.Calibration == nil {
+		return -1, -1
+	}
+	return controls.Calibration.Index, len(controls.Calibration.Tested)
 }
 
 func dispatchAction(ctx context.Context, model *storeui.Model, action storeinput.Action) bool {

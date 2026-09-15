@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestAutoMappingUsesSemanticGameControllerButtons(t *testing.T) {
@@ -164,54 +163,162 @@ func TestStoreDoesNotTreatReadFailureAsCorruption(t *testing.T) {
 	}
 }
 
-func TestSessionCompletesPreviewAndLoadsSavedMapping(t *testing.T) {
+func TestFirstRunTestsDetectedMappingBeforeCatalogueAndLoadsOnRestart(t *testing.T) {
 	root := t.TempDir()
-	now := time.Unix(100, 0)
 	identity := Identity{GUID: "one", Name: "Pad"}
 	session := NewSession(root, "magicx-zero-28")
-	session.Connect(identity, true, now)
-	session.HandleButton(2, now.Add(time.Second))
-	buttons := []int{0, 1, 2, 3, 4, 5, 7, 6}
-	for _, button := range buttons {
-		session.HandleButton(button, now.Add(2*time.Second))
+	session.Connect(identity, true)
+	if session.Mode != Setup || !session.FirstRun {
+		t.Fatalf("first run skipped dedicated setup: mode=%s", session.Mode)
 	}
+	press(session, Down)
+	press(session, Confirm)
 	if session.Mode != Preview {
-		t.Fatalf("setup did not reach preview: %s (%s)", session.Mode, session.ValidationError)
+		t.Fatalf("detected mapping test did not open preview: %s", session.Mode)
 	}
-	for _, button := range buttons {
-		session.HandleButton(button, now.Add(3*time.Second))
+	for _, action := range Actions {
+		press(session, action)
 	}
-	if session.Mode != Normal || session.Source != "saved calibration" {
-		t.Fatalf("tested mapping was not saved: mode=%s source=%s error=%s", session.Mode, session.Source, session.ValidationError)
+	if session.Mode != Normal || session.Source != "tested detected mapping" {
+		t.Fatalf("tested auto mapping was not saved: mode=%s source=%s error=%s", session.Mode, session.Source, session.ValidationError)
 	}
 
 	restarted := NewSession(root, "magicx-zero-28")
-	restarted.Connect(identity, false, now)
-	if restarted.Source != "saved calibration" || restarted.Mapping[Confirm] != 4 {
-		t.Fatalf("saved mapping did not survive restart: source=%s mapping=%v", restarted.Source, restarted.Mapping)
+	restarted.Connect(identity, false)
+	if restarted.Mode != Normal || restarted.Source != "saved controller mapping" {
+		t.Fatalf("saved mapping did not bypass setup: mode=%s source=%s", restarted.Mode, restarted.Source)
 	}
 }
 
-func TestSessionReconnectTimeoutAndNoController(t *testing.T) {
-	now := time.Unix(100, 0)
+func TestFirstRunCustomMappingReviewConflictRetryStartOverAndCancel(t *testing.T) {
+	session := NewSession(t.TempDir(), "trimui-smart-pro")
+	session.Connect(Identity{GUID: "one", Name: "Pad"}, true)
+	press(session, Down)
+	press(session, Down)
+	press(session, Confirm)
+	if session.Mode != Calibrating {
+		t.Fatalf("customize did not start calibration: %s", session.Mode)
+	}
+
+	session.HandleButton(2)
+	if session.Mode != Review || session.Calibration.Mapping[Up] != 2 {
+		t.Fatalf("assignment review missing: mode=%s mapping=%v", session.Mode, session.Calibration.Mapping)
+	}
+	press(session, Confirm)
+	session.HandleButton(2)
+	if session.Mode != Calibrating || !strings.Contains(session.ValidationError, "already assigned") {
+		t.Fatalf("conflict did not stay on action for retry: mode=%s error=%q", session.Mode, session.ValidationError)
+	}
+	session.HandleButton(4)
+	press(session, Down)
+	press(session, Confirm)
+	if session.Mode != Calibrating || session.Calibration.Index != 1 {
+		t.Fatalf("retry did not remove pending assignment: mode=%s index=%d", session.Mode, session.Calibration.Index)
+	}
+	session.HandleButton(5)
+	press(session, Down)
+	press(session, Down)
+	press(session, Confirm)
+	if session.Mode != Calibrating || session.Calibration.Index != 0 {
+		t.Fatalf("start over retained progress: mode=%s index=%d", session.Mode, session.Calibration.Index)
+	}
+	session.HandleButton(7)
+	press(session, Back)
+	if session.Mode != Setup || session.Calibration != nil {
+		t.Fatalf("first-run cancel did not return to setup: mode=%s", session.Mode)
+	}
+}
+
+func TestCustomMappingRequiresReviewAndPreviewBeforeAtomicSave(t *testing.T) {
+	root := t.TempDir()
+	identity := Identity{GUID: "custom", Name: "Pad"}
+	session := NewSession(root, "magicx-zero-28")
+	session.Connect(identity, false)
+	press(session, Down)
+	press(session, Down)
+	press(session, Confirm)
+	buttons := []int{2, 4, 5, 7, 8, 9, 10, 15}
+	for index, button := range buttons {
+		session.HandleButton(button)
+		if session.Mode != Review {
+			t.Fatalf("action %d skipped assignment review: %s", index, session.Mode)
+		}
+		if _, found, err := session.Store.Load(Identity{Device: "magicx-zero-28", GUID: "custom", Name: "Pad"}); err != nil || found {
+			t.Fatalf("mapping saved before preview: found=%v err=%v", found, err)
+		}
+		press(session, Confirm)
+	}
+	if session.Mode != Preview {
+		t.Fatalf("custom mapping skipped preview: %s", session.Mode)
+	}
+	for _, button := range buttons {
+		session.HandleButton(button)
+	}
+	if session.Mode != Normal || session.Source != "saved custom mapping" {
+		t.Fatalf("custom mapping was not saved after preview: mode=%s source=%s", session.Mode, session.Source)
+	}
+}
+
+func TestNoControllerBlockedReconnectResetAndSafeExit(t *testing.T) {
 	session := NewSession(t.TempDir(), "magicx-zero-28")
-	if action, effect := session.HandleButton(0, now); action != "" || effect != NoEffect {
+	if session.Mode != Blocked || !session.FirstRun {
+		t.Fatalf("no-controller launch was not blocked: %#v", session)
+	}
+	if action, effect := session.HandleButton(0); action != "" || effect != NoEffect {
 		t.Fatal("no-controller input caused an action")
 	}
-	session.Connect(Identity{GUID: "one", Name: "Pad"}, true, now)
-	if session.Mode != Startup || session.Source != "Knulli SDL_GAMECONTROLLERCONFIG" {
+	session.Connect(Identity{GUID: "one", Name: "Pad"}, true)
+	if session.Mode != Setup || session.Source != "Knulli SDL_GAMECONTROLLERCONFIG" {
 		t.Fatalf("unexpected auto mapping state: %#v", session)
 	}
-	session.Tick(now.Add(9 * time.Second))
-	if session.Mode != Normal {
-		t.Fatal("startup setup prompt did not safely time out")
+	if action, _ := session.HandleButton(AutoMapping()[Back]); action != Exit {
+		t.Fatalf("first-run safe exit did not exit: %q", action)
+	}
+	press(session, Confirm)
+	press(session, Diagnostics)
+	press(session, Down)
+	press(session, Down)
+	press(session, Confirm)
+	if session.Mode != Setup || !session.FirstRun {
+		t.Fatalf("reset did not require setup again: mode=%s first=%v", session.Mode, session.FirstRun)
 	}
 	session.Disconnect()
-	if session.Connected || session.Source != "no controller" {
+	if session.Connected || session.Source != "no controller" || session.Mode != Blocked {
 		t.Fatal("disconnect retained controller state")
 	}
-	session.Connect(Identity{GUID: "two", Name: "Other Pad"}, false, now)
-	if session.Identity.GUID != "two" || session.Source != "SDL GameController auto mapping" {
+	session.Connect(Identity{GUID: "two", Name: "Other Pad"}, false)
+	if session.Identity.GUID != "two" || session.Source != "SDL GameController mapping" || session.Mode != Setup {
 		t.Fatal("reconnect reused another controller identity")
 	}
+}
+
+func TestControllerSetupRemainsAvailableAndSupportsStartupOverride(t *testing.T) {
+	session := NewSession(t.TempDir(), "trimui-smart-pro")
+	session.Connect(Identity{GUID: "one", Name: "Pad"}, false)
+	press(session, Confirm)
+	if session.Mode != Normal {
+		t.Fatalf("detected mapping choice did not enter catalogue: %s", session.Mode)
+	}
+	press(session, Diagnostics)
+	press(session, Confirm)
+	if session.Mode != Setup || session.FirstRun {
+		t.Fatalf("settings setup did not open: mode=%s first=%v", session.Mode, session.FirstRun)
+	}
+	press(session, Back)
+	if session.Mode != Settings {
+		t.Fatalf("settings setup cancel did not return to settings: %s", session.Mode)
+	}
+	session.Mode = Normal
+	session.OpenSetup()
+	if session.Mode != Setup || session.FirstRun {
+		t.Fatalf("startup override did not open optional setup: mode=%s first=%v", session.Mode, session.FirstRun)
+	}
+}
+
+func press(session *Session, action Action) {
+	mapping := session.Mapping
+	if session.FirstRun {
+		mapping = AutoMapping()
+	}
+	session.HandleButton(mapping[action])
 }

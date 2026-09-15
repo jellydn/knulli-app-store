@@ -68,7 +68,9 @@ Do not use Grout's built-in updater during this test. It has no supported disabl
 
 ## Controls
 
-The footer shows semantic Confirm, Back, and Settings actions with the active SDL labels. On first startup, press any controller button within eight seconds to calibrate, or wait to keep Knulli's automatic mapping. Settings can retry setup, export diagnostics, and reset this controller to automatic mapping. Physical button positions are not assumed.
+The first launch for each device/controller identity opens a dedicated setup screen before the catalogue. Choose **Use Detected Mapping**, **Test Detected Mapping**, **Customize**, or **Safe Exit**. Customize assigns one semantic action at a time, then reviews each detected button with Accept, Retry, Start Over, and Cancel choices. All custom and tested mappings require an eight-action preview before atomic save. Later launches load the saved mapping directly. Settings can reopen setup, export diagnostics, or reset the active mapping. Hold the saved Back and Details/Diagnostics controls while launching for a deliberate setup override. Physical button positions are not assumed.
+
+If SDL exposes no GameController, the setup screen stays blocked, automatically exports diagnostics when possible, and shows the log and export paths. It does not open the catalogue with unknown controls.
 
 ## Device test checklist
 
