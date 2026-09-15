@@ -57,12 +57,17 @@ sudo ./build/knulli-app install \
   -arch aarch64 -device trimui-smart-pro -resolution 1280x720 \
   package.json
 
+# Take ownership of a copy that already exists at the destination, without reinstalling it.
+sudo ./build/knulli-app adopt package.json
+
 sudo ./build/knulli-app repair package.json
 sudo ./build/knulli-app update package-v2.json
 sudo ./build/knulli-app uninstall org.example.package
 ```
 
 `-root` redirects all device paths into another directory. Tests use it for a complete temporary-filesystem workflow. It is also useful for offline inspection; it must not point at an untrusted tree with symlinked path components.
+
+After a committed menu change the command prints `game list refresh accepted` when Knulli accepted the reload request, or `restart required to update game list` when it did not. Accepted means queued, not completed.
 
 The installer never runs remote install scripts. It only copies regular files from a verified archive, preserves declared configuration, and writes one optional EmulationStation menu record.
 
@@ -81,7 +86,7 @@ These notes record evidence reviewed on 2026-09-15. Upstream facts can change. T
 
 ## Experimental device GUI
 
-The controller-native SDL2 GUI browses the catalogue, shows package details and separate approval/technical states, and presents only actions allowed by the installer service. On the first launch for each device/controller identity, a dedicated setup screen requires the user to use, test, or customize the detected mapping before the catalogue opens. It uses semantic actions and prefers Knulli's `SDL_GAMECONTROLLERCONFIG`. No universal physical A/B assumption remains.
+The controller-native SDL2 GUI browses the catalogue, shows package details and separate approval/technical states, and presents only actions allowed by the installer service. A copy that already exists at the destination shows the row state **EXTERNAL** and offers **Manage existing** in place of **Install**. On the first launch for each device/controller identity, a dedicated setup screen requires the user to use, test, or customize the detected mapping before the catalogue opens. It uses semantic actions and prefers Knulli's `SDL_GAMECONTROLLERCONFIG`. No universal physical A/B assumption remains.
 
 Current Knulli is identified through `OS_NAME="knulli"` in `/etc/os-release`, not its inherited `ID=buildroot`. The release identifier comes from `/usr/share/knulli/knulli.version`. Compatibility errors include the selected raw value, normalized value, source, and full detected device matrix. Use Settings to export a redacted diagnostic text bundle. The active log is capped at 512 KiB with one rotated copy at `/userdata/system/logs/knulli-app-store.log.1`.
 

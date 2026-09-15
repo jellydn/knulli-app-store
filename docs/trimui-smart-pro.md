@@ -48,7 +48,7 @@ The launcher appends diagnostics to `/userdata/system/logs/knulli-app-store.log`
 
 ## Experimental package operations
 
-Only Grout 5.1.0.0 and PlayTime 1.0.0 are actionable. Grout is verified for this Smart Pro matrix. PlayTime remains experimental because MagicX is untested. Select **Install** for a new copy. If the App Store detects an external copy, it shows **Manage existing install**. Details explain that this inventories the copy and records safe ownership without reinstalling it. Exact release matches become manager-owned. Changed and unknown files stay unmanaged and are backed up under `/userdata/system/knulli-app-store/originals/<package-id>/` before a later Repair can replace them. State is stored under `/userdata/system/knulli-app-store/installed/`.
+Only Grout 5.1.0.0 and PlayTime 1.0.0 are actionable. Grout is verified for this Smart Pro matrix. PlayTime remains experimental because MagicX is untested. Select **Install** for a new copy. If the App Store detects an external copy, the row shows **EXTERNAL** and the action becomes **Manage existing**. Details explain that this inventories the copy and records safe ownership without reinstalling it. Exact release matches become manager-owned. Changed and unknown files stay unmanaged and are backed up under `/userdata/system/knulli-app-store/originals/<package-id>/` before a later Repair can replace them. State is stored under `/userdata/system/knulli-app-store/installed/`.
 
 The manager restores execute mode only on reviewed paths. PlayTime needs `playtime` and `playtime.sh` to be executable so Knulli can start the launcher and its local binary. Grout needs `Grout.sh` and `grout` for the same reason. No downloaded script is executed during installation.
 
@@ -83,7 +83,7 @@ If SDL exposes no GameController, the setup screen stays blocked, automatically 
 - Confirm the footer shows the active semantic controls and mapping source; record the log if no controller appears.
 - Open Settings with its displayed physical label, export diagnostics, and inspect the bundle for platform and mapping decisions. Do not send it if manual inspection finds private data.
 - Confirm the header shows `TRIMUI SMART PRO / 1280X720`. Unknown boards must show `UNKNOWN DEVICE`, and failed runtime-size detection must identify its fallback.
-- Confirm Grout shows `VERIFIED`, PlayTime shows its Smart Pro test state, and the other three packages remain read-only.
+- Confirm Grout shows `VERIFIED`, PlayTime shows its Smart Pro test state, and the other two packages remain read-only.
 - Confirm returning to EmulationStation works and a second launch also works.
 - Confirm Wi-Fi disabled and enabled produce the same catalogue because this artifact reads its bundled index.
 - Send the log, firmware version, observed controls, and a photo or screenshot with the result. Do not include credentials or private network data.
@@ -96,7 +96,7 @@ After this checklist passes, add linked `real-device-test` evidence for the GUI 
 2. Confirm the launcher and statistics function, then close and reopen it.
 3. Change one statistic, run Repair, and confirm the statistic remains.
 4. Run Uninstall and confirm managed files are gone while `/userdata/system/configs/playtime/` remains.
-5. If PlayTime existed before this test, use **Manage existing install** and confirm its statistics remain.
+5. If PlayTime existed before this test, use **Manage existing** and confirm its statistics remain.
 
 ### Grout 5.1.0.0
 
@@ -104,7 +104,7 @@ After this checklist passes, add linked `real-device-test` evidence for the GUI 
 2. Connect to a test RomM server and confirm one core browse or sync operation. Do not include credentials in the report.
 3. Run Repair and confirm `config.json`, `save_slots.json`, `.cache/`, and `logs/` remain.
 4. Run Uninstall and confirm managed files are gone while the preserved paths remain.
-5. If Grout existed before this test, use **Manage existing install** and confirm credentials and configuration remain.
+5. If Grout existed before this test, use **Manage existing** and confirm credentials and configuration remain.
 
 Report install, launch, core function, Repair, Uninstall, and adoption results separately for each package. The current report says both package tests were good but does not itemize these steps. PlayTime stays experimental until its MagicX matrix is tested.
 
@@ -112,6 +112,6 @@ Report install, launch, core function, Repair, Uninstall, and adoption results s
 
 1. Update the App Store files from the new artifact and start it on current Knulli.
 2. Select Grout or PlayTime. Confirm compatibility says the Knulli identity came from `/etc/os-release:OS_NAME` and calls the decision experimental.
-3. Confirm **Install** or **Manage existing install** is available when the header shows TrimUI Smart Pro and runtime 1280×720. The diagnostic log should select `SDL renderer output`; any `1280x13107` display or virtual-framebuffer candidate must show `valid=false` with a rejection reason.
+3. Confirm **Install** or **Manage existing** is available when the header shows TrimUI Smart Pro and runtime 1280×720. The diagnostic log should select `SDL renderer output`; any `1280x13107` display or virtual-framebuffer candidate must show `valid=false` with a rejection reason.
 4. Export diagnostics from Settings and inspect the platform line. It should show raw firmware `knulli`, normalized firmware `knulli`, source `/etc/os-release:OS_NAME`, and the current release identifier from `/usr/share/knulli/knulli.version`.
 5. If an action remains unavailable, send the diagnostic bundle after checking it for private data. Unknown firmware must remain blocked.

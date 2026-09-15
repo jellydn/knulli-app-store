@@ -38,15 +38,17 @@ with neither is not saved. Corrupt files are retained with a .corrupt suffix.
 PACKAGE STATUS
 
 Grout 5.1.0.0 remains blocked on MagicX Zero 28. PlayTime 1.0.0 is a
-user-authorized experimental test package. Select Install or Adopt and confirm
-the unverified warning. Its reviewed ARM64 archive uses runtime display size
-and SDL GameController actions. Its accelerated renderer, launch, tracking,
-repair, and uninstall still need a real-device test. Neither package is
-verified.
+user-authorized experimental test package. Select Install, or Manage existing
+for a detected external copy, and confirm the unverified warning. Its
+reviewed ARM64 archive uses runtime display size and SDL GameController
+actions. Its accelerated renderer, launch, tracking, repair, and uninstall
+still need a real-device test. Neither package is verified.
 
 PlayTime data stays under /userdata/system/configs/playtime. Manager state and
 adoption backups are under /userdata/system/knulli-app-store. Package details
-and the log identify the exact managed file when Repair is required.
+and the log identify the exact managed file when Repair is required. The app
+asks Knulli to reload game lists when it changes the menu; reboot if it reports
+that a restart is required.
 
 TROUBLESHOOTING
 

@@ -1,6 +1,6 @@
 # Architecture
 
-The installer owns policy and side effects. A future UI will call the same Go service methods and will not extract archives, edit XML, or run shell commands itself.
+The installer owns policy and side effects. Every front end calls the same Go service methods and never extracts archives, edits XML, or runs shell commands itself.
 
 ```text
 manifest JSON ──▶ strict validation ──▶ compatibility check
@@ -30,14 +30,17 @@ signed index (future)                  HTTPS download
 - `internal/diagnostics`: timestamped, redacted, size-bounded event logs and user-requested diagnostic exports.
 - `internal/archive`: bounded ZIP and `tar.gz` extraction into staging.
 - `internal/safefs`: allowed-path resolution, symlink rejection, atomic files, free-space checks, and rollback snapshots.
-- `internal/installer`: download, lifecycle operations, installed state, backups, and XML menu integration.
-- `cmd/knulli-app`: a thin command-line adapter.
+- `internal/installer`: download, lifecycle operations, installed state, backups, XML menu integration, and the committed game-list reload request.
+- `internal/updatecheck`: read-only upstream release metadata checks and the JSON or Markdown review report.
+- `cmd/knulli-app`: a thin installer command-line adapter.
+- `cmd/knulli-app-ui`: the SDL2 GUI entry point behind the `sdl` build tag.
+- `cmd/check-updates`: a thin adapter that writes the catalogue update report.
 
 ## Lifecycle invariants
 
 An archive is fully downloaded, hashed, and staged before a destination file changes. Every destination mutation enters the transaction before it happens. Installed state is the last file written. A failed step restores snapshots in reverse order.
 
-Update and repair share the same safe application path. Update can replace the manifest version and remove stale owned files. Repair reinstalls the declared release. Both leave existing declared configuration unchanged. Uninstall removes owned files, leaves preserved configuration, and restores files that existed before first ownership. A pre-existing copy is offered as **Manage existing install**. Adoption inventories it without reinstalling, records exact release matches, marks uncertain files unmanaged, and backs them up before later replacement.
+Update and repair share the same safe application path. Update can replace the manifest version and remove stale owned files. Repair reinstalls the declared release. Both leave existing declared configuration unchanged. Uninstall removes owned files, leaves preserved configuration, and restores files that existed before first ownership. A pre-existing copy is offered as **Manage existing**. Adoption inventories it without reinstalling, records exact release matches, marks uncertain files unmanaged, and backs them up before later replacement.
 
 Menu ownership is separate from package-file ownership. The installer adds an entry only when the exact launch path is absent. It removes only one unchanged entry that it created. A shared, pre-existing, or modified entry remains as an orphan rather than being deleted. After a committed menu change, the manager asks Knulli to queue a game-list reload through `GET http://127.0.0.1:1234/reloadgames`. A successful response means accepted, not completed. If the loopback request fails, the operation remains committed and the UI reports **Restart required**.
 
