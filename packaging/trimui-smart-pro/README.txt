@@ -22,15 +22,14 @@ and knulli-app-store files. Manager state under /userdata/system is retained.
 
 CONTROLS
 
-D-pad: move through packages and actions
-SDL A: select or confirm
-SDL B: back or cancel
-SDL Y: export a redacted diagnostic text bundle
+The footer shows semantic Confirm, Back, and Settings actions with their active
+SDL labels. It does not assume physical A/B positions. At first startup, press
+any controller button within eight seconds to calibrate, or wait to keep the
+Knulli/SDL automatic mapping. Settings can rerun setup, export diagnostics, or
+reset the active controller mapping.
 
-With Knulli's default Ports layout, physical B (south) maps to SDL A and
-physical A (east) maps to SDL B. A per-game Xbox-layout setting reverses
-those physical prompts. The app uses Knulli's SDL_GAMECONTROLLERCONFIG;
-it does not guess raw event or button numbers.
+Mappings are stored by device and controller identity under:
+  /userdata/system/configs/knulli-app-store/controller-mappings.json
 
 CURRENT SAFETY STATE
 
@@ -53,8 +52,8 @@ TROUBLESHOOTING
 If the app returns to EmulationStation, inspect:
   /userdata/system/logs/knulli-app-store.log
 
-Press Y in the App Store to export platform, catalogue, and capped redacted
-logs to /userdata/system/knulli-app-store/diagnostics. The export does not
+Use Settings > Export Diagnostics to export platform, catalogue, and capped
+redacted logs to /userdata/system/knulli-app-store/diagnostics. It does not
 include package credentials or private configuration files.
 
 The log records each SDL and framebuffer resolution candidate. On TrimUI

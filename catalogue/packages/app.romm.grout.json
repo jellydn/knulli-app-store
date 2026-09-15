@@ -15,7 +15,8 @@
     "notes": [
       "Experimental TrimUI Smart Pro test package; upstream names this device but no minimum Knulli version or linked test report is claimed.",
       "Do not use Grout's built-in updater during this test. It cannot be disabled through a supported setting; use Knulli App Store for repair or future updates.",
-      "The manager preserves and backs up pre-existing config.json, save_slots.json, cache, logs, and unknown files before adoption."
+      "The manager preserves and backs up pre-existing config.json, save_slots.json, cache, logs, and unknown files before adoption.",
+      "MagicX Zero 28 remains blocked: the tagged Knulli release does not establish MagicX orientation, input handling, SDL ABI, or readable 640x480 behavior."
     ],
     "evidence": [
       {

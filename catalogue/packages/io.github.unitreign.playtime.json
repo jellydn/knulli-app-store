@@ -15,7 +15,8 @@
     "notes": [
       "Experimental TrimUI Smart Pro test package; no minimum Knulli version or package-specific device result is claimed.",
       "The manager restores execute permission only for the reviewed playtime binary and playtime.sh launcher.",
-      "PlayTime statistics remain outside the managed package directory under /userdata/system/configs/playtime."
+      "PlayTime statistics remain outside the managed package directory under /userdata/system/configs/playtime.",
+      "MagicX Zero 28 remains blocked: 640x480 layout code exists, but the tagged dynamic SDL ABI, accelerated renderer, and controller launch are not verified on that device."
     ],
     "evidence": [
       {

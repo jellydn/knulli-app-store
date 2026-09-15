@@ -48,6 +48,8 @@ Upstream package code runs later when the user launches it. The installer does n
 - The GUI has one community-reported TrimUI Smart Pro test. Package-specific real-device testing has not been completed, and no current package has a verified badge.
 - Grout and PlayTime are experimental, actionable packages only for the declared Smart Pro test. Grout's built-in updater is outside manager transactions and must not be used during the test.
 - Diagnostic export contains detected platform metadata, public catalogue package status, and redacted App Store logs. It does not scan or copy package configuration, credentials, ROMs, or user data.
+- Controller mappings are device- and controller-scoped, validated before load/save, and replaced atomically. A missing GUID uses the controller name only within the detected Knulli device; an unidentified controller is not persisted.
+- MagicX Zero 28 is an experimental App Store target, not package compatibility evidence. Grout and PlayTime remain blocked there pending their separate runtime evidence.
 - EmuDrop is an approved catalogue exception, not an approved installer payload. Its copyright risk, missing license, and launch-time updater keep it non-installable.
 
 Report a security issue privately to the repository owner. Do not include user data, tokens, or private catalogue URLs in a public report.

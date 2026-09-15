@@ -67,7 +67,7 @@ func run() error {
 		diagnosticLog.Event("startup_error", "error", err.Error())
 		return err
 	}
-	err = sdlui.Run(context.Background(), service, sdlui.Options{Windowed: *windowed || *screenshot != "", Screenshot: *screenshot, Platform: current, Diagnostics: diagnosticLog})
+	err = sdlui.Run(context.Background(), service, sdlui.Options{Windowed: *windowed || *screenshot != "", Screenshot: *screenshot, Platform: current, Diagnostics: diagnosticLog, Root: *root})
 	if err != nil {
 		diagnosticLog.Event("final_error", "error", err.Error())
 	}

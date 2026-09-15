@@ -140,6 +140,9 @@ func DisplayName(device string) string {
 	if strings.EqualFold(device, "trimui-smart-pro") {
 		return "TrimUI Smart Pro"
 	}
+	if strings.EqualFold(device, "magicx-zero-28") {
+		return "MagicX Zero 28"
+	}
 	if device == "" {
 		return "Unknown device"
 	}

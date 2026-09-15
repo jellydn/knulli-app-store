@@ -62,17 +62,13 @@ The App Store writes concise UTC timestamped events for startup, platform and ca
 
 Resolution selection records every candidate with its source, dimensions, validation result, and rejection reason. The GUI prefers the SDL renderer output, then the SDL window size and current display mode. Valid framebuffer mode data is a fallback; `fb0/virtual_size` is last because it describes an allocation and can be taller than the visible display. Dimensions outside 320×200 through 7680×4320 or outside a 1:2 through 3.5:1 aspect ratio are rejected. No valid source means compatibility remains blocked. Terminal control sequences from older launchers are removed from new logs and exports.
 
-Press SDL Y anywhere in the GUI to create a text bundle under `/userdata/system/knulli-app-store/diagnostics/`. The screen shows the exact output path. The bundle contains detected platform fields, public package IDs and review states, and the bounded redacted logs. It does not include Grout credentials, PlayTime data, ROMs, or private configuration.
+Use Settings > Export Diagnostics to create a text bundle under `/userdata/system/knulli-app-store/diagnostics/`. The screen shows the exact output path. The bundle contains detected platform fields, public package IDs and review states, and the bounded redacted logs. It does not include Grout credentials, PlayTime data, ROMs, or private configuration.
 
 Do not use Grout's built-in updater during this test. It has no supported disable setting and operates outside App Store rollback. Future Grout updates must use a newly reviewed manifest. These manifests do not edit `gamelist.xml`: after install or uninstall, refresh game lists or reboot. This avoids deleting or replacing an entry that may belong to a pre-existing manual installation.
 
 ## Controls
 
-- D-pad: move through packages or available actions.
-- SDL A: select and confirm.
-- SDL B: back and cancel.
-
-With Knulli's default Ports layout, physical B (south) maps to SDL A and physical A (east) maps to SDL B. If the per-game Xbox layout is enabled, the physical labels change. The footer reports whether SDL accepted a controller mapping.
+The footer shows semantic Confirm, Back, and Settings actions with the active SDL labels. On first startup, press any controller button within eight seconds to calibrate, or wait to keep Knulli's automatic mapping. Settings can retry setup, export diagnostics, and reset this controller to automatic mapping. Physical button positions are not assumed.
 
 ## Device test checklist
 
@@ -80,8 +76,8 @@ With Knulli's default Ports layout, physical B (south) maps to SDL A and physica
 - Confirm the app appears in Ports and opens at 1280×720 without replacing system libraries.
 - Confirm text, selection, trust state, and package details are readable with no clipping.
 - Confirm D-pad navigation, select, back, and exit with Knulli's default Ports layout.
-- Confirm the footer says `CONTROLLER: READY`; record the log if it does not.
-- Press SDL Y, confirm the saved diagnostic path appears without clipping, and inspect the bundle for the platform sources and compatibility decision. Do not send it if manual inspection finds private data.
+- Confirm the footer shows the active semantic controls and mapping source; record the log if no controller appears.
+- Open Settings with its displayed physical label, export diagnostics, and inspect the bundle for platform and mapping decisions. Do not send it if manual inspection finds private data.
 - Confirm the header shows `TRIMUI SMART PRO / 1280X720`. Unknown boards must show `UNKNOWN DEVICE`, and failed runtime-size detection must identify its fallback.
 - Confirm Grout and PlayTime show `APPROVED / EXPERIMENTAL`; the other four packages remain read-only.
 - Confirm EmuDrop shows the ROM copyright warning and remains `APPROVED / CANDIDATE`.
@@ -114,5 +110,5 @@ Report install, launch, core function, Repair, Uninstall, and adoption results s
 1. Update the App Store files from the new artifact and start it on current Knulli.
 2. Select Grout or PlayTime. Confirm compatibility says the Knulli identity came from `/etc/os-release:OS_NAME` and calls the decision experimental.
 3. Confirm Install or Adopt is available when the header shows TrimUI Smart Pro and runtime 1280×720. The diagnostic log should select `SDL renderer output`; any `1280x13107` display or virtual-framebuffer candidate must show `valid=false` with a rejection reason.
-4. Press SDL Y and inspect the exported platform line. It should show raw firmware `knulli`, normalized firmware `knulli`, source `/etc/os-release:OS_NAME`, and the current release identifier from `/usr/share/knulli/knulli.version`.
+4. Export diagnostics from Settings and inspect the platform line. It should show raw firmware `knulli`, normalized firmware `knulli`, source `/etc/os-release:OS_NAME`, and the current release identifier from `/usr/share/knulli/knulli.version`.
 5. If an action remains unavailable, send the diagnostic bundle after checking it for private data. Unknown firmware must remain blocked.

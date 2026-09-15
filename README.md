@@ -5,12 +5,12 @@ Knulli App Store is an early, safety-focused package manager for community Knull
 ## Current scope
 
 - Manifest-driven packages for reviewed Knulli `aarch64` devices; the original installer test matrix is H700
-- An experimental TrimUI Smart Pro GUI artifact targeting Allwinner A133 and 1280×720
+- Experimental GUI artifacts for TrimUI Smart Pro at 1280×720 and MagicX Zero 28 at 640×480
 - One or more explicit resolutions per approved manifest; no resolution is assumed
 - ZIP and `tar.gz` release archives, up to 512 MiB compressed and installed
 - Writes below `/userdata` only
 
-The experimental GUI is functional on one community-tested TrimUI Smart Pro. This is evidence for the app-store GUI only, not for any catalogue package or other device. Grout 5.1.0.0 and PlayTime 1.0.0 are explicit experimental test packages for that device. Neither package is verified.
+The experimental GUI is functional on one community-tested TrimUI Smart Pro. MagicX Zero 28 support is source-backed but untested. This is not package evidence. Grout 5.1.0.0 and PlayTime 1.0.0 remain actionable only on Smart Pro and are blocked on MagicX. Neither package is verified.
 
 PortMaster is a featured external provider. Users open it through Knulli's official install and launch mechanism. This repository does not copy the PortMaster catalogue or implement another PortMaster installer. ROM-download sources, including EmuDrop, are outside the official catalogue policy.
 EmuDrop is one explicit community-approved exception. It remains non-installable and displays a copyright warning. This exception does not permit other ROM-download sources.
@@ -74,12 +74,12 @@ The catalogue contains two experimental packages and four non-actionable candida
 
 These notes record evidence reviewed on 2026-09-15. Upstream facts can change. Follow the [manifest review workflow](docs/manifest-review.md) before promotion.
 
-## Experimental TrimUI Smart Pro GUI
+## Experimental device GUI
 
-The controller-native SDL2 GUI browses the catalogue, shows package details and separate approval/technical states, and presents only actions allowed by the installer service. Grout and PlayTime require an experimental-risk confirmation before install or adoption. Existing copies are inventoried and backed up before adoption. The header uses Knulli's board identifier and SDL's runtime display size. The artifact uses Knulli's `SDL_GAMECONTROLLERCONFIG` instead of raw device numbers.
+The controller-native SDL2 GUI browses the catalogue, shows package details and separate approval/technical states, and presents only actions allowed by the installer service. It uses semantic actions and prefers Knulli's `SDL_GAMECONTROLLERCONFIG`. A controller-only setup flow can save mappings by Knulli device and SDL controller identity. No universal physical A/B assumption remains.
 
-Current Knulli is identified through `OS_NAME="knulli"` in `/etc/os-release`, not its inherited `ID=buildroot`. The release identifier comes from `/usr/share/knulli/knulli.version`. Compatibility errors include the selected raw value, normalized value, source, and full detected device matrix. Press SDL Y in the GUI to export a redacted diagnostic text bundle. The active log is capped at 512 KiB with one rotated copy at `/userdata/system/logs/knulli-app-store.log.1`.
+Current Knulli is identified through `OS_NAME="knulli"` in `/etc/os-release`, not its inherited `ID=buildroot`. The release identifier comes from `/usr/share/knulli/knulli.version`. Compatibility errors include the selected raw value, normalized value, source, and full detected device matrix. Use Settings to export a redacted diagnostic text bundle. The active log is capped at 512 KiB with one rotated copy at `/userdata/system/logs/knulli-app-store.log.1`.
 
 The GUI validates SDL renderer, window, display-mode, and framebuffer resolution candidates before compatibility checks. It records the selected source and rejects corrupted or implausible dimensions instead of trusting `fb0/virtual_size`.
 
-GitHub Actions publishes `knulli-app-store-trimui-smart-pro-experimental` after all checks pass. See the [TrimUI Smart Pro test guide](docs/trimui-smart-pro.md) for authoritative runtime evidence, installation steps, controls, and the device test checklist. The build remains experimental because the exact tested Knulli version and repeatable evidence are not recorded.
+GitHub Actions publishes separate `knulli-app-store-trimui-smart-pro-experimental` and `knulli-app-store-magicx-zero-28-experimental` artifacts after all checks pass. See the [TrimUI Smart Pro guide](docs/trimui-smart-pro.md) and [MagicX Zero 28 guide](docs/magicx-zero-28.md).

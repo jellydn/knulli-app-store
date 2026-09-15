@@ -12,6 +12,11 @@ static Uint32 event_type(SDL_Event *event) { return event->type; }
 static SDL_Keycode event_key(SDL_Event *event) { return event->key.keysym.sym; }
 static Uint8 event_key_repeat(SDL_Event *event) { return event->key.repeat; }
 static Uint8 event_controller_button(SDL_Event *event) { return event->cbutton.button; }
+static SDL_JoystickID event_controller_which(SDL_Event *event) { return event->cbutton.which; }
+static SDL_JoystickID event_device_which(SDL_Event *event) { return event->cdevice.which; }
+static void controller_guid(SDL_GameController *controller, char *output, int size) {
+    SDL_JoystickGetGUIDString(SDL_JoystickGetGUID(SDL_GameControllerGetJoystick(controller)), output, size);
+}
 */
 import "C"
 
@@ -27,6 +32,7 @@ import (
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
+	storeinput "github.com/jellydn/knulli-app-store/internal/input"
 	"github.com/jellydn/knulli-app-store/internal/platform"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
 	xdraw "golang.org/x/image/draw"
@@ -42,6 +48,7 @@ type Options struct {
 	Screenshot  string
 	Platform    platform.Info
 	Diagnostics *diagnostics.Log
+	Root        string
 }
 
 func Run(ctx context.Context, backend appstore.Backend, options Options) error {
@@ -81,6 +88,9 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	logResolutionCandidates(options.Diagnostics, platform.AssessResolutions(allCandidates), options.Platform)
 	backend.SetPlatform(options.Platform)
 	platformHeader := platform.DisplayHeader(options.Platform, 0, 0)
+	outputWidth, outputHeight := selectedOutputSize(options.Platform.Resolution)
+	destination := outputRectangle(outputWidth, outputHeight)
+	sdlDestination := C.SDL_Rect{x: C.int(destination.Min.X), y: C.int(destination.Min.Y), w: C.int(destination.Dx()), h: C.int(destination.Dy())}
 	texture := C.SDL_CreateTexture(renderer, C.SDL_PIXELFORMAT_ABGR8888, C.SDL_TEXTUREACCESS_STREAMING, canvasWidth, canvasHeight)
 	if texture == nil {
 		return sdlError("create SDL2 texture")
@@ -91,10 +101,12 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	if err := model.Load(ctx); err != nil {
 		return err
 	}
+	controls := storeinput.NewSession(options.Root, options.Platform.Device)
 	controller := openController()
+	connectController(controls, controller, options.Diagnostics)
 	defer func() {
 		if controller != nil {
-			C.SDL_GameControllerClose(controller)
+			C.SDL_GameControllerClose(controller.handle)
 		}
 	}()
 	ticker := time.NewTicker(time.Second / 30)
@@ -102,21 +114,24 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	for {
 		var event C.SDL_Event
 		for C.SDL_PollEvent(&event) != 0 {
-			if handleEvent(ctx, model, &event, &controller) {
+			if handleEvent(ctx, model, &event, &controller, controls, options.Diagnostics) {
 				return nil
 			}
 		}
 		model.Poll()
-		frame := draw(model, platformHeader, controller != nil)
+		controls.Tick(time.Now())
+		frame := draw(model, platformHeader, controls)
 		if C.SDL_UpdateTexture(texture, nil, unsafe.Pointer(&frame.Pix[0]), C.int(frame.Stride)) != 0 {
 			return sdlError("upload UI frame")
 		}
-		if C.SDL_RenderCopy(renderer, texture, nil, nil) != 0 {
+		C.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255)
+		C.SDL_RenderClear(renderer)
+		if C.SDL_RenderCopy(renderer, texture, nil, &sdlDestination) != 0 {
 			return sdlError("render UI frame")
 		}
 		C.SDL_RenderPresent(renderer)
 		if options.Screenshot != "" {
-			return saveScreenshot(options.Screenshot, frame)
+			return saveOutputScreenshot(options.Screenshot, frame, outputWidth, outputHeight)
 		}
 		select {
 		case <-ctx.Done():
@@ -156,7 +171,7 @@ func logResolutionCandidates(logger *diagnostics.Log, assessments []platform.Res
 	logger.Event("platform_detected", "details", platform.Summary(selected))
 }
 
-func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, controller **C.SDL_GameController) bool {
+func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, controller **controllerState, controls *storeinput.Session, logger *diagnostics.Log) bool {
 	switch C.event_type(event) {
 	case C.SDL_QUIT:
 		return true
@@ -177,38 +192,116 @@ func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, 
 			model.ExportDiagnostics(ctx)
 		}
 	case C.SDL_CONTROLLERBUTTONDOWN:
-		switch C.event_controller_button(event) {
-		case C.SDL_CONTROLLER_BUTTON_DPAD_UP, C.SDL_CONTROLLER_BUTTON_DPAD_LEFT:
-			model.Move(-1)
-		case C.SDL_CONTROLLER_BUTTON_DPAD_DOWN, C.SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
-			model.Move(1)
-		case C.SDL_CONTROLLER_BUTTON_A:
-			model.Select(ctx)
-		case C.SDL_CONTROLLER_BUTTON_B:
-			return model.Back()
-		case C.SDL_CONTROLLER_BUTTON_Y:
+		if *controller == nil || C.event_controller_which(event) != (*controller).instanceID {
+			return false
+		}
+		button := int(C.event_controller_button(event))
+		before := controls.Mode
+		beforeSource := controls.Source
+		action, effect := controls.HandleButton(button, time.Now())
+		logger.Event("controller_input", "button", storeinput.ButtonLabel(button), "semantic_action", string(action), "mode", string(before))
+		if controls.Mode != before || controls.Source != beforeSource {
+			logger.Event("controller_mapping_decision", "from_mode", string(before), "to_mode", string(controls.Mode), "source", controls.Source, "message", controls.Message)
+		}
+		if controls.ValidationError != "" {
+			logger.Event("controller_mapping_validation_failed", "error", controls.ValidationError)
+		}
+		if effect == storeinput.ExportDiagnostics {
 			model.ExportDiagnostics(ctx)
 		}
+		if dispatchAction(ctx, model, action) {
+			return true
+		}
 	case C.SDL_CONTROLLERDEVICEREMOVED:
-		if *controller != nil {
-			C.SDL_GameControllerClose(*controller)
+		if *controller != nil && C.event_device_which(event) == (*controller).instanceID {
+			logger.Event("controller_disconnected", "name", (*controller).identity.Name, "guid", (*controller).identity.GUID)
+			C.SDL_GameControllerClose((*controller).handle)
 			*controller = nil
+			controls.Disconnect()
 		}
 	case C.SDL_CONTROLLERDEVICEADDED:
 		if *controller == nil {
 			*controller = openController()
+			connectController(controls, *controller, logger)
 		}
 	}
 	return false
 }
 
-func openController() *C.SDL_GameController {
+type controllerState struct {
+	handle     *C.SDL_GameController
+	identity   storeinput.Identity
+	instanceID C.SDL_JoystickID
+}
+
+func openController() *controllerState {
 	for index := C.int(0); index < C.SDL_NumJoysticks(); index++ {
 		if C.SDL_IsGameController(index) == C.SDL_TRUE {
-			return C.SDL_GameControllerOpen(index)
+			handle := C.SDL_GameControllerOpen(index)
+			if handle == nil {
+				continue
+			}
+			var guid [33]C.char
+			C.controller_guid(handle, &guid[0], C.int(len(guid)))
+			joystick := C.SDL_GameControllerGetJoystick(handle)
+			return &controllerState{handle: handle, identity: storeinput.Identity{GUID: C.GoString(&guid[0]), Name: C.GoString(C.SDL_GameControllerName(handle))}, instanceID: C.SDL_JoystickInstanceID(joystick)}
 		}
 	}
 	return nil
+}
+
+func connectController(controls *storeinput.Session, controller *controllerState, logger *diagnostics.Log) {
+	if controller == nil {
+		logger.Event("controller_unavailable", "device", controls.Device)
+		return
+	}
+	controls.Connect(controller.identity, os.Getenv("SDL_GAMECONTROLLERCONFIG") != "", time.Now())
+	logger.Event("controller_connected", "device", controls.Device, "name", controller.identity.Name, "guid", controller.identity.GUID, "mapping_source", controls.Source)
+	if controls.ValidationError != "" {
+		logger.Event("controller_mapping_validation_failed", "error", controls.ValidationError)
+	}
+}
+
+func dispatchAction(ctx context.Context, model *storeui.Model, action storeinput.Action) bool {
+	switch action {
+	case storeinput.Up, storeinput.Left:
+		model.Move(-1)
+	case storeinput.Down, storeinput.Right:
+		model.Move(1)
+	case storeinput.Confirm:
+		model.Select(ctx)
+	case storeinput.Back:
+		return model.Back()
+	case storeinput.Exit:
+		return true
+	}
+	return false
+}
+
+func selectedOutputSize(resolution string) (int, int) {
+	width, height := windowWidth, windowHeight
+	if _, err := fmt.Sscanf(resolution, "%dx%d", &width, &height); err != nil || width <= 0 || height <= 0 {
+		return windowWidth, windowHeight
+	}
+	return width, height
+}
+
+func outputRectangle(width, height int) image.Rectangle {
+	scaleWidth := width
+	scaleHeight := scaleWidth * canvasHeight / canvasWidth
+	if scaleHeight > height {
+		scaleHeight = height
+		scaleWidth = scaleHeight * canvasWidth / canvasHeight
+	}
+	x := (width - scaleWidth) / 2
+	y := (height - scaleHeight) / 2
+	return image.Rect(x, y, x+scaleWidth, y+scaleHeight)
+}
+
+func renderOutput(frame *image.RGBA, width, height int) *image.RGBA {
+	output := image.NewRGBA(image.Rect(0, 0, width, height))
+	xdraw.NearestNeighbor.Scale(output, outputRectangle(width, height), frame, frame.Bounds(), xdraw.Src, nil)
+	return output
 }
 
 func sdlError(operation string) error {
@@ -216,8 +309,11 @@ func sdlError(operation string) error {
 }
 
 func saveScreenshot(path string, frame *image.RGBA) error {
-	scaled := image.NewRGBA(image.Rect(0, 0, windowWidth, windowHeight))
-	xdraw.NearestNeighbor.Scale(scaled, scaled.Bounds(), frame, frame.Bounds(), xdraw.Src, nil)
+	return saveOutputScreenshot(path, frame, windowWidth, windowHeight)
+}
+
+func saveOutputScreenshot(path string, frame *image.RGBA, width, height int) error {
+	scaled := renderOutput(frame, width, height)
 	file, err := os.Create(path)
 	if err != nil {
 		return err

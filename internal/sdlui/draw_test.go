@@ -4,13 +4,16 @@
 package sdlui
 
 import (
+	"image"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
+	storeinput "github.com/jellydn/knulli-app-store/internal/input"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/platform"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
@@ -53,9 +56,13 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		"error":               {Items: []appstore.Item{item}, Error: "SHA-256 mismatch; package files were not changed"},
 		"progress":            {Items: []appstore.Item{experimental}, Busy: true, Message: "Downloading, verifying, and applying Grout"},
 	}
+	controls := storeinput.NewSession(t.TempDir(), "trimui-smart-pro")
+	controls.Connected = true
+	controls.Source = "Knulli SDL_GAMECONTROLLERCONFIG"
+	controls.Mode = storeinput.Normal
 	directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR")
 	for name, model := range states {
-		frame := draw(model, "TrimUI Smart Pro / 1280x720", true)
+		frame := draw(model, "TrimUI Smart Pro / 1280x720", controls)
 		if frame.Bounds().Dx() != canvasWidth || frame.Bounds().Dy() != canvasHeight {
 			t.Fatalf("%s frame has unexpected bounds %v", name, frame.Bounds())
 		}
@@ -67,6 +74,33 @@ func TestRenderRepresentativeStates(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+	}
+}
+
+func TestRenderControllerSetupAtMagicXResolution(t *testing.T) {
+	model := &storeui.Model{Items: []appstore.Item{{Package: manifest.Package{Name: "PlayTime", Review: manifest.Review{Status: "experimental"}}, Compatibility: "Blocked: MagicX runtime ABI is not yet verified"}}}
+	controls := storeinput.NewSession(t.TempDir(), "magicx-zero-28")
+	controls.Connect(storeinput.Identity{GUID: "03000000", Name: "MagicX runtime controller"}, true, time.Unix(100, 0))
+	controls.HandleButton(0, time.Unix(101, 0))
+	frame := draw(model, "MagicX Zero 28 / 640x480", controls)
+	output := renderOutput(frame, 640, 480)
+	if output.Bounds() != image.Rect(0, 0, 640, 480) || outputRectangle(640, 480) != image.Rect(0, 60, 640, 420) {
+		t.Fatalf("unexpected MagicX output layout: bounds=%v viewport=%v", output.Bounds(), outputRectangle(640, 480))
+	}
+	if directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR"); directory != "" {
+		if err := os.MkdirAll(directory, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := saveOutputScreenshot(filepath.Join(directory, "magicx-zero-28-controller-setup.png"), frame, 640, 480); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestRenderNoControllerState(t *testing.T) {
+	frame := draw(&storeui.Model{}, "MagicX Zero 28 / 640x480", storeinput.NewSession(t.TempDir(), "magicx-zero-28"))
+	if frame.Bounds() != image.Rect(0, 0, canvasWidth, canvasHeight) {
+		t.Fatalf("no-controller frame failed: %v", frame.Bounds())
 	}
 }
 

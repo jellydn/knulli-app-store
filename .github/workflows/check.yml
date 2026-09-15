@@ -40,10 +40,13 @@ jobs:
           go run ./cmd/knulli-app catalogue -output /tmp/index-two.json
           cmp /tmp/index-one.json /tmp/index-two.json
 
-  trimui-smart-pro-artifact:
+  device-artifact:
     needs: test
     runs-on: ubuntu-latest
     container: golang:1.19-bookworm
+    strategy:
+      matrix:
+        target: [trimui-smart-pro, magicx-zero-28]
     steps:
       - uses: actions/checkout@v4
       - name: Install aarch64 cross compiler and SDL2 headers
@@ -69,10 +72,10 @@ jobs:
       - name: Package experimental Ports artifact
         run: |
           VERSION=$(printf '%.7s' "$GITHUB_SHA")
-          scripts/package-trimui-smart-pro.sh build/knulli-app build/knulli-app-ui build/catalog-index.json dist "$VERSION"
+          scripts/package-device.sh build/knulli-app build/knulli-app-ui build/catalog-index.json dist "$VERSION" "${{ matrix.target }}"
       - uses: actions/upload-artifact@v4
         with:
-          name: knulli-app-store-trimui-smart-pro-experimental
+          name: knulli-app-store-${{ matrix.target }}-experimental
           path: dist/
           if-no-files-found: error
           retention-days: 30

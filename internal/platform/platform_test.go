@@ -77,6 +77,13 @@ func TestDisplayHeaderUsesKnownDeviceAndRuntimeSize(t *testing.T) {
 	}
 }
 
+func TestDisplayHeaderNamesMagicXZero28(t *testing.T) {
+	info := Info{Device: "magicx-zero-28"}
+	if got := DisplayHeader(info, 640, 480); got != "MagicX Zero 28 / 640x480" {
+		t.Fatalf("unexpected MagicX header: %q", got)
+	}
+}
+
 func TestDisplayHeaderShowsFallbackStates(t *testing.T) {
 	tests := []struct {
 		name string

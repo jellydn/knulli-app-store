@@ -4,12 +4,14 @@
 package sdlui
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	imagedraw "image/draw"
 	"strings"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
+	storeinput "github.com/jellydn/knulli-app-store/internal/input"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
 	"golang.org/x/image/font"
@@ -42,7 +44,7 @@ var palette = struct {
 	error:      color.RGBA{R: 239, G: 94, B: 94, A: 255},
 }
 
-func draw(model *storeui.Model, platformName string, controller bool) *image.RGBA {
+func draw(model *storeui.Model, platformName string, controls *storeinput.Session) *image.RGBA {
 	frame := image.NewRGBA(image.Rect(0, 0, canvasWidth, canvasHeight))
 	fill(frame, frame.Bounds(), palette.background)
 	text(frame, 16, 25, palette.text, "KNULLI APP STORE")
@@ -56,16 +58,67 @@ func draw(model *storeui.Model, platformName string, controller bool) *image.RGB
 		drawDetails(frame, model)
 	}
 	drawStatus(frame, model)
-	controllerStatus := "CONTROLLER: NOT MAPPED"
-	if controller {
-		controllerStatus = "CONTROLLER: READY"
+	controllerStatus := "NO CONTROLLER"
+	controlHelp := "CONFIRM --  BACK --  SETTINGS --"
+	if controls != nil && controls.Connected {
+		controllerStatus = strings.ToUpper(shorten(controls.Source, 20))
+		controlHelp = "CONFIRM " + storeinput.ButtonLabel(controls.Mapping[storeinput.Confirm]) + "  BACK " + storeinput.ButtonLabel(controls.Mapping[storeinput.Back]) + "  SETTINGS " + storeinput.ButtonLabel(controls.Mapping[storeinput.Diagnostics])
 	}
-	text(frame, 16, 345, palette.muted, "DPAD NAV   B SELECT   A BACK   Y EXPORT LOG")
-	text(frame, 436, 345, palette.muted, controllerStatus)
+	text(frame, 16, 345, palette.muted, shorten(controlHelp, 57))
+	text(frame, 474, 345, palette.muted, shorten(controllerStatus, 20))
 	if platformName != "" {
 		text(frame, 16, 39, palette.muted, shorten(strings.ToUpper(platformName), 58))
 	}
+	drawControllerOverlay(frame, controls)
 	return frame
+}
+
+func drawControllerOverlay(frame *image.RGBA, controls *storeinput.Session) {
+	if controls == nil || controls.Mode == storeinput.Normal {
+		return
+	}
+	fill(frame, image.Rect(242, 42, 624, 322), color.RGBA{R: 25, G: 34, B: 49, A: 255})
+	text(frame, 258, 68, palette.accent, "CONTROLLER SETUP")
+	text(frame, 258, 88, palette.muted, shorten(strings.ToUpper(controls.Identity.Name), 44))
+	switch controls.Mode {
+	case storeinput.Startup:
+		text(frame, 258, 126, palette.text, "PRESS ANY CONTROLLER BUTTON TO CALIBRATE")
+		text(frame, 258, 150, palette.muted, "OR WAIT 8 SECONDS TO USE KNULLI / SDL AUTO")
+		text(frame, 258, 180, palette.warning, "NO KEYBOARD IS REQUIRED")
+	case storeinput.Settings:
+		text(frame, 258, 112, palette.text, "SETTINGS")
+		for index, item := range storeinput.SettingsItems {
+			prefix := "  "
+			shade := palette.text
+			if index == controls.SettingsIndex {
+				prefix = "> "
+				shade = palette.accent
+			}
+			text(frame, 270, 140+index*28, shade, prefix+item)
+		}
+	case storeinput.Calibrating:
+		action, _ := controls.Calibration.Current()
+		text(frame, 258, 116, palette.warning, "PRESS A PHYSICAL BUTTON FOR")
+		text(frame, 258, 145, palette.text, storeinput.Label(action))
+		text(frame, 258, 177, palette.muted, fmt.Sprintf("STEP %d OF %d", controls.Calibration.Index+1, len(storeinput.Actions)))
+		text(frame, 258, 205, palette.muted, "CURRENT AUTO EXIT BUTTON CANCELS")
+	case storeinput.Preview:
+		text(frame, 258, 108, palette.warning, "TEST EVERY CONTROL BEFORE SAVE")
+		for index, action := range storeinput.Actions {
+			mark := "[ ]"
+			if controls.Calibration.Tested[action] {
+				mark = "[X]"
+			}
+			column := index / 4
+			row := index % 4
+			text(frame, 258+column*180, 138+row*28, palette.text, shorten(mark+" "+storeinput.Label(action)+" "+storeinput.ButtonLabel(controls.Calibration.Mapping[action]), 25))
+		}
+	}
+	if controls.ValidationError != "" {
+		text(frame, 258, 292, palette.error, shorten(strings.ToUpper(controls.ValidationError), 48))
+	} else if controls.Message != "" {
+		text(frame, 258, 292, palette.muted, shorten(strings.ToUpper(controls.Message), 48))
+	}
 }
 
 func drawList(frame *image.RGBA, model *storeui.Model) {
