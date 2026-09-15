@@ -1,0 +1,31 @@
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.19.x"
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Static checks
+        run: go vet ./...
+      - name: Unit and integration tests
+        run: go test -race ./...
+      - name: Build static aarch64 CLI
+        run: GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o /tmp/knulli-app ./cmd/knulli-app
+      - name: Validate catalogue and deterministic output
+        run: |
+          go run ./cmd/knulli-app catalogue -output /tmp/index-one.json
+          go run ./cmd/knulli-app catalogue -output /tmp/index-two.json
+          cmp /tmp/index-one.json /tmp/index-two.json
