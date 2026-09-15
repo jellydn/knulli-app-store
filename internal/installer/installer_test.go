@@ -56,6 +56,10 @@ func TestInstallRepairUpdateAndUninstallEndToEnd(t *testing.T) {
 	if err := manager.Install(context.Background(), pkg); err != nil {
 		t.Fatal(err)
 	}
+	status, err := manager.Status(pkg.ID)
+	if err != nil || !status.Installed || !status.Healthy {
+		t.Fatalf("unexpected installed status: %#v, %v", status, err)
+	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "version one")
 	assertRootFile(t, root, "userdata/roms/tools/demo/config.ini", "user configuration")
 	assertRootFile(t, root, "userdata/roms/tools/demo/obsolete.txt", "remove on update")
@@ -63,6 +67,10 @@ func TestInstallRepairUpdateAndUninstallEndToEnd(t *testing.T) {
 	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<path>./demo/launch.sh</path>")
 
 	writeRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "damaged")
+	status, err = manager.Status(pkg.ID)
+	if err != nil || status.Healthy {
+		t.Fatalf("damaged file was not detected: %#v, %v", status, err)
+	}
 	if err := manager.Repair(context.Background(), pkg); err != nil {
 		t.Fatal(err)
 	}

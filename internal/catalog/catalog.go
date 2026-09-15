@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -18,6 +19,41 @@ const IndexSchemaV1 = "org.knulli.app-store/catalog-index/v1"
 type Index struct {
 	Schema   string  `json:"schema"`
 	Packages []Entry `json:"packages"`
+}
+
+func Load(path string) (Index, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Index{}, err
+	}
+	var index Index
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&index); err != nil {
+		return Index{}, fmt.Errorf("decode catalogue index: %w", err)
+	}
+	if index.Schema != IndexSchemaV1 {
+		return Index{}, fmt.Errorf("unsupported catalogue schema %q", index.Schema)
+	}
+	previous := ""
+	for position, entry := range index.Packages {
+		if err := entry.Package.Validate(); err != nil {
+			return Index{}, fmt.Errorf("package %d: %w", position, err)
+		}
+		if entry.ID != entry.Package.ID || entry.ID <= previous {
+			return Index{}, fmt.Errorf("catalogue package ids must match and be strictly sorted")
+		}
+		canonical, err := manifest.Canonical(entry.Package)
+		if err != nil {
+			return Index{}, err
+		}
+		digest := sha256.Sum256(canonical)
+		if entry.ManifestSHA256 != hex.EncodeToString(digest[:]) {
+			return Index{}, fmt.Errorf("catalogue digest mismatch for %s", entry.ID)
+		}
+		previous = entry.ID
+	}
+	return index, nil
 }
 
 type Entry struct {

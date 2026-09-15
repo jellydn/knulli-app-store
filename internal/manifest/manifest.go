@@ -155,8 +155,11 @@ func (p Package) validateInstallable() []string {
 		if p.Compatibility.Firmware != "knulli" || p.Compatibility.MinimumVersion == "" {
 			problems = append(problems, "compatibility must name Knulli and a minimum version")
 		}
-		if !contains(p.Compatibility.Architectures, "aarch64") || !contains(p.Compatibility.Devices, "h700") {
-			problems = append(problems, "initial catalogue packages must include aarch64 and h700")
+		if !contains(p.Compatibility.Architectures, "aarch64") {
+			problems = append(problems, "initial catalogue packages must include aarch64")
+		}
+		if len(p.Compatibility.Devices) == 0 {
+			problems = append(problems, "at least one tested device is required")
 		}
 		if len(p.Compatibility.Resolutions) == 0 {
 			problems = append(problems, "at least one tested resolution is required")
