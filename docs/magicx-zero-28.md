@@ -30,7 +30,7 @@ The key combines Knulli device ID and controller GUID. An all-zero or absent GUI
 ## Package status
 
 - **Grout 5.1.0.0 remains blocked.** Its tagged Knulli release does not establish MagicX orientation, input dispatch, SDL ABI, or readable 640×480 behavior. Its known Zero 28 handling is in a MinUI path that the Knulli launcher does not select.
-- **PlayTime 1.0.0 is a user-authorized experimental test.** The reviewed ARM64 archive uses the Knulli SDL2 libraries, runtime display dimensions with a 640×480 fallback, and SDL GameController actions. Select **Install** or **Adopt** and confirm the unverified warning. Its accelerated renderer, launch, tracking, and complete life cycle are not proven on MagicX.
+- **PlayTime 1.0.0 is a user-authorized experimental test.** The reviewed ARM64 archive uses the Knulli SDL2 libraries, runtime display dimensions with a 640×480 fallback, and SDL GameController actions. Select **Install**, or **Manage existing install** for a detected external copy, and confirm the unverified warning. Its accelerated renderer, launch, tracking, and complete life cycle are not proven on MagicX.
 
 Successful App Store navigation does not prove a package. Grout remains blocked, and PlayTime remains unverified.
 
@@ -43,9 +43,9 @@ Successful App Store navigation does not prove a package. Grout remains blocked,
 5. Restart and confirm the saved mapping loads. Reset it, confirm setup becomes required, and confirm only this controller/device record changes.
 6. Disconnect and reconnect the controller if the runtime permits it. Confirm the correct identity and mapping return.
 7. Export diagnostics. Confirm controller identity, mapping source, semantic events, and validation failure are present without private data.
-8. Confirm Grout shows the MagicX device blocker. Confirm PlayTime shows **Install** or **Adopt** with an experimental warning.
+8. Confirm Grout shows the MagicX device blocker. Confirm PlayTime shows **Install** or **Manage existing install** with an experimental warning.
 9. Install PlayTime, refresh game lists or reboot, and launch it. Track a game, close it, and relaunch it.
 10. Confirm the App Store reports PlayTime healthy. Damage only a disposable managed test copy if you test Repair; confirm Repair restores it and keeps `/userdata/system/configs/playtime/`.
-11. Uninstall PlayTime and confirm its managed files are gone while `/userdata/system/configs/playtime/` remains. If you used Adopt, confirm uncertain original files are restored from `/userdata/system/knulli-app-store/originals/io.github.unitreign.playtime/`.
+11. Uninstall PlayTime and confirm its managed files are gone while `/userdata/system/configs/playtime/` remains. If you managed an external copy and later repaired it, confirm uncertain original files are restored from `/userdata/system/knulli-app-store/originals/io.github.unitreign.playtime/`.
 
 The App Store log is `/userdata/system/logs/knulli-app-store.log`. Diagnostic exports are under `/userdata/system/knulli-app-store/diagnostics/`. Installed state and original-file backups are under `/userdata/system/knulli-app-store/`. If a test fails, stop the app, inspect the installed-state JSON, and restore a retained original to its recorded path. Do not send PlayTime data in a report.

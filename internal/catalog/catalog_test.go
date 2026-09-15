@@ -17,12 +17,14 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first.Packages) != 5 || len(second.Packages) != 5 {
-		t.Fatalf("expected five packages, got %d and %d", len(first.Packages), len(second.Packages))
+	if len(first.Packages) != 4 || len(second.Packages) != 4 {
+		t.Fatalf("expected four packages, got %d and %d", len(first.Packages), len(second.Packages))
 	}
 	approved := map[string]bool{
-		"app.romm.grout":               true,
-		"io.github.unitreign.playtime": true,
+		"app.romm.grout":                         true,
+		"io.github.misantronic.raofflineproxy":   true,
+		"io.github.tomtombombadil.pocketcurator": true,
+		"io.github.unitreign.playtime":           true,
 	}
 	experimental := 0
 	verified := 0

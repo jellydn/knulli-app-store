@@ -21,14 +21,21 @@ import (
 )
 
 type Manager struct {
-	Root        string
-	Platform    platform.Info
-	Client      *http.Client
-	Diagnostics *diagnostics.Log
+	Root          string
+	Platform      platform.Info
+	Client        *http.Client
+	RefreshClient *http.Client
+	RefreshURL    string
+	Diagnostics   *diagnostics.Log
+	Outcome       func(OperationOutcome)
 }
 
 func (m Manager) Install(ctx context.Context, pkg manifest.Package) error {
 	return m.apply(ctx, pkg, "install")
+}
+
+func (m Manager) Adopt(ctx context.Context, pkg manifest.Package) error {
+	return m.apply(ctx, pkg, "adopt")
 }
 
 func (m Manager) Update(ctx context.Context, pkg manifest.Package) error {
@@ -81,10 +88,10 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	if err != nil {
 		return err
 	}
-	if operation == "install" && old != nil {
+	if (operation == "install" || operation == "adopt") && old != nil {
 		return fmt.Errorf("package %s is already installed", pkg.ID)
 	}
-	if operation != "install" && old == nil {
+	if operation != "install" && operation != "adopt" && old == nil {
 		return fmt.Errorf("package %s is not installed", pkg.ID)
 	}
 	if operation == "repair" && (old.Manifest.Version != pkg.Version || old.Manifest.Release.SHA256 != pkg.Release.SHA256) {
@@ -111,6 +118,12 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 			return fmt.Errorf("inventory pre-existing installation: %w", err)
 		}
 		m.event("adoption_inventory", "package", pkg.ID, "files", fmt.Sprint(len(existing)), "bytes", fmt.Sprint(existingBytes))
+	}
+	if operation == "install" && len(existing) > 0 {
+		return fmt.Errorf("an external installation exists; use Manage existing install")
+	}
+	if operation == "adopt" && len(existing) == 0 {
+		return fmt.Errorf("no external installation was found; use Install")
 	}
 	available, err := safefs.AvailableBytes(destinationHost)
 	if err != nil {
@@ -166,20 +179,43 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 			}
 		}
 	}()
-	state, err := m.installFiles(tx, guard, pkg, old, files, existing)
+	var state Installed
+	if operation == "adopt" {
+		state, err = m.adoptFiles(tx, guard, pkg, files, existing)
+	} else {
+		state, err = m.installFiles(tx, guard, pkg, old, files)
+	}
 	if err != nil {
 		return err
 	}
 	m.event("backup_complete", "package", pkg.ID, "originals", fmt.Sprint(len(state.Originals)))
-	if old != nil && old.Manifest.Install.Menu != nil && !sameMenu(old.Manifest.Install.Menu, pkg.Install.Menu) {
-		if err := applyMenu(tx, guard, *old.Manifest.Install.Menu, true); err != nil {
-			return err
+	gameListChanged := false
+	if old != nil && old.MenuOwned && old.Manifest.Install.Menu != nil && !sameMenu(old.Manifest.Install.Menu, pkg.Install.Menu) {
+		changed, menuErr := removeMenu(tx, guard, *old.Manifest.Install.Menu)
+		if menuErr != nil {
+			return menuErr
 		}
+		gameListChanged = gameListChanged || changed
 	}
 	if pkg.Install.Menu != nil {
-		if err := applyMenu(tx, guard, *pkg.Install.Menu, false); err != nil {
-			return err
+		if old != nil && old.MenuOwned && old.Manifest.Install.Menu != nil && sameMenu(old.Manifest.Install.Menu, pkg.Install.Menu) {
+			changed, menuErr := replaceMenu(tx, guard, *old.Manifest.Install.Menu, *pkg.Install.Menu)
+			if menuErr != nil {
+				return menuErr
+			}
+			state.MenuOwned = changed
+			gameListChanged = gameListChanged || changed
+		} else {
+			owned, menuErr := addMenu(tx, guard, *pkg.Install.Menu)
+			if menuErr != nil {
+				return menuErr
+			}
+			state.MenuOwned = owned
+			gameListChanged = gameListChanged || owned
 		}
+	}
+	if old != nil && old.MenuOwned && pkg.Install.Menu == nil {
+		state.MenuOwned = false
 	}
 	stateData, err := encodeState(state)
 	if err != nil {
@@ -191,16 +227,13 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+	m.reportOutcome(ctx, gameListChanged)
 	m.event("operation_complete", "package", pkg.ID, "action", operation)
 	return nil
 }
 
-func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg manifest.Package, old *Installed, files []storearchive.File, existing []existingFile) (Installed, error) {
+func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg manifest.Package, old *Installed, files []storearchive.File) (Installed, error) {
 	state := Installed{Schema: "org.knulli.app-store/installed-state/v1", Manifest: pkg, Originals: make(map[string]string)}
-	releaseHashes := make(map[string]string, len(files))
-	for _, file := range files {
-		releaseHashes[path.Join(pkg.Install.Destination, file.Relative)] = file.SHA256
-	}
 	oldTracked := make(map[string]bool)
 	if old != nil {
 		for key, value := range old.Originals {
@@ -209,27 +242,6 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 		for _, file := range old.Files {
 			oldTracked[file.Path] = true
 		}
-	}
-	adoptedOwned := make(map[string]bool)
-	for _, file := range existing {
-		if releaseHashes[file.Virtual] == file.SHA256 {
-			adoptedOwned[file.Virtual] = true
-			continue
-		}
-		backup := originalPath(pkg.ID, file.Virtual)
-		backupHost, err := guard.Resolve(backup)
-		if err != nil {
-			return Installed{}, err
-		}
-		if _, err := os.Stat(backupHost); err == nil {
-			return Installed{}, fmt.Errorf("adoption backup already exists for %s; move the existing package aside before retrying", file.Virtual)
-		} else if !os.IsNotExist(err) {
-			return Installed{}, err
-		}
-		if err := tx.Copy(file.Host, backup, file.Mode); err != nil {
-			return Installed{}, err
-		}
-		state.Originals[file.Virtual] = backup
 	}
 	newPaths := make(map[string]bool)
 	for _, file := range files {
@@ -252,7 +264,7 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 				return Installed{}, err
 			}
 		}
-		if !oldTracked[virtual] && !adoptedOwned[virtual] {
+		if !oldTracked[virtual] {
 			if info, err := os.Stat(host); err == nil {
 				backup := originalPath(pkg.ID, virtual)
 				if _, exists := state.Originals[virtual]; !exists {
@@ -304,7 +316,58 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 	return state, nil
 }
 
-func (m Manager) Uninstall(id string) (result error) {
+func (m Manager) adoptFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg manifest.Package, files []storearchive.File, existing []existingFile) (Installed, error) {
+	state := Installed{Schema: "org.knulli.app-store/installed-state/v1", Manifest: pkg, Originals: make(map[string]string)}
+	existingByPath := make(map[string]existingFile, len(existing))
+	for _, file := range existing {
+		existingByPath[file.Virtual] = file
+	}
+	for _, releaseFile := range files {
+		virtual := path.Join(pkg.Install.Destination, releaseFile.Relative)
+		existingFile, found := existingByPath[virtual]
+		preserved := isPreserved(releaseFile.Relative, pkg.Install.Preserve)
+		managed := found && existingFile.SHA256 == releaseFile.SHA256 && existingFile.Mode.Perm() == releaseFile.Mode.Perm() && !preserved
+		if found && !managed {
+			if err := backupExisting(tx, guard, pkg.ID, existingFile, &state); err != nil {
+				return Installed{}, err
+			}
+		}
+		state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: releaseFile.SHA256, Mode: uint32(releaseFile.Mode.Perm()), Preserved: preserved, Unmanaged: !managed})
+		delete(existingByPath, virtual)
+	}
+	for _, file := range existingByPath {
+		if err := backupExisting(tx, guard, pkg.ID, file, &state); err != nil {
+			return Installed{}, err
+		}
+	}
+	sort.Slice(state.Files, func(i, j int) bool { return state.Files[i].Path < state.Files[j].Path })
+	m.event("adoption_complete", "package", pkg.ID, "managed_files", fmt.Sprint(len(state.Files)), "backups", fmt.Sprint(len(state.Originals)))
+	return state, nil
+}
+
+func backupExisting(tx *safefs.Transaction, guard *safefs.Guard, id string, file existingFile, state *Installed) error {
+	backup := originalPath(id, file.Virtual)
+	backupHost, err := guard.Resolve(backup)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(backupHost); err == nil {
+		return fmt.Errorf("adoption backup already exists for %s; move the existing package aside before retrying", file.Virtual)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if err := tx.Copy(file.Host, backup, file.Mode); err != nil {
+		return err
+	}
+	state.Originals[file.Virtual] = backup
+	return nil
+}
+
+func (m Manager) Uninstall(id string) error {
+	return m.UninstallContext(context.Background(), id)
+}
+
+func (m Manager) UninstallContext(ctx context.Context, id string) (result error) {
 	m.event("operation_start", "package", id, "action", "uninstall")
 	defer func() {
 		if result != nil {
@@ -356,10 +419,8 @@ func (m Manager) Uninstall(id string) (result error) {
 			}
 		}
 	}()
-	owned := make(map[string]bool, len(state.Files))
 	for _, file := range state.Files {
-		owned[file.Path] = true
-		if file.Preserved {
+		if file.Preserved || file.Unmanaged {
 			continue
 		}
 		if backup, exists := state.Originals[file.Path]; exists {
@@ -378,26 +439,13 @@ func (m Manager) Uninstall(id string) (result error) {
 			return err
 		}
 	}
-	for target, backup := range state.Originals {
-		if owned[target] || isPreservedTarget(target, state.Manifest.Install.Destination, state.Manifest.Install.Preserve) {
-			continue
+	gameListChanged := false
+	if state.MenuOwned && state.Manifest.Install.Menu != nil {
+		changed, menuErr := removeMenu(tx, guard, *state.Manifest.Install.Menu)
+		if menuErr != nil {
+			return menuErr
 		}
-		backupHost, err := guard.Resolve(backup)
-		if err != nil {
-			return err
-		}
-		info, err := os.Stat(backupHost)
-		if err != nil {
-			return err
-		}
-		if err := tx.Copy(backupHost, target, info.Mode()); err != nil {
-			return err
-		}
-	}
-	if state.Manifest.Install.Menu != nil {
-		if err := applyMenu(tx, guard, *state.Manifest.Install.Menu, true); err != nil {
-			return err
-		}
+		gameListChanged = changed
 	}
 	for _, backup := range state.Originals {
 		if err := tx.Remove(backup); err != nil {
@@ -410,6 +458,7 @@ func (m Manager) Uninstall(id string) (result error) {
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+	m.reportOutcome(ctx, gameListChanged)
 	m.event("operation_complete", "package", id, "action", "uninstall")
 	return nil
 }
@@ -495,33 +544,43 @@ func isPreserved(relative string, preserved []string) bool {
 	return false
 }
 
-func isPreservedTarget(target, destination string, preserved []string) bool {
-	prefix := strings.TrimSuffix(destination, "/") + "/"
-	if !strings.HasPrefix(target, prefix) {
-		return false
-	}
-	return isPreserved(strings.TrimPrefix(target, prefix), preserved)
+func addMenu(tx *safefs.Transaction, guard *safefs.Guard, menu manifest.Menu) (bool, error) {
+	return changeMenu(tx, guard, menu.Gamelist, func(data []byte) ([]byte, bool, error) {
+		return addMenuEntry(data, menu)
+	})
 }
 
-func applyMenu(tx *safefs.Transaction, guard *safefs.Guard, menu manifest.Menu, remove bool) error {
-	host, err := guard.Resolve(menu.Gamelist)
+func replaceMenu(tx *safefs.Transaction, guard *safefs.Guard, oldMenu, newMenu manifest.Menu) (bool, error) {
+	return changeMenu(tx, guard, newMenu.Gamelist, func(data []byte) ([]byte, bool, error) {
+		return replaceOwnedMenuEntry(data, oldMenu, newMenu)
+	})
+}
+
+func removeMenu(tx *safefs.Transaction, guard *safefs.Guard, menu manifest.Menu) (bool, error) {
+	return changeMenu(tx, guard, menu.Gamelist, func(data []byte) ([]byte, bool, error) {
+		return removeOwnedMenuEntry(data, menu)
+	})
+}
+
+func changeMenu(tx *safefs.Transaction, guard *safefs.Guard, gamelist string, change func([]byte) ([]byte, bool, error)) (bool, error) {
+	host, err := guard.Resolve(gamelist)
 	if err != nil {
-		return err
+		return false, err
 	}
 	data, err := os.ReadFile(host)
 	if err != nil {
-		if remove && os.IsNotExist(err) {
-			return nil
-		}
 		if !os.IsNotExist(err) {
-			return err
+			return false, err
 		}
 	}
-	updated, err := updateGamelist(data, menu, remove)
+	updated, changed, err := change(data)
 	if err != nil {
-		return err
+		return false, err
 	}
-	return tx.Write(menu.Gamelist, updated, 0644)
+	if !changed {
+		return false, nil
+	}
+	return true, tx.Write(gamelist, updated, 0644)
 }
 
 func originalPath(id, target string) string {

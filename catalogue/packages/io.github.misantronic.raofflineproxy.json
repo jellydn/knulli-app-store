@@ -2,15 +2,20 @@
   "schema": "org.knulli.app-store/package-manifest/v1",
   "id": "io.github.misantronic.raofflineproxy",
   "name": "RAOfflineProxy",
+  "version": "1.13.0-alpha1",
   "type": "integration",
   "summary": "Provides an offline RetroAchievements proxy for supported emulators.",
   "repository": "https://github.com/misantronic/RAOfflineProxy",
   "license": "GPL-3.0-only",
   "review": {
     "status": "candidate",
+    "approval": {
+      "provenance": "community"
+    },
     "notes": [
-      "The current Knulli asset is a remote install script and has no publisher-provided checksum; unrestricted scripts are not accepted.",
-      "A reviewable archive, exact write paths, H700 compatibility, and real-device testing are required."
+      "User-approved for review, but blocked: the Knulli asset is a self-extracting shell installer instead of a supported ZIP or tar.gz archive.",
+      "The built-in updater downloads and executes a selected shell asset without checksum verification. It cannot bypass App Store transactions.",
+      "The GitHub asset is 510188 bytes with API digest cd3e8b2eb891751b7f80463e9cbcc5b9065668d26a20c14acf2d8f63191fcda3, but exact extracted size, complete writes, dependency ABI, and device evidence remain unresolved."
     ],
     "evidence": [
       {
@@ -20,7 +25,12 @@
       {
         "kind": "tagged-release",
         "url": "https://github.com/misantronic/RAOfflineProxy/releases/tag/v1.13.0-alpha1",
-        "note": "Alpha release observed during candidate review; not approved for installation."
+        "note": "Alpha release observed during review. GitHub reports the release as mutable; it is not approved for installation."
+      },
+      {
+        "kind": "license",
+        "url": "https://github.com/misantronic/RAOfflineProxy/blob/main/LICENSE",
+        "note": "GPL-3.0 license reviewed."
       }
     ]
   }

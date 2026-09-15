@@ -17,7 +17,7 @@ Upstream package code runs later when the user launches it. The installer does n
 ## Installer controls
 
 - Reject candidate manifests and unknown manifest fields.
-- Match firmware, minimum version, architecture, H700 device family, and resolution before download.
+- Match firmware, minimum version, architecture, approved device, and resolution before download.
 - Accept only HTTPS, version-pinned release URLs and require exact compressed size and SHA-256.
 - Limit compressed and installed size to 512 MiB and check free space before download.
 - Stage extraction before package writes.
@@ -30,11 +30,12 @@ Upstream package code runs later when the user launches it. The installer does n
 - Atomically replace regular files and installed state.
 - Snapshot every changed file and roll back a failed operation in reverse order.
 - Keep a persistent backup when installation overwrites a file the package did not own.
-- Inventory unmanaged package directories before adoption. Exact release-hash matches can become manager-owned; changed and unknown files are backed up because ownership is not proven.
+- Show a detected external copy as **Manage existing install**, then inventory it before adoption. Exact release-hash matches can become manager-owned; changed and unknown files are marked unmanaged and backed up because ownership is not proven.
 - Preserve declared configuration during repair, update, and uninstall.
 - Track installed paths, hashes, modes, and original-file backups.
 - Redact URL credentials, query strings, fragments, and common secret fields from diagnostic logs. Cap the active log at 512 KiB and retain one rotated copy.
-- Parse and rewrite `gamelist.xml` as XML while retaining unknown elements.
+- Parse and rewrite `gamelist.xml` as XML while retaining unknown elements. Add only an absent exact launch path. Remove only an unchanged entry that manager state proves the installer created.
+- Ask Knulli's loopback `/reloadgames` endpoint to queue a live refresh after a committed menu change. Report **Restart required** if the request is not accepted; never claim that the refresh completed.
 
 ## Non-goals and residual risks
 

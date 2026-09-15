@@ -17,7 +17,52 @@ type xmlNode struct {
 	Children []*xmlNode
 }
 
-func updateGamelist(data []byte, menu manifest.Menu, remove bool) ([]byte, error) {
+func addMenuEntry(data []byte, menu manifest.Menu) ([]byte, bool, error) {
+	root, err := parseGamelist(data)
+	if err != nil {
+		return nil, false, err
+	}
+	for _, child := range root.Children {
+		if child.Name.Local == "game" && childValue(child, "path") == menu.Path {
+			return data, false, nil
+		}
+	}
+	root.Children = append(root.Children, menuNode(menu))
+	output, err := encodeGamelist(root)
+	return output, err == nil, err
+}
+
+func replaceOwnedMenuEntry(data []byte, oldMenu, newMenu manifest.Menu) ([]byte, bool, error) {
+	root, err := parseGamelist(data)
+	if err != nil {
+		return nil, false, err
+	}
+	for index, child := range root.Children {
+		if menuNodeMatches(child, oldMenu) {
+			root.Children[index] = menuNode(newMenu)
+			output, encodeErr := encodeGamelist(root)
+			return output, encodeErr == nil, encodeErr
+		}
+	}
+	return data, false, nil
+}
+
+func removeOwnedMenuEntry(data []byte, menu manifest.Menu) ([]byte, bool, error) {
+	root, err := parseGamelist(data)
+	if err != nil {
+		return nil, false, err
+	}
+	for index, child := range root.Children {
+		if menuNodeMatches(child, menu) {
+			root.Children = append(root.Children[:index], root.Children[index+1:]...)
+			output, encodeErr := encodeGamelist(root)
+			return output, encodeErr == nil, encodeErr
+		}
+	}
+	return data, false, nil
+}
+
+func parseGamelist(data []byte) (*xmlNode, error) {
 	root := &xmlNode{Name: xml.Name{Local: "gameList"}}
 	if len(bytes.TrimSpace(data)) > 0 {
 		decoder := xml.NewDecoder(bytes.NewReader(data))
@@ -40,25 +85,26 @@ func updateGamelist(data []byte, menu manifest.Menu, remove bool) ([]byte, error
 			return nil, fmt.Errorf("parse gamelist: %w", err)
 		}
 	}
-	filtered := root.Children[:0]
-	for _, child := range root.Children {
-		if child.Name.Local == "game" && childValue(child, "path") == menu.Path {
-			continue
-		}
-		filtered = append(filtered, child)
+	return root, nil
+}
+
+func menuNode(menu manifest.Menu) *xmlNode {
+	game := &xmlNode{Name: xml.Name{Local: "game"}}
+	game.Children = append(game.Children,
+		&xmlNode{Name: xml.Name{Local: "path"}, Text: menu.Path},
+		&xmlNode{Name: xml.Name{Local: "name"}, Text: menu.Name},
+	)
+	if menu.Description != "" {
+		game.Children = append(game.Children, &xmlNode{Name: xml.Name{Local: "desc"}, Text: menu.Description})
 	}
-	root.Children = filtered
-	if !remove {
-		game := &xmlNode{Name: xml.Name{Local: "game"}}
-		game.Children = append(game.Children,
-			&xmlNode{Name: xml.Name{Local: "path"}, Text: menu.Path},
-			&xmlNode{Name: xml.Name{Local: "name"}, Text: menu.Name},
-		)
-		if menu.Description != "" {
-			game.Children = append(game.Children, &xmlNode{Name: xml.Name{Local: "desc"}, Text: menu.Description})
-		}
-		root.Children = append(root.Children, game)
-	}
+	return game
+}
+
+func menuNodeMatches(node *xmlNode, menu manifest.Menu) bool {
+	return node.Name.Local == "game" && childValue(node, "path") == menu.Path && childValue(node, "name") == menu.Name && childValue(node, "desc") == menu.Description
+}
+
+func encodeGamelist(root *xmlNode) ([]byte, error) {
 	var output bytes.Buffer
 	output.WriteString(xml.Header)
 	encoder := xml.NewEncoder(&output)

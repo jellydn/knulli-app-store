@@ -20,6 +20,7 @@ Usage:
   knulli-app validate MANIFEST
   knulli-app catalogue [-dir catalogue/packages] [-output build/catalog-index.json]
   knulli-app install [platform flags] MANIFEST
+  knulli-app adopt [platform flags] MANIFEST
   knulli-app update [platform flags] MANIFEST
   knulli-app repair [platform flags] MANIFEST
   knulli-app uninstall [-root /] PACKAGE_ID
@@ -70,7 +71,7 @@ func run(arguments []string) error {
 		}
 		fmt.Fprintf(os.Stderr, "wrote %d packages to %s\n", len(index.Packages), *output)
 		return nil
-	case "install", "update", "repair":
+	case "install", "adopt", "update", "repair":
 		return runApply(arguments[0], arguments[1:])
 	case "uninstall":
 		flags := flag.NewFlagSet("uninstall", flag.ContinueOnError)
@@ -86,10 +87,13 @@ func run(arguments []string) error {
 			return fmt.Errorf("open diagnostics log: %w", err)
 		}
 		diagnosticLog.Event("startup", "component", "cli", "command", "uninstall")
-		if err := (installer.Manager{Root: *root, Diagnostics: diagnosticLog}).Uninstall(flags.Arg(0)); err != nil {
+		outcome := installer.OperationOutcome{}
+		manager := installer.Manager{Root: *root, Diagnostics: diagnosticLog, Outcome: func(value installer.OperationOutcome) { outcome = value }}
+		if err := manager.UninstallContext(context.Background(), flags.Arg(0)); err != nil {
 			return err
 		}
 		fmt.Printf("uninstalled %s\n", flags.Arg(0))
+		printGameListOutcome(outcome)
 		return nil
 	default:
 		return fmt.Errorf("unknown command %q", arguments[0])
@@ -139,10 +143,13 @@ func runApply(operation string, arguments []string) error {
 		diagnosticLog.Event("platform_detection_incomplete", "error", err.Error())
 		return err
 	}
-	manager := installer.Manager{Root: *root, Platform: current, Diagnostics: diagnosticLog}
+	outcome := installer.OperationOutcome{}
+	manager := installer.Manager{Root: *root, Platform: current, Diagnostics: diagnosticLog, Outcome: func(value installer.OperationOutcome) { outcome = value }}
 	switch operation {
 	case "install":
 		err = manager.Install(context.Background(), pkg)
+	case "adopt":
+		err = manager.Adopt(context.Background(), pkg)
 	case "update":
 		err = manager.Update(context.Background(), pkg)
 	case "repair":
@@ -152,7 +159,16 @@ func runApply(operation string, arguments []string) error {
 		return err
 	}
 	fmt.Printf("%s completed for %s %s\n", operation, pkg.ID, pkg.Version)
+	printGameListOutcome(outcome)
 	return nil
+}
+
+func printGameListOutcome(outcome installer.OperationOutcome) {
+	if outcome.GameListRefreshAccepted {
+		fmt.Println("game list refresh accepted")
+	} else if outcome.RestartRequired {
+		fmt.Println("restart required to update game list")
+	}
 }
 
 func override(target *string, value string) {

@@ -2,6 +2,8 @@
 
 ## Package changes
 
+Read [How to add a package](docs/how-to-add-a-package.md) before you open a package pull request.
+
 1. Open an issue that identifies the upstream repository and the package owner.
 2. Add or update one file in `catalogue/packages/`.
 3. Attach evidence for the license, immutable release asset, publisher checksum, Knulli compatibility, install paths, preserved files, network use, and every write path.
@@ -25,5 +27,7 @@ git diff --exit-code -- build/catalog-index.json
 ```
 
 Generated build output is not committed. Review the generated index locally and sign it only in trusted release automation.
+
+The weekly release checker has read-only repository access. It downloads GitHub release metadata only and uploads a review report. It does not download assets, edit manifests, approve updates, open issues, or merge changes. `GITHUB_TOKEN` is optional for local use and increases the GitHub API rate limit; never put it in a report.
 
 Comments must explain a design reason that the code cannot make clear by itself.

@@ -156,7 +156,9 @@ func (m *Model) start(ctx context.Context) {
 	m.Error = ""
 	m.Message = "Starting " + string(action)
 	go func() {
+		completion := actionName(action) + " completed"
 		err := m.backend.Execute(ctx, item.Package.ID, action, func(message string) {
+			completion = message
 			select {
 			case m.events <- operationEvent{message: message}:
 			case <-ctx.Done():
@@ -166,7 +168,7 @@ func (m *Model) start(ctx context.Context) {
 		if err == nil {
 			items, err = m.backend.Items(ctx)
 		}
-		message := actionName(action) + " completed"
+		message := completion
 		if err != nil {
 			message = fmt.Sprintf("%s failed", actionName(action))
 		}

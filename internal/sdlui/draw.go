@@ -281,6 +281,10 @@ func drawDetails(frame *image.RGBA, model *storeui.Model, controls *storeinput.S
 	y = drawWrapped(frame, 258, y, compatibilityColor(item), item.Compatibility, 48, 4)
 	notice := item.HealthReason
 	noticeColor := palette.error
+	if notice == "" && item.PreExisting {
+		notice = "Lists files; no reinstall. Records safe ownership and backs up unknown files."
+		noticeColor = palette.warning
+	}
 	if notice == "" && item.Package.Install != nil {
 		notice = item.Package.Install.Warning
 		noticeColor = palette.warning
@@ -320,7 +324,7 @@ func installState(item appstore.Item) string {
 		return "INSTALLED"
 	}
 	if item.PreExisting {
-		return "ADOPT"
+		return "EXTERNAL"
 	}
 	if item.Compatible && item.Package.Installable() {
 		return "AVAILABLE"
@@ -387,7 +391,7 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item, co
 	text(frame, 258, y-14, palette.muted, "ACTIONS")
 	x := 258
 	for index, action := range item.Actions {
-		label := " " + strings.ToUpper(string(action)) + " "
+		label := " " + strings.ToUpper(actionLabel(action)) + " "
 		background := palette.selected
 		if model.Focus != storeui.Browse && index == model.Action {
 			background = palette.accent
@@ -402,7 +406,7 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item, co
 		if item.Package.Install != nil && item.Package.Install.Warning != "" && (action == appstore.Install || action == appstore.Adopt) {
 			fill(frame, image.Rect(250, 108, 616, 318), color.RGBA{R: 35, G: 46, B: 64, A: 255})
 			text(frame, 266, 132, trustColor(item), "PACKAGE NOTICE  |  "+trustLabel(item))
-			text(frame, 266, 151, palette.text, strings.ToUpper(string(action))+" "+shorten(strings.ToUpper(item.Package.Name), 24)+"?")
+			text(frame, 266, 151, palette.text, strings.ToUpper(actionLabel(action))+" "+shorten(strings.ToUpper(item.Package.Name), 24)+"?")
 			warning := strings.ToUpper(item.Package.Install.Warning)
 			for index, line := range wrapText(warning, 40) {
 				if index == 2 {
@@ -414,10 +418,17 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item, co
 		} else {
 			fill(frame, image.Rect(286, 126, 580, 214), color.RGBA{R: 35, G: 46, B: 64, A: 255})
 			text(frame, 304, 153, palette.warning, "CONFIRM PACKAGE CHANGE")
-			text(frame, 304, 176, palette.text, strings.ToUpper(string(action))+" "+shorten(strings.ToUpper(item.Package.Name), 24)+"?")
+			text(frame, 304, 176, palette.text, strings.ToUpper(actionLabel(action))+" "+shorten(strings.ToUpper(item.Package.Name), 24)+"?")
 			text(frame, 304, 199, palette.muted, confirmationHelp(controls))
 		}
 	}
+}
+
+func actionLabel(action appstore.Action) string {
+	if action == appstore.Adopt {
+		return "Manage existing"
+	}
+	return string(action)
 }
 
 func confirmationHelp(controls *storeinput.Session) string {

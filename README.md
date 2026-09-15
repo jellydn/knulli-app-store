@@ -4,7 +4,7 @@
 
 [Knulli App Store](https://github.com/jellydn/knulli-app-store) is a safe community package manager for [Knulli](https://knulli.org/) utilities, themes, and integrations. It has a reviewable catalogue, a transactional installer, and a controller-only SDL2 interface.
 
-The catalogue currently has five packages. [Grout 5.1.0.0](https://github.com/rommapp/grout) is verified only on TrimUI Smart Pro. [PlayTime 1.0.0](https://github.com/unitreign/playtime) has a successful Smart Pro report but stays experimental because MagicX Zero 28 is not yet package-tested.
+The catalogue has four packages. [Grout 5.1.0.0](https://github.com/rommapp/grout) is verified only on TrimUI Smart Pro. [PlayTime 1.0.0](https://github.com/unitreign/playtime) has a successful Smart Pro report but stays experimental because MagicX Zero 28 is not yet package-tested. [RAOfflineProxy](https://github.com/misantronic/RAOfflineProxy) and [PocketCurator](https://github.com/tomtombombadil/PocketCurator) are approved for future tests but are blocked until their technical review is complete.
 
 ## Why
 
@@ -12,7 +12,7 @@ Package operations can damage user data. The installer verifies immutable releas
 
 ## How
 
-Download the newest device build from [GitHub Actions](https://github.com/jellydn/knulli-app-store/actions/workflows/check.yml), then follow the [TrimUI Smart Pro](docs/trimui-smart-pro.md) or [MagicX Zero 28](docs/magicx-zero-28.md) installation guide. Package evidence is in the [manifest review guide](docs/manifest-review.md) and [real-device test record](docs/real-device-tests.md).
+Download the newest device build from [GitHub Actions](https://github.com/jellydn/knulli-app-store/actions/workflows/check.yml), then follow the [TrimUI Smart Pro](docs/trimui-smart-pro.md) or [MagicX Zero 28](docs/magicx-zero-28.md) installation guide. Package evidence is in the [review guide](docs/manifest-review.md) and [real-device test record](docs/real-device-tests.md). Contributors can use [How to add a package](docs/how-to-add-a-package.md).
 
 ## Current scope
 
@@ -68,17 +68,16 @@ The installer never runs remote install scripts. It only copies regular files fr
 
 ## Catalogue status
 
-The catalogue contains one verified package, one experimental package, and three non-actionable candidates. Community approval records provenance separately from technical and real-device status.
+The catalogue contains one verified package, one experimental package, and two approved but non-actionable candidates. Community approval records provenance separately from technical and real-device status.
 
 | Package | Status | Remaining blocker |
 | --- | --- | --- |
 | PlayTime 1.0.0 | Smart Pro tested; MagicX experimental | The Smart Pro report did not itemize lifecycle steps; no MagicX package result |
 | Grout 5.1.0.0 | Verified on Smart Pro | The report was positive but did not itemize lifecycle steps; built-in updater must not be used |
-| RAOfflineProxy | Not approved | Knulli asset is an unrestricted install script with no publisher checksum |
-| ETK Tool | Not approved | Release is script-based; system-space behavior is outside the initial policy |
-| PocketCurator | Not approved | A checksum exists, but the repository has no declared license; paths and device behavior are not tested |
+| RAOfflineProxy v1.13.0-alpha1 | Approved; blocked | The Knulli asset is a self-extracting script; supported archive, extracted size, dependencies, narrow writes, and updater safety are unresolved |
+| PocketCurator v1.1.2 | Approved; blocked | The release is mutable; extracted inventory/size, narrow ROM and game-list writes, updater safety, and exact Knulli evidence are unresolved |
 
-These notes record evidence reviewed on 2026-09-15. Upstream facts can change. Follow the [manifest review workflow](docs/manifest-review.md) before promotion.
+These notes record evidence reviewed on 2026-09-15. Upstream facts can change. The weekly [catalogue update check](https://github.com/jellydn/knulli-app-store/actions/workflows/catalogue-updates.yml) reports metadata changes for manual review; it never edits or approves a package. Follow the [manifest review workflow](docs/manifest-review.md) before promotion.
 
 ## Experimental device GUI
 

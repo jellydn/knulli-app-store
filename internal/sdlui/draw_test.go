@@ -41,6 +41,9 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		},
 		DeviceTested: true, Compatible: true, Compatibility: "Experimental compatibility on this device; no minimum version is claimed", Actions: []appstore.Action{appstore.Install},
 	}
+	external := experimental
+	external.PreExisting = true
+	external.Actions = []appstore.Action{appstore.Adopt}
 	incompatible := experimental
 	incompatible.Compatible = false
 	incompatible.Actions = nil
@@ -55,6 +58,8 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		"installed-healthy":   {Items: []appstore.Item{verified}},
 		"verified":            {Items: []appstore.Item{verified}, Focus: storeui.Actions},
 		"experimental":        {Items: []appstore.Item{experimental}, Focus: storeui.Actions},
+		"external":            {Items: []appstore.Item{external}, Focus: storeui.Actions},
+		"external-confirm":    {Items: []appstore.Item{external}, Focus: storeui.Confirm},
 		"issue":               {Items: []appstore.Item{issue}},
 		"issue-details":       {Items: []appstore.Item{issue}, Focus: storeui.Actions},
 		"compatibility-error": {Items: []appstore.Item{incompatible}, Focus: storeui.Actions},
@@ -117,6 +122,9 @@ func TestCompactLabelsAndRequiredNotices(t *testing.T) {
 	}
 	if got := installState(appstore.Item{Package: verified, Installed: true, Healthy: false}); got != "ISSUE" {
 		t.Fatalf("unhealthy install label = %q", got)
+	}
+	if got := installState(appstore.Item{Package: experimental, PreExisting: true}); got != "EXTERNAL" || actionLabel(appstore.Adopt) != "Manage existing" {
+		t.Fatalf("external install labels are not concise: state=%q action=%q", got, actionLabel(appstore.Adopt))
 	}
 	for _, pkg := range []manifest.Package{verified, experimental} {
 		if pkg.Install.Warning == "" || len(wrapText(strings.ToUpper(pkg.Install.Warning), 40)) > 2 {

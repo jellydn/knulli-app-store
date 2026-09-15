@@ -113,24 +113,27 @@ func (s *Service) Execute(ctx context.Context, id string, action Action, progres
 	message := operationMessage(action, entry.Package.Name)
 	progress(message)
 	s.manager.Diagnostics.Event("action_selected", "package", id, "action", string(action))
+	manager := s.manager
+	outcome := installer.OperationOutcome{}
+	manager.Outcome = func(value installer.OperationOutcome) { outcome = value }
 	switch action {
 	case Install:
-		err = s.manager.Install(ctx, entry.Package)
+		err = manager.Install(ctx, entry.Package)
 	case Adopt:
-		err = s.manager.Install(ctx, entry.Package)
+		err = manager.Adopt(ctx, entry.Package)
 	case Update:
-		err = s.manager.Update(ctx, entry.Package)
+		err = manager.Update(ctx, entry.Package)
 	case Repair:
-		err = s.manager.Repair(ctx, entry.Package)
+		err = manager.Repair(ctx, entry.Package)
 	case Uninstall:
-		err = s.manager.Uninstall(id)
+		err = manager.UninstallContext(ctx, id)
 	default:
 		return fmt.Errorf("unknown action %q", action)
 	}
 	if err != nil {
 		return err
 	}
-	progress("Completed " + string(action))
+	progress(completionMessage(action, outcome))
 	return nil
 }
 
@@ -197,12 +200,34 @@ func actions(item Item) []Action {
 
 func operationMessage(action Action, name string) string {
 	if action == Adopt {
-		return "Backing up existing " + name + " and installing reviewed release"
+		return "Inventorying and backing up existing " + name
 	}
 	if action == Install || action == Update || action == Repair {
 		return "Downloading, verifying, and applying " + name
 	}
 	return "Removing managed files and restoring backups for " + name
+}
+
+func completionMessage(action Action, outcome installer.OperationOutcome) string {
+	message := actionLabel(action) + " completed"
+	if outcome.GameListRefreshAccepted {
+		return message + "; game list refresh requested"
+	}
+	if outcome.RestartRequired {
+		return message + "; restart required to update game list"
+	}
+	return message
+}
+
+func actionLabel(action Action) string {
+	if action == Adopt {
+		return "Manage existing install"
+	}
+	value := string(action)
+	if value == "" {
+		return "Action"
+	}
+	return strings.ToUpper(value[:1]) + value[1:]
 }
 
 func containsAction(actions []Action, wanted Action) bool {

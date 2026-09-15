@@ -31,8 +31,8 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 5 {
-		t.Fatalf("expected five catalogue items, got %d", len(items))
+	if len(items) != 4 {
+		t.Fatalf("expected four catalogue items, got %d", len(items))
 	}
 	experimental := 0
 	verified := 0
@@ -172,6 +172,15 @@ func TestActionsReflectInstallStateAndHealth(t *testing.T) {
 	assertActions(t, actions(item), Update, Uninstall, Repair)
 	item.Compatible = false
 	assertActions(t, actions(item), Uninstall)
+}
+
+func TestCompletionMessageReportsRefreshOrRestartPrecisely(t *testing.T) {
+	if got := completionMessage(Uninstall, installer.OperationOutcome{GameListRefreshAccepted: true}); got != "Uninstall completed; game list refresh requested" {
+		t.Fatalf("refresh message = %q", got)
+	}
+	if got := completionMessage(Adopt, installer.OperationOutcome{RestartRequired: true}); got != "Manage existing install completed; restart required to update game list" {
+		t.Fatalf("restart message = %q", got)
+	}
 }
 
 func assertActions(t *testing.T, got []Action, wanted ...Action) {

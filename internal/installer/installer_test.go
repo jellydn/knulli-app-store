@@ -21,7 +21,7 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
 
-func TestInstallRepairUpdateAndUninstallEndToEnd(t *testing.T) {
+func TestManageExistingRepairUpdateAndUninstallEndToEnd(t *testing.T) {
 	root := t.TempDir()
 	diagnosticLog, err := diagnostics.Open(root)
 	if err != nil {
@@ -59,12 +59,16 @@ func TestInstallRepairUpdateAndUninstallEndToEnd(t *testing.T) {
 
 	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server), Diagnostics: diagnosticLog}
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", v1, "1.0.0")
-	if err := manager.Install(context.Background(), pkg); err != nil {
+	if err := manager.Adopt(context.Background(), pkg); err != nil {
 		t.Fatal(err)
 	}
 	status, err := manager.Status(pkg.ID)
-	if err != nil || !status.Installed || !status.Healthy {
-		t.Fatalf("unexpected installed status: %#v, %v", status, err)
+	if err != nil || !status.Installed || status.Healthy {
+		t.Fatalf("changed external files should need repair after management: %#v, %v", status, err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "original launcher")
+	if err := manager.Repair(context.Background(), pkg); err != nil {
+		t.Fatal(err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "version one")
 	assertRootFile(t, root, "userdata/roms/tools/demo/config.ini", "user configuration")
@@ -120,12 +124,122 @@ func TestFailedGamelistUpdateRollsBackFiles(t *testing.T) {
 	defer server.Close()
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
 	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
-	if err := manager.Install(context.Background(), pkg); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
+	if err := manager.Adopt(context.Background(), pkg); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
 		t.Fatalf("expected gamelist failure, got %v", err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "original")
 	assertMissing(t, root, "userdata/system/knulli-app-store/installed/org.example.demo.json")
 	assertMissing(t, root, strings.TrimPrefix(originalPath(pkg.ID, "/userdata/roms/tools/demo/launch.sh"), "/"))
+}
+
+func TestUninstallRemovesOwnedMenuEntryAndRefreshesGameList(t *testing.T) {
+	root := t.TempDir()
+	asset := zipBytes(t, map[string]string{"launch.sh": "managed"})
+	assetServer := serveAsset(t, asset)
+	defer assetServer.Close()
+	refreshCalls := 0
+	refreshServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		refreshCalls++
+		if request.Method != http.MethodGet || request.URL.Path != "/reloadgames" {
+			t.Fatalf("unexpected refresh request: %s %s", request.Method, request.URL.Path)
+		}
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	defer refreshServer.Close()
+	var outcomes []OperationOutcome
+	manager := Manager{
+		Root: root, Platform: testPlatform(), Client: rewriteClient(t, assetServer),
+		RefreshClient: refreshServer.Client(), RefreshURL: refreshServer.URL + "/reloadgames",
+		Outcome: func(outcome OperationOutcome) { outcomes = append(outcomes, outcome) },
+	}
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	if err := manager.Install(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.UninstallContext(context.Background(), pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	if refreshCalls != 2 || len(outcomes) != 2 || !outcomes[0].GameListRefreshAccepted || !outcomes[1].GameListRefreshAccepted {
+		t.Fatalf("game-list refresh outcomes are wrong: calls=%d outcomes=%#v", refreshCalls, outcomes)
+	}
+	assertNotContains(t, root, "userdata/roms/tools/gamelist.xml", "./demo/launch.sh")
+}
+
+func TestSharedPreExistingMenuEntryIsNotOwnedOrRemoved(t *testing.T) {
+	root := t.TempDir()
+	writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", `<gameList><game><path>./demo/launch.sh</path><name>Manual Demo</name><custom>keep</custom></game></gameList>`)
+	asset := zipBytes(t, map[string]string{"launch.sh": "managed"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	var outcomes []OperationOutcome
+	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server), Outcome: func(outcome OperationOutcome) { outcomes = append(outcomes, outcome) }}
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	if err := manager.Install(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	baseGuard, err := safefs.NewGuard(root, []string{managerPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := loadState(baseGuard, pkg.ID)
+	if err != nil || state.MenuOwned {
+		t.Fatalf("manual menu entry became manager-owned: %#v, %v", state, err)
+	}
+	if err := manager.Uninstall(pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<name>Manual Demo</name>")
+	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<custom>keep</custom>")
+	if len(outcomes) != 2 || outcomes[0].GameListChanged || outcomes[1].GameListChanged {
+		t.Fatalf("unchanged shared menu requested refresh: %#v", outcomes)
+	}
+}
+
+func TestUninstallGamelistFailureRollsBackManagedFilesAndState(t *testing.T) {
+	root := t.TempDir()
+	asset := zipBytes(t, map[string]string{"launch.sh": "managed"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	if err := manager.Install(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList><broken></gameList>")
+	if err := manager.Uninstall(pkg.ID); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
+		t.Fatalf("expected uninstall gamelist failure, got %v", err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "managed")
+	if status, err := manager.Status(pkg.ID); err != nil || !status.Installed {
+		t.Fatalf("uninstall rollback lost state: %#v, %v", status, err)
+	}
+}
+
+func TestRefreshFailureRequiresRestartWithoutFailingOperation(t *testing.T) {
+	root := t.TempDir()
+	asset := zipBytes(t, map[string]string{"launch.sh": "managed"})
+	assetServer := serveAsset(t, asset)
+	defer assetServer.Close()
+	refreshServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		http.Error(writer, "unavailable", http.StatusServiceUnavailable)
+	}))
+	defer refreshServer.Close()
+	var outcome OperationOutcome
+	manager := Manager{
+		Root: root, Platform: testPlatform(), Client: rewriteClient(t, assetServer),
+		RefreshClient: refreshServer.Client(), RefreshURL: refreshServer.URL,
+		Outcome: func(value OperationOutcome) { outcome = value },
+	}
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	if err := manager.Install(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	if !outcome.GameListChanged || !outcome.RestartRequired || outcome.GameListRefreshAccepted {
+		t.Fatalf("failed refresh did not require restart: %#v", outcome)
+	}
+	if status, err := manager.Status(pkg.ID); err != nil || !status.Installed {
+		t.Fatalf("refresh failure rolled back committed install: %#v, %v", status, err)
+	}
 }
 
 func TestChecksumFailureWritesNoPackageFiles(t *testing.T) {
@@ -277,11 +391,18 @@ func TestPlayTimeMagicXAdoptionAndUninstallPreserveExistingData(t *testing.T) {
 	if existing, err := manager.PreExisting(pkg); err != nil || !existing {
 		t.Fatalf("MagicX PlayTime copy was not offered for adoption: existing=%v err=%v", existing, err)
 	}
-	if err := manager.Install(context.Background(), pkg); err != nil {
+	if err := manager.Adopt(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	if status, err := manager.Status(pkg.ID); err != nil || status.Healthy {
+		t.Fatalf("incomplete external PlayTime copy did not request repair: %#v, %v", status, err)
+	}
+	assertMissing(t, root, "userdata/roms/tools/PlayTime/playtime")
+	if err := manager.Repair(context.Background(), pkg); err != nil {
 		t.Fatal(err)
 	}
 	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
-		t.Fatalf("adopted PlayTime was not healthy: %#v, %v", status, err)
+		t.Fatalf("repaired PlayTime was not healthy: %#v, %v", status, err)
 	}
 	if err := manager.Uninstall(pkg.ID); err != nil {
 		t.Fatal(err)
@@ -327,10 +448,10 @@ func TestAdoptBacksUpExistingFilesAndUninstallRestoresThem(t *testing.T) {
 	if err != nil || !preExisting {
 		t.Fatalf("existing package was not detected: %v, %v", preExisting, err)
 	}
-	if err := manager.Install(context.Background(), pkg); err != nil {
+	if err := manager.Adopt(context.Background(), pkg); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.Install(context.Background(), pkg); err == nil || !strings.Contains(err.Error(), "already installed") {
+	if err := manager.Adopt(context.Background(), pkg); err == nil || !strings.Contains(err.Error(), "already installed") {
 		t.Fatalf("repeated install was not rejected: %v", err)
 	}
 	baseGuard, err := safefs.NewGuard(root, []string{managerPath})
@@ -338,7 +459,7 @@ func TestAdoptBacksUpExistingFilesAndUninstallRestoresThem(t *testing.T) {
 		t.Fatal(err)
 	}
 	state, err := loadState(baseGuard, pkg.ID)
-	if err != nil || len(state.Originals) != 5 {
+	if err != nil || len(state.Originals) != 6 {
 		t.Fatalf("pre-existing inventory was not saved: %#v, %v", state, err)
 	}
 	for _, backup := range state.Originals {
@@ -347,6 +468,10 @@ func TestAdoptBacksUpExistingFilesAndUninstallRestoresThem(t *testing.T) {
 		} else if info, err := os.Stat(host); err != nil || !info.Mode().IsRegular() {
 			t.Fatalf("missing adoption backup %s: %v", backup, err)
 		}
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "old launcher")
+	if err := manager.Repair(context.Background(), pkg); err != nil {
+		t.Fatal(err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "reviewed launcher")
 	assertRootFile(t, root, "userdata/roms/tools/demo/config.ini", "old credentials")
@@ -360,10 +485,10 @@ func TestAdoptBacksUpExistingFilesAndUninstallRestoresThem(t *testing.T) {
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "old launcher")
 	assertRootFile(t, root, "userdata/roms/tools/demo/config.ini", "updated credentials")
 	assertRootFile(t, root, "userdata/roms/tools/demo/local-config.ini", "updated local credentials")
-	assertRootFile(t, root, "userdata/roms/tools/demo/unknown/cache.db", "old cache")
+	assertRootFile(t, root, "userdata/roms/tools/demo/unknown/cache.db", "changed cache")
 	assertRootFile(t, root, "userdata/roms/tools/demo/logs/session.log", "new log")
 	assertRootFile(t, root, "userdata/system/configs/playtime/playtime.db", "statistics")
-	assertMissing(t, root, "userdata/roms/tools/demo/tool")
+	assertRootFile(t, root, "userdata/roms/tools/demo/tool", "reviewed binary")
 }
 
 func TestAdoptionRejectsNonRegularExistingPaths(t *testing.T) {

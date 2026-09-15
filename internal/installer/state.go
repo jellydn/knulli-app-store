@@ -16,6 +16,7 @@ type Installed struct {
 	Manifest  manifest.Package  `json:"manifest"`
 	Files     []InstalledFile   `json:"files"`
 	Originals map[string]string `json:"originals,omitempty"`
+	MenuOwned bool              `json:"menu_owned,omitempty"`
 }
 
 type InstalledFile struct {
@@ -23,6 +24,7 @@ type InstalledFile struct {
 	SHA256    string `json:"sha256"`
 	Mode      uint32 `json:"mode"`
 	Preserved bool   `json:"preserved,omitempty"`
+	Unmanaged bool   `json:"unmanaged,omitempty"`
 }
 
 func statePath(id string) string {

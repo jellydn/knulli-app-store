@@ -13,9 +13,10 @@ import (
 )
 
 type fakeBackend struct {
-	items  []appstore.Item
-	err    error
-	action appstore.Action
+	items      []appstore.Item
+	err        error
+	action     appstore.Action
+	completion string
 }
 
 func (fake *fakeBackend) SetPlatform(platform.Info) {}
@@ -31,7 +32,28 @@ func (fake *fakeBackend) Items(context.Context) ([]appstore.Item, error) {
 func (fake *fakeBackend) Execute(_ context.Context, _ string, action appstore.Action, progress func(string)) error {
 	fake.action = action
 	progress("Working")
+	if fake.completion != "" {
+		progress(fake.completion)
+	}
 	return fake.err
+}
+
+func TestModelKeepsRestartRequiredCompletion(t *testing.T) {
+	backend := &fakeBackend{
+		items:      []appstore.Item{{Package: manifest.Package{ID: "org.example.alpha", Name: "Alpha"}, Actions: []appstore.Action{appstore.Uninstall}}},
+		completion: "Uninstall completed; restart required to update game list",
+	}
+	model := New(backend)
+	if err := model.Load(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	model.Select(context.Background())
+	model.Select(context.Background())
+	model.Select(context.Background())
+	waitForModel(t, model)
+	if model.Error != "" || model.Message != backend.completion {
+		t.Fatalf("restart outcome was lost: message=%q error=%q", model.Message, model.Error)
+	}
 }
 
 func TestModelWrapsNavigationAndRequiresConfirmation(t *testing.T) {

@@ -2,15 +2,21 @@
   "schema": "org.knulli.app-store/package-manifest/v1",
   "id": "io.github.tomtombombadil.pocketcurator",
   "name": "PocketCurator",
+  "version": "1.1.2",
   "type": "utility",
   "summary": "Manages a user's own ROM collection from an EmulationStation-style interface.",
   "repository": "https://github.com/tomtombombadil/PocketCurator",
+  "license": "MIT",
   "review": {
     "status": "candidate",
+    "approval": {
+      "provenance": "community"
+    },
     "notes": [
-      "The release publishes an archive checksum, but the repository does not declare a license.",
-      "This candidate is not a ROM-download source; review must confirm that packaged behavior remains limited to user-owned files.",
-      "H700 compatibility, allowed write paths, and real-device testing are still required."
+      "User-approved for review, but blocked: GitHub reports stable release v1.1.2 as mutable and the exact extracted size and complete archive inventory remain unresolved.",
+      "Runtime writes can span user-selected ROM, media, and gamelist paths. A narrow package policy and containment review are required before installation.",
+      "The built-in updater and netsync path can download executable code outside App Store checks and must be disabled in a reviewed package.",
+      "Upstream names TrimUI Smart Pro as tested without firmware or package-version detail. This is not enough for a Knulli device matrix; MagicX is not named."
     ],
     "evidence": [
       {
@@ -19,8 +25,18 @@
       },
       {
         "kind": "tagged-release",
-        "url": "https://github.com/tomtombombadil/PocketCurator/releases/tag/v1.1.13",
-        "note": "Release and checksum asset observed during candidate review; not approved for installation."
+        "url": "https://github.com/tomtombombadil/PocketCurator/releases/tag/v1.1.2",
+        "note": "Stable ZIP is 5903925 bytes with published SHA-256 bb1907289bb5e22c6d24c39b9fae6dac0c17b75821a6565d77fcba3cce9af664. GitHub reports the release as mutable; exact extracted inventory remains under review."
+      },
+      {
+        "kind": "license",
+        "url": "https://github.com/tomtombombadil/PocketCurator/blob/main/LICENSE",
+        "note": "MIT project license and bundled dependency notices reviewed."
+      },
+      {
+        "kind": "compatibility-claim",
+        "url": "https://github.com/tomtombombadil/PocketCurator/blob/main/README.md",
+        "note": "Upstream lists TrimUI Smart Pro, but does not tie that claim to Knulli, v1.1.2, or a lifecycle result."
       }
     ]
   }

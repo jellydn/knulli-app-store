@@ -1,0 +1,37 @@
+name: catalogue updates
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-releases:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: "1.19.x"
+          cache: true
+      - name: Test release checker
+        run: go test ./internal/updatecheck
+      - name: Check upstream release metadata
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: go run ./cmd/check-updates -output build/catalogue-update-report
+      - name: Upload review report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: catalogue-update-report
+          path: |
+            build/catalogue-update-report.json
+            build/catalogue-update-report.md
+          if-no-files-found: error
+          retention-days: 30
