@@ -25,4 +25,4 @@ Prefer Knulli's generated `SDL_GAMECONTROLLERCONFIG`. Do not read raw evdev node
 
 - GUI builds need a cross compiler, SDL2 headers, and a glibc contract (CI currently assumes symbols through 2.34).
 - The GUI remains experimental: one community-tested TrimUI Smart Pro, incomplete MagicX coverage.
-- Custom cgo wrappers and dual `//go:build sdl` plus `// +build sdl` tags add maintenance cost while Go 1.19 remains the baseline.
+- Custom cgo wrappers and the `sdl` build tag add maintenance cost for the optional GUI.

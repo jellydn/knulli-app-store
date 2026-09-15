@@ -4,12 +4,6 @@
 
 ## Tech Debt
 
-**Go 1.19 baseline:**
-- Issue: Language and CI are pinned to 1.19 / `staticcheck v0.3.3` / dual `// +build` lines
-- Files: `go.mod`, `.github/workflows/check.yml`, `internal/sdlui/*.go`, `cmd/knulli-app-ui/main.go`
-- Impact: Misses later Go security and toolchain fixes; SDL packages keep legacy build tags
-- Fix approach: Bump Go, staticcheck, and CI images together; drop `// +build` when the floor allows
-
 **Catalogue index signing is not implemented:**
 - Issue: `catalog.Build` is deterministic and hash-bound, but release automation does not yet sign the index
 - Files: `internal/catalog/catalog.go`, `docs/architecture.md`, `docs/adr/0002-declarative-reviewed-catalogue.md`
@@ -110,10 +104,10 @@
 
 ## Dependencies at Risk
 
-**golang.org/x/image v0.7.0:**
-- Risk: old x/image line; only GUI text/scale usage
-- Impact: GUI compile if the module is yanked or incompatible with a Go bump
-- Migration plan: upgrade with the Go toolchain bump; keep CLI CGO-free and independent of this module
+**golang.org/x/image:**
+- Risk: GUI text and scale path only; keep it on a current module line with the Go baseline
+- Impact: GUI compile if the module is yanked or incompatible with a later Go bump
+- Migration plan: upgrade with the toolchain; keep the CLI CGO-free and independent of this module
 
 **SDL2 and glibc 2.34:**
 - Risk: Knulli does not publish this as a compatibility contract; CI uses Debian Bookworm

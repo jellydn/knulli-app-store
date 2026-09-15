@@ -30,7 +30,7 @@
 
 **Linting:**
 - `go vet ./...` and `go vet -tags sdl ./...`
-- CI `staticcheck` v0.3.3 with and without `sdl`
+- CI `staticcheck` v0.8.1 with and without `sdl`
 
 ## Import Organization
 
@@ -65,7 +65,7 @@
 
 **When to Comment:**
 - `CONTRIBUTING.md` requires comments only for a design reason the code cannot make clear
-- Build-tag files include both `//go:build sdl` and `// +build sdl`
+- Build-tag files use `//go:build sdl` only
 - cgo preamble in `internal/sdlui/run.go` documents the SDL functions in use
 
 **JSDoc/TSDoc:**
