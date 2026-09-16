@@ -38,6 +38,9 @@ return to first-run setup, since it also holds the saved controller mapping:
 rm -rf build/scratch-root && make gui
 ```
 
+`GUI_ARCH` defaults to `aarch64`. The override is required on an x86 desktop so
+platform detection can evaluate the fixture's AArch64 loader and ABI evidence.
+
 ## The same run by hand
 
 ```sh
@@ -47,6 +50,7 @@ scripts/desktop-fixture.sh trimui-smart-pro "$PWD/build/scratch-root"
   -input keyboard \
   -windowed \
   -root "$PWD/build/scratch-root" \
+  -arch aarch64 \
   -resolution 1280x720 \
   -catalog build/catalog-index.json
 ```
@@ -70,6 +74,7 @@ A flow is a key sequence:
 
 ```sh
 ./build/knulli-app-ui -input keyboard -root "$PWD/build/scratch-root" \
+  -arch aarch64 -resolution 1280x720 \
   -catalog build/catalog-index.json \
   -keys "down,down,enter" \
   -shot-dir /tmp/walk/03-customize \
@@ -119,9 +124,9 @@ exits non-zero, so a broken flow fails the run rather than passing quietly.
 
 The `gui-walkthrough` job in `.github/workflows/check.yml` runs
 `make walkthrough` on every pull request and uploads the frames and records as
-the `gui-walkthrough` artifact. Reviewers read the screens a change affects
-without a handheld, and the same artifact is useful evidence when a device run
-is not available.
+the `gui-walkthrough` artifact, including partial evidence when a flow fails.
+Reviewers read the screens a change affects without a handheld, and the same
+artifact is useful evidence when a device run is not available.
 
 ## Keyboard bindings
 
@@ -156,9 +161,8 @@ backups — lands below `ROOT`, which is exactly how the device path is exercise
 without a device.
 
 **The root is fabricated evidence and must stay a throwaway.** The script
-refuses `/`, requires an absolute path, and refuses to overwrite a tree that
-looks like a real device root unless its own marker file is present. Never point
-it at a mounted SD card or a live `/userdata`.
+refuses `/`, symlinks, relative paths, and non-empty directories without its own
+marker file. Never point it at a mounted SD card or a live `/userdata`.
 
 ## Verify against a package
 
