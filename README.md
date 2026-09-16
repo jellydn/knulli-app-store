@@ -147,6 +147,8 @@ git diff --exit-code -- build/catalog-index.json
 
 `make check` formats, vets, and runs tests. SDL GUI compile and layout tests need `libsdl2-dev` and `go test -tags sdl ./...`.
 
+`make gui` walks the whole GUI on a development machine with no handheld and no controller: the keyboard carries the semantic actions and a scratch fixture root supplies the Knulli files platform detection reads. `make walkthrough` drives every flow in turn and writes one frame per step, which is what the `gui-walkthrough` artifact on each pull request contains. See [Desktop GUI verification](docs/desktop-verification.md) for the bindings, the fixture contents, the flows, and what only a device can test.
+
 ## Author
 
 👤 **Huynh Duc Dung**
