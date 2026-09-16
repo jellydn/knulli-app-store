@@ -149,7 +149,7 @@ func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName 
 			text(frame, 48, 205+index*25, shade, prefix+item)
 		}
 		text(frame, 344, 205, palette.muted, "DETECTED CONTROLS")
-		drawMappingSummary(frame, storeinput.AutoMapping(), nil, 344, 225, 140, 20)
+		drawMappingSummary(frame, controls.DetectedMapping(), nil, 344, 225, 140, 20)
 	case storeinput.Settings:
 		text(frame, 32, modeHeadingBaseline, palette.warning, "MAPPING AND DIAGNOSTICS ARE MANAGED HERE")
 		for index, item := range storeinput.SettingsItems {
