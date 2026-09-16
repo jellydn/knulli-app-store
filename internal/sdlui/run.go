@@ -81,10 +81,10 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	defer C.SDL_DestroyRenderer(renderer)
 	runtimeCandidates := runtimeResolutionCandidates(window, renderer)
 	allCandidates := append([]platform.ResolutionCandidate(nil), runtimeCandidates...)
-	if options.Platform.ResolutionSource == "command-line override" {
-		allCandidates = append(append([]platform.ResolutionCandidate(nil), options.Platform.Evidence.Candidates...), runtimeCandidates...)
+	if options.Platform.Evidence(platform.FieldResolution).Location == "command-line override" {
+		allCandidates = append(options.Platform.ResolutionCandidates(), runtimeCandidates...)
 	} else {
-		allCandidates = append(allCandidates, options.Platform.Evidence.Candidates...)
+		allCandidates = append(allCandidates, options.Platform.ResolutionCandidates()...)
 	}
 	options.Platform = options.Platform.WithCandidates(allCandidates)
 	logResolutionCandidates(options.Diagnostics, platform.AssessResolutions(allCandidates), options.Platform)
@@ -105,7 +105,7 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	}
 	controls := storeinput.NewSession(options.Root, options.Platform.Device)
 	controller := openController()
-	connectController(controls, controller, options.Diagnostics)
+	connectController(ctx, model, controls, controller, options.Diagnostics)
 	if controller == nil {
 		model.ExportDiagnostics(ctx)
 	} else if controls.Mode == storeinput.Normal && startupOverride(controller, controls.Mapping) {
@@ -174,7 +174,7 @@ func logResolutionCandidates(logger *diagnostics.Log, assessments []platform.Res
 	for _, candidate := range assessments {
 		logger.Event("resolution_candidate", "source", candidate.Source, "width", fmt.Sprint(candidate.Width), "height", fmt.Sprint(candidate.Height), "valid", fmt.Sprint(candidate.Valid), "reason", candidate.Reason)
 	}
-	logger.Event("resolution_selected", "resolution", selected.Resolution, "source", selected.ResolutionSource)
+	logger.Event("resolution_selected", "resolution", selected.Resolution, "source", selected.Evidence(platform.FieldResolution).Location)
 	logger.Event("platform_detected", "details", platform.Summary(selected))
 }
 
@@ -186,33 +186,29 @@ func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, 
 		if C.event_key_repeat(event) != 0 {
 			return false
 		}
-		var action storeinput.Action
+		var key Key
 		switch C.event_key(event) {
 		case C.SDLK_UP:
-			action = storeinput.Up
+			key = KeyUp
 		case C.SDLK_LEFT:
-			action = storeinput.Left
+			key = KeyLeft
 		case C.SDLK_DOWN:
-			action = storeinput.Down
+			key = KeyDown
 		case C.SDLK_RIGHT:
-			action = storeinput.Right
+			key = KeyRight
 		case C.SDLK_RETURN, C.SDLK_SPACE:
-			action = storeinput.Confirm
+			key = KeyConfirm
 		case C.SDLK_ESCAPE:
-			action = storeinput.Back
+			key = KeyBack
 		case C.SDLK_y:
-			action = storeinput.Diagnostics
+			key = KeyDiagnostics
 		case C.SDLK_q:
-			action = storeinput.Exit
+			key = KeyExit
 		}
-		if action == "" {
+		if key == KeyNone {
 			return false
 		}
-		mapping := controls.Mapping
-		if controls.FirstRun {
-			mapping = storeinput.AutoMapping()
-		}
-		return Handle(ctx, model, controls, logger, Event{Kind: EventButton, Button: int(mapping[action])}).Exit
+		return Handle(ctx, model, controls, logger, Event{Kind: EventKey, Key: key}).Exit
 	case C.SDL_CONTROLLERBUTTONDOWN:
 		if *controller == nil || C.event_controller_which(event) != (*controller).instanceID {
 			return false
@@ -228,7 +224,7 @@ func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, 
 	case C.SDL_CONTROLLERDEVICEADDED:
 		if *controller == nil {
 			*controller = openController()
-			connectController(controls, *controller, logger)
+			connectController(ctx, model, controls, *controller, logger)
 		}
 	}
 	return false
@@ -256,18 +252,12 @@ func openController() *controllerState {
 	return nil
 }
 
-func connectController(controls *storeinput.Session, controller *controllerState, logger *diagnostics.Log) {
+func connectController(ctx context.Context, model *storeui.Model, controls *storeinput.Session, controller *controllerState, logger *diagnostics.Log) {
 	if controller == nil {
 		logger.Event("controller_unavailable", "device", controls.Device)
 		return
 	}
-	beforeMode, beforeSource := controls.Mode, controls.Source
-	controls.Connect(controller.identity, os.Getenv("SDL_GAMECONTROLLERCONFIG") != "")
-	logger.Event("controller_connected", "device", controls.Device, "name", controller.identity.Name, "guid", controller.identity.GUID, "mapping_source", controls.Source)
-	logControllerTransition(logger, controls, beforeMode, beforeSource)
-	if controls.ValidationError != "" {
-		logger.Event("controller_mapping_validation_failed", "error", controls.ValidationError)
-	}
+	Handle(ctx, model, controls, logger, Event{Kind: EventControllerConnected, Identity: controller.identity, KnulliMapping: os.Getenv("SDL_GAMECONTROLLERCONFIG") != ""})
 }
 
 func startupOverride(controller *controllerState, mapping storeinput.Mapping) bool {

@@ -15,30 +15,65 @@ import (
 )
 
 type Info struct {
-	Firmware         string
-	Version          string
-	Arch             string
-	Device           string
-	Resolution       string
-	ResolutionSource string
-	ABI              string
-	GLIBCVersion     string
-	Dependencies     []string
+	Firmware     string
+	Version      string
+	Arch         string
+	Device       string
+	Resolution   string
+	ABI          string
+	GLIBCVersion string
+	Dependencies []string
 
-	// Evidence records where each detected value came from. It is produced
-	// by Resolve; overrides attach their own evidence.
-	Evidence Evidence
+	evidence evidence
 }
 
-// Evidence is the provenance bundle for a resolved platform: raw source
-// values, where they were read from, and every resolution candidate that
-// was considered.
-type Evidence struct {
-	FirmwareRaw    string
-	FirmwareSource string
-	VersionRaw     string
-	VersionSource  string
-	Candidates     []ResolutionCandidate
+type evidence struct {
+	FirmwareRaw      string
+	FirmwareSource   string
+	VersionRaw       string
+	VersionSource    string
+	ResolutionSource string
+	Candidates       []ResolutionCandidate
+}
+
+type Field string
+
+const (
+	FieldFirmware   Field = "firmware"
+	FieldVersion    Field = "version"
+	FieldResolution Field = "resolution"
+)
+
+// Source is immutable provenance for one resolved platform field.
+type Source struct {
+	Raw      string
+	Location string
+}
+
+// Evidence returns the provenance for one semantic field.
+func (i Info) Evidence(field Field) Source {
+	switch field {
+	case FieldFirmware:
+		return Source{Raw: i.evidence.FirmwareRaw, Location: i.evidence.FirmwareSource}
+	case FieldVersion:
+		return Source{Raw: i.evidence.VersionRaw, Location: i.evidence.VersionSource}
+	case FieldResolution:
+		return Source{Raw: i.Resolution, Location: i.evidence.ResolutionSource}
+	default:
+		return Source{}
+	}
+}
+
+// ResolutionCandidates returns an independent copy of the detected candidates.
+func (i Info) ResolutionCandidates() []ResolutionCandidate {
+	return append([]ResolutionCandidate(nil), i.evidence.Candidates...)
+}
+
+// Clone returns an independent copy of Info's slice-backed data.
+func (i Info) Clone() Info {
+	i.Dependencies = append([]string(nil), i.Dependencies...)
+	i.evidence.Candidates = i.ResolutionCandidates()
+	return i
 }
 
 // Option adjusts one detection input before resolution. Every option is a
@@ -91,13 +126,13 @@ func Resolve(root string, options ...Option) Info {
 	info := detect(request.root)
 	if request.firmware != "" {
 		info.Firmware = request.firmware
-		info.Evidence.FirmwareRaw = request.firmware
-		info.Evidence.FirmwareSource = "command-line override"
+		info.evidence.FirmwareRaw = request.firmware
+		info.evidence.FirmwareSource = "command-line override"
 	}
 	if request.version != "" {
 		info.Version = request.version
-		info.Evidence.VersionRaw = request.version
-		info.Evidence.VersionSource = "command-line override"
+		info.evidence.VersionRaw = request.version
+		info.evidence.VersionSource = "command-line override"
 	}
 	if request.arch != "" {
 		info.Arch = request.arch
@@ -106,7 +141,7 @@ func Resolve(root string, options ...Option) Info {
 		info.Device = request.device
 	}
 	if request.resolution != "" {
-		candidates := append([]ResolutionCandidate{ResolutionCandidateFromString("command-line override", request.resolution)}, info.Evidence.Candidates...)
+		candidates := append([]ResolutionCandidate{ResolutionCandidateFromString("command-line override", request.resolution)}, info.ResolutionCandidates()...)
 		info = info.WithCandidates(candidates)
 	}
 	return info
@@ -148,14 +183,14 @@ func detect(root string) Info {
 		{path: "/etc/os-release", key: "ID", value: osRelease["ID"]},
 	}
 	for _, source := range firmwareSources {
-		if strings.TrimSpace(source.value) != "" && info.Evidence.FirmwareSource == "" {
-			info.Evidence.FirmwareRaw = source.value
-			info.Evidence.FirmwareSource = source.path + ":" + source.key
+		if strings.TrimSpace(source.value) != "" && info.evidence.FirmwareSource == "" {
+			info.evidence.FirmwareRaw = source.value
+			info.evidence.FirmwareSource = source.path + ":" + source.key
 		}
 		if normalized := normalizeFirmware(source.value); normalized != "" {
 			info.Firmware = normalized
-			info.Evidence.FirmwareRaw = source.value
-			info.Evidence.FirmwareSource = source.path + ":" + source.key
+			info.evidence.FirmwareRaw = source.value
+			info.evidence.FirmwareSource = source.path + ":" + source.key
 			break
 		}
 	}
@@ -171,8 +206,8 @@ func detect(root string) Info {
 	for _, source := range versionSources {
 		if normalized := normalizeVersion(source.value); normalized != "" {
 			info.Version = normalized
-			info.Evidence.VersionRaw = source.value
-			info.Evidence.VersionSource = source.path
+			info.evidence.VersionRaw = source.value
+			info.evidence.VersionSource = source.path
 			break
 		}
 	}
@@ -193,12 +228,12 @@ func detect(root string) Info {
 // candidates and re-selects the resolution from them.
 func (i Info) WithCandidates(candidates []ResolutionCandidate) Info {
 	i.Resolution = ""
-	i.ResolutionSource = ""
-	i.Evidence.Candidates = append([]ResolutionCandidate(nil), candidates...)
+	i.evidence.ResolutionSource = ""
+	i.evidence.Candidates = append([]ResolutionCandidate(nil), candidates...)
 	for _, assessment := range AssessResolutions(candidates) {
 		if assessment.Valid {
 			i.Resolution = fmt.Sprintf("%dx%d", assessment.Width, assessment.Height)
-			i.ResolutionSource = assessment.Source
+			i.evidence.ResolutionSource = assessment.Source
 			break
 		}
 	}
@@ -245,7 +280,7 @@ func DisplayHeader(info Info, runtimeWidth, runtimeHeight int) string {
 		resolution = fmt.Sprintf("%dx%d", runtimeWidth, runtimeHeight)
 	} else if info.Resolution != "" {
 		resolution = info.Resolution
-		if !strings.HasPrefix(info.ResolutionSource, "SDL ") {
+		if !strings.HasPrefix(info.Evidence(FieldResolution).Location, "SDL ") {
 			resolution += " fallback"
 		}
 	}
@@ -305,14 +340,14 @@ func Check(pkg manifest.Package, current Info) error {
 
 func Summary(info Info) string {
 	return fmt.Sprintf("device=%q architecture=%q abi=%q glibc=%q dependencies=%q resolution=%q resolution_source=%q firmware_raw=%q firmware=%q firmware_source=%q version_raw=%q version=%q version_source=%q",
-		info.Device, info.Arch, info.ABI, info.GLIBCVersion, strings.Join(info.Dependencies, ","), info.Resolution, info.ResolutionSource, info.Evidence.FirmwareRaw, info.Firmware, info.Evidence.FirmwareSource, info.Evidence.VersionRaw, info.Version, info.Evidence.VersionSource)
+		info.Device, info.Arch, info.ABI, info.GLIBCVersion, strings.Join(info.Dependencies, ","), info.Resolution, info.Evidence(FieldResolution).Location, info.Evidence(FieldFirmware).Raw, info.Firmware, info.Evidence(FieldFirmware).Location, info.Evidence(FieldVersion).Raw, info.Version, info.Evidence(FieldVersion).Location)
 }
 
 func compatibilityError(field string, current Info, constraint string) error {
 	detected := fmt.Sprintf("device=%q architecture=%q abi=%q glibc=%q dependencies=%q resolution=%q resolution_source=%q firmware_raw=%q firmware=%q firmware_source=%q",
-		current.Device, current.Arch, current.ABI, current.GLIBCVersion, strings.Join(current.Dependencies, ","), current.Resolution, current.ResolutionSource, current.Evidence.FirmwareRaw, current.Firmware, current.Evidence.FirmwareSource)
+		current.Device, current.Arch, current.ABI, current.GLIBCVersion, strings.Join(current.Dependencies, ","), current.Resolution, current.Evidence(FieldResolution).Location, current.Evidence(FieldFirmware).Raw, current.Firmware, current.Evidence(FieldFirmware).Location)
 	if field == "firmware_version" {
-		detected += fmt.Sprintf(" version_raw=%q version=%q version_source=%q", current.Evidence.VersionRaw, current.Version, current.Evidence.VersionSource)
+		detected += fmt.Sprintf(" version_raw=%q version=%q version_source=%q", current.Evidence(FieldVersion).Raw, current.Version, current.Evidence(FieldVersion).Location)
 	}
 	return fmt.Errorf("compatibility failed field=%s: detected %s; %s", field, detected, constraint)
 }

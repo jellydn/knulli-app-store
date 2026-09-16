@@ -16,7 +16,8 @@ import (
 )
 
 type routerBackend struct {
-	items []appstore.Item
+	items   []appstore.Item
+	exports int
 }
 
 func (router *routerBackend) Items(context.Context) ([]appstore.Item, error) {
@@ -28,18 +29,20 @@ func (router *routerBackend) Execute(context.Context, string, appstore.Action, f
 }
 
 func (router *routerBackend) ExportDiagnostics(context.Context) (string, error) {
+	router.exports++
 	return "", nil
 }
 
 func (router *routerBackend) SetPlatform(platform.Info) {}
 
-func newRouterHarness(t *testing.T) (*storeui.Model, *storeinput.Session, *diagnostics.Log) {
+func newRouterHarness(t *testing.T) (*storeui.Model, *storeinput.Session, *diagnostics.Log, *routerBackend) {
 	t.Helper()
 	logger, err := diagnostics.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	model := storeui.New(&routerBackend{items: []appstore.Item{}})
+	backend := &routerBackend{items: []appstore.Item{}}
+	model := storeui.New(backend)
 	if err := model.Load(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -48,11 +51,11 @@ func newRouterHarness(t *testing.T) (*storeui.Model, *storeinput.Session, *diagn
 	// Connect without a saved mapping opens the setup wizard; route through
 	// the normal mode so the semantic actions are exercised.
 	controls.Mode = storeinput.Normal
-	return model, controls, logger
+	return model, controls, logger, backend
 }
 
 func TestHandleQuitExits(t *testing.T) {
-	model, controls, logger := newRouterHarness(t)
+	model, controls, logger, _ := newRouterHarness(t)
 	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventQuit})
 	if !effects.Exit {
 		t.Fatal("quit event did not exit")
@@ -60,7 +63,7 @@ func TestHandleQuitExits(t *testing.T) {
 }
 
 func TestHandleButtonReportsSemanticAction(t *testing.T) {
-	model, controls, logger := newRouterHarness(t)
+	model, controls, logger, _ := newRouterHarness(t)
 	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: int(storeinput.AutoMapping()[storeinput.Down])})
 	if effects.Action != storeinput.Down {
 		t.Fatalf("down button reported %q, want %q", effects.Action, storeinput.Down)
@@ -71,7 +74,7 @@ func TestHandleButtonReportsSemanticAction(t *testing.T) {
 }
 
 func TestHandleExitActionQuits(t *testing.T) {
-	model, controls, logger := newRouterHarness(t)
+	model, controls, logger, _ := newRouterHarness(t)
 	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: int(storeinput.AutoMapping()[storeinput.Exit])})
 	if !effects.Exit {
 		t.Fatal("exit action did not exit")
@@ -79,7 +82,7 @@ func TestHandleExitActionQuits(t *testing.T) {
 }
 
 func TestHandleBackWalksFocusBeforeExiting(t *testing.T) {
-	model, controls, logger := newRouterHarness(t)
+	model, controls, logger, _ := newRouterHarness(t)
 	model.Focus = storeui.Actions
 	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: int(storeinput.AutoMapping()[storeinput.Back])})
 	if effects.Exit {
@@ -92,9 +95,56 @@ func TestHandleBackWalksFocusBeforeExiting(t *testing.T) {
 }
 
 func TestHandleControllerRemovedDisconnects(t *testing.T) {
-	model, controls, logger := newRouterHarness(t)
+	model, controls, logger, _ := newRouterHarness(t)
 	Handle(context.Background(), model, controls, logger, Event{Kind: EventControllerRemoved})
 	if controls.Connected {
 		t.Fatal("controller removal did not disconnect the session")
+	}
+}
+
+func TestHandleControllerConnected(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	controls.Disconnect()
+	identity := storeinput.Identity{Name: "Hotplug Pad", GUID: "guid"}
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventControllerConnected, Identity: identity, KnulliMapping: true})
+	if !controls.Connected || controls.Identity.Name != identity.Name || controls.Mode != storeinput.Setup || controls.Source != "Knulli SDL_GAMECONTROLLERCONFIG" {
+		t.Fatalf("controller connection was not routed: %#v", controls)
+	}
+}
+
+func TestHandleKeyUsesFirstRunMapping(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	controls.Mode = storeinput.Setup
+	controls.FirstRun = true
+	controls.Mapping[storeinput.Down] = 99
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyDown})
+	if controls.SetupIndex != 1 {
+		t.Fatalf("first-run key did not use the portable auto mapping: index %d", controls.SetupIndex)
+	}
+}
+
+func TestHandleModeDependentButtons(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		prepare    func(*storeinput.Session)
+		button     int
+		wantMode   storeinput.Mode
+		wantExport bool
+	}{
+		{name: "blocked diagnostics", prepare: func(controls *storeinput.Session) { controls.Disconnect() }, button: storeinput.AutoMapping()[storeinput.Confirm], wantMode: storeinput.Blocked, wantExport: true},
+		{name: "calibration assignment", prepare: func(controls *storeinput.Session) {
+			controls.Mode = storeinput.Calibrating
+			controls.Calibration = storeinput.NewCalibration()
+		}, button: 42, wantMode: storeinput.Review},
+		{name: "settings diagnostics", prepare: func(controls *storeinput.Session) { controls.Mode = storeinput.Settings; controls.SettingsIndex = 1 }, button: storeinput.AutoMapping()[storeinput.Confirm], wantMode: storeinput.Settings, wantExport: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			model, controls, logger, backend := newRouterHarness(t)
+			test.prepare(controls)
+			effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: test.button})
+			if controls.Mode != test.wantMode || effects.ExportedDiagnostics != test.wantExport || (backend.exports > 0) != test.wantExport {
+				t.Fatalf("mode=%q exported=%v calls=%d", controls.Mode, effects.ExportedDiagnostics, backend.exports)
+			}
+		})
 	}
 }
