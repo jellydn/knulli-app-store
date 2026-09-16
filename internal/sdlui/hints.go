@@ -38,6 +38,9 @@ func footerHints(model *storeui.Model, controls *storeinput.Session) []storeinpu
 	confirm := storeinput.NewHint(storeinput.Confirm)
 	back := storeinput.NewHint(storeinput.Back)
 	if controls == nil || controls.Mode == storeinput.Normal {
+		if model.Busy {
+			return nil
+		}
 		if len(model.Items) == 0 {
 			return []storeinput.Hint{back, storeinput.NewHint(storeinput.Diagnostics)}
 		}
