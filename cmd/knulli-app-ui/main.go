@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
@@ -40,11 +41,22 @@ func run() error {
 	windowed := flag.Bool("windowed", false, "use a window instead of fullscreen")
 	screenshot := flag.String("screenshot", "", "save one rendered frame and exit")
 	input := flag.String("input", string(sdlui.InputAuto), "input source: auto (SDL GameController) or keyboard (desktop verification)")
+	keys := flag.String("keys", "", "walkthrough key sequence, for example \"down,down,enter\" (desktop verification)")
+	shotDir := flag.String("shot-dir", "", "save one frame and one walk.tsv record per walkthrough step")
+	walkTimeout := flag.Duration("walk-timeout", time.Minute, "bound a walkthrough run, so a stuck flow fails instead of hanging")
 	flag.Parse()
 	inputMode, err := sdlui.ParseInputMode(*input)
 	if err != nil {
 		return err
 	}
+	walkKeys, err := sdlui.ParseKeys(*keys)
+	if err != nil {
+		return err
+	}
+	if *shotDir != "" && len(walkKeys) == 0 {
+		return fmt.Errorf("-shot-dir needs -keys: there is no walkthrough step to capture")
+	}
+
 	diagnosticLog, err := diagnostics.Open(*root)
 	if err != nil {
 		return fmt.Errorf("open diagnostics log: %w", err)
@@ -68,12 +80,15 @@ func run() error {
 		return err
 	}
 	err = sdlui.Run(context.Background(), service, sdlui.Options{
-		Windowed:    *windowed || *screenshot != "",
+		Windowed:    *windowed || *screenshot != "" || len(walkKeys) > 0,
 		Screenshot:  *screenshot,
 		Platform:    current,
 		Diagnostics: diagnosticLog,
 		Root:        *root,
 		Input:       inputMode,
+		Keys:        walkKeys,
+		ShotDir:     *shotDir,
+		WalkTimeout: *walkTimeout,
 	})
 	if err != nil {
 		diagnosticLog.Event("final_error", "error", err.Error())
