@@ -29,7 +29,7 @@ type InstalledFile struct {
 	// this destination file, so a health check can skip hashing a file that
 	// still matches them instead of re-reading every managed file on every
 	// catalogue load. State written before this signature existed has no
-	// Modified value and always rehashes.
+	// Modified value, so its first check hashes and then records them.
 	Size      int64  `json:"size,omitempty"`
 	Modified  string `json:"modified,omitempty"`
 	Preserved bool   `json:"preserved,omitempty"`

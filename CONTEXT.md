@@ -46,7 +46,7 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Unmanaged file** — An adopted file whose content did not match the reviewed release. Tracked so it is never claimed as owned, never verified, never removed.
 
-**Installed state** — The record of what an operation left behind: manifest, files, originals, menu ownership. Written after every file change has committed, never before.
+**Installed state** — The record of what an operation left behind: manifest, files, originals, menu ownership. Written after every file change has committed, never before. A health check may also rewrite the content signatures it just verified, under the manager lock and only while the state it read is unchanged.
 
 **Health** — The check that managed files still match what was installed, in content and in the mode the filesystem actually applied. Content is hashed when the destination no longer matches the size and modification time recorded with that hash, so an unchanged file is not read again on every load. A check that verifies content records the signature it confirmed, so state written before this signature existed heals on its first load. A wider mode applied by the destination filesystem is accepted; only a lost owner read, write, or execute permission fails. Preserved and unmanaged files are exempt.
 

@@ -47,8 +47,7 @@ An existing copy shows EXTERNAL and offers Manage existing; that inventories
 and backs up uncertain files without reinstalling the reviewed release. Only
 files count, so an empty directory left by a rolled-back write still offers
 Install. A card that reports a wider file mode than requested is not a health
-failure. The
-other two packages are read-only.
+failure. The other two packages are read-only.
 
 The Store disables Grout's updater metadata URL and verifies the transformed
 binary. Use App Store Repair and reviewed updates only. Grout config stays

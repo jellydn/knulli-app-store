@@ -123,6 +123,7 @@ func (m Manager) Status(id string) (Status, error) {
 	}
 	status := Status{Installed: true, Version: state.Manifest.Version, Healthy: true}
 	hashed := 0
+	recorded := 0
 	// updated holds the state this check verified, with the signature it just
 	// confirmed, so the next load can skip reading those bytes again.
 	var updated []InstalledFile
@@ -163,6 +164,7 @@ func (m Manager) Status(id string) (Status, error) {
 					updated = append([]InstalledFile(nil), state.Files...)
 				}
 				updated[index].Size, updated[index].Modified = size, modified
+				recorded++
 			}
 		}
 		if issue := modeIssue(file, info.Mode()); issue != nil {
@@ -170,7 +172,7 @@ func (m Manager) Status(id string) (Status, error) {
 		}
 	}
 	if updated != nil {
-		m.recordVerifiedSignatures(baseGuard, state, updated)
+		m.recordVerifiedSignatures(baseGuard, state, updated, recorded)
 	}
 	m.event("package_health_checked", "package", state.Manifest.ID, "healthy", fmt.Sprint(status.Healthy), "issues", fmt.Sprint(len(status.Issues)), "files", fmt.Sprint(len(state.Files)), "hashed", fmt.Sprint(hashed))
 	return status, nil
@@ -181,7 +183,7 @@ func (m Manager) Status(id string) (Status, error) {
 // being hashed on every load. This writes outside an operation, so it takes
 // the manager lock and writes only while the state it verified is still the
 // state on disk: a concurrent operation owns whichever state it commits.
-func (m Manager) recordVerifiedSignatures(guard *safefs.Guard, checked *Installed, updated []InstalledFile) {
+func (m Manager) recordVerifiedSignatures(guard *safefs.Guard, checked *Installed, updated []InstalledFile, recorded int) {
 	id := checked.Manifest.ID
 	managerHost, err := guard.Resolve(managerPath)
 	if err != nil {
@@ -210,7 +212,7 @@ func (m Manager) recordVerifiedSignatures(guard *safefs.Guard, checked *Installe
 		m.event("verified_signature_write_failed", "package", id, "error", err.Error())
 		return
 	}
-	m.event("verified_signature_recorded", "package", id, "files", fmt.Sprint(len(updated)))
+	m.event("verified_signature_recorded", "package", id, "signatures", fmt.Sprint(recorded))
 }
 
 // modeIssue reports a permission regression. The destination filesystem owns
