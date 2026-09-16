@@ -169,8 +169,8 @@ walk catalogue-walk keyboard \
   "enter,down,up,enter,enter,esc,esc,q" \
   "setup,catalogue,actions,confirm"
 
-# A read-only package offers no action and says so. The catalogue is sorted by
-# package name, so a candidate sits below the two actionable packages.
+# A read-only package offers no action and says so. Only compatible packages
+# are listed, and PocketCurator follows Grout and PlayTime in this fixture.
 walk catalogue-read-only keyboard \
   "enter,down,down,enter" \
   "setup,catalogue" \
