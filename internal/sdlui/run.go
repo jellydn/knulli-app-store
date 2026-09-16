@@ -51,6 +51,9 @@ type Options struct {
 	Platform    platform.Info
 	Diagnostics *diagnostics.Log
 	Root        string
+	// Input selects the source. The zero value is the device default: an SDL
+	// GameController, or a blocked screen when none is attached.
+	Input InputMode
 }
 
 func Run(ctx context.Context, backend appstore.Backend, options Options) error {
@@ -103,14 +106,23 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	if err := model.Load(ctx); err != nil {
 		return err
 	}
-	controls := storeinput.NewSession(options.Root, options.Platform.Device)
-	controller := openController()
-	connectController(ctx, model, controls, controller, options.Diagnostics)
-	if controller == nil {
-		model.ExportDiagnostics(ctx)
-	} else if controls.Mode == storeinput.Normal && startupOverride(controller, controls.Mapping) {
-		controls.OpenSetup()
-		options.Diagnostics.Event("controller_setup_override", "result", "opened", "gesture", "back+diagnostics")
+	var controls *storeinput.Session
+	var controller *controllerState
+	if options.Input.IsKeyboard() {
+		// A desktop run has no device controller. The keyboard is the source,
+		// so the catalogue opens and every flow stays reachable.
+		controls = storeinput.NewDesktopSession(options.Root, options.Platform.Device)
+		options.Diagnostics.Event("controller_source", "source", storeinput.KeyboardSourceName, "device", options.Platform.Device, "screen", string(controls.Mode))
+	} else {
+		controls = storeinput.NewSession(options.Root, options.Platform.Device)
+		controller = openController()
+		connectController(ctx, model, controls, controller, options.Diagnostics)
+		if controller == nil {
+			model.ExportDiagnostics(ctx)
+		} else if controls.Mode == storeinput.Normal && startupOverride(controller, controls.Mapping) {
+			controls.OpenSetup()
+			options.Diagnostics.Event("controller_setup_override", "result", "opened", "gesture", "back+diagnostics")
+		}
 	}
 	defer func() {
 		if controller != nil {
@@ -122,7 +134,7 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	for {
 		var event C.SDL_Event
 		for C.SDL_PollEvent(&event) != 0 {
-			if handleEvent(ctx, model, &event, &controller, controls, options.Diagnostics) {
+			if handleEvent(ctx, model, &event, &controller, controls, options.Diagnostics, options.Input) {
 				return nil
 			}
 		}
@@ -178,8 +190,14 @@ func logResolutionCandidates(logger *diagnostics.Log, assessments []platform.Res
 	logger.Event("platform_detected", "details", platform.Summary(selected))
 }
 
-func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, controller **controllerState, controls *storeinput.Session, logger *diagnostics.Log) bool {
-	switch C.event_type(event) {
+func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, controller **controllerState, controls *storeinput.Session, logger *diagnostics.Log, input InputMode) bool {
+	eventType := C.event_type(event)
+	if input.IsKeyboard() && (eventType == C.SDL_CONTROLLERBUTTONDOWN || eventType == C.SDL_CONTROLLERDEVICEREMOVED || eventType == C.SDL_CONTROLLERDEVICEADDED) {
+		// A desktop run keeps the keyboard as its only source, so attaching a
+		// controller cannot replace it mid-flow.
+		return false
+	}
+	switch eventType {
 	case C.SDL_QUIT:
 		return Handle(ctx, model, controls, logger, Event{Kind: EventQuit}).Exit
 	case C.SDL_KEYDOWN:

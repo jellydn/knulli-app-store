@@ -94,11 +94,14 @@ func Handle(ctx context.Context, model *storeui.Model, controls *storeinput.Sess
 		if action == "" {
 			return Effects{}
 		}
-		mapping := controls.Mapping
-		if controls.FirstRun {
-			mapping = storeinput.AutoMapping()
+		// A key carries a semantic action. The session resolves the binding the
+		// current screen accepts, so a key reaches the same screen a controller
+		// button would, including setup, calibration and the preview.
+		code, ok := controls.Binding(action)
+		if !ok {
+			return Effects{}
 		}
-		return processButton(ctx, model, controls, int(mapping[action]), logger)
+		return processButton(ctx, model, controls, code, logger)
 	}
 	return Effects{}
 }
