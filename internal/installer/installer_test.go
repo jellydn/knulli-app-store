@@ -694,70 +694,6 @@ func TestFilesystemNormalizedModeIsNotAHealthIssue(t *testing.T) {
 	}
 }
 
-func TestUnchangedContentIsNotHashedAgain(t *testing.T) {
-	root := t.TempDir()
-	logger, err := diagnostics.Open(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher", "data.txt": "data"})
-	server := serveAsset(t, asset)
-	defer server.Close()
-	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	manager := Manager{Root: root, Client: rewriteClient(t, server), Diagnostics: logger}.WithPlatform(testPlatform())
-	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
-		t.Fatal(err)
-	}
-	// The install verified these bytes and recorded their signature, so the
-	// catalogue load that follows an operation reads no content at all.
-	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
-		t.Fatalf("first health check: %#v, %v", status, err)
-	}
-	if event := lastHealthEvent(t, root); !strings.Contains(event, `files="2"`) || !strings.Contains(event, `hashed="0"`) {
-		t.Fatalf("the catalogue load after an install hashed content again: %s", event)
-	}
-	// A destination whose metadata moved is read again, and an unchanged
-	// digest keeps the package healthy.
-	bumped := time.Now().Add(time.Hour)
-	if err := os.Chtimes(filepath.Join(root, "userdata/roms/tools/demo/data.txt"), bumped, bumped); err != nil {
-		t.Fatal(err)
-	}
-	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
-		t.Fatalf("rehash after a metadata change: %#v, %v", status, err)
-	}
-	if event := lastHealthEvent(t, root); !strings.Contains(event, `hashed="1"`) {
-		t.Fatalf("moved metadata did not trigger a rehash: %s", event)
-	}
-	// The check that read the bytes records the signature it verified, so the
-	// next load is free again.
-	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
-		t.Fatalf("check after recording a signature: %#v, %v", status, err)
-	}
-	if event := lastHealthEvent(t, root); !strings.Contains(event, `hashed="0"`) {
-		t.Fatalf("a verified signature was not reused: %s", event)
-	}
-}
-
-func TestHealthCheckDetectsContentChangeWhenSizeOrTimeMoves(t *testing.T) {
-	root := t.TempDir()
-	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
-	server := serveAsset(t, asset)
-	defer server.Close()
-	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
-	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
-		t.Fatal(err)
-	}
-	launcher := filepath.Join(root, "userdata/roms/tools/demo/launch.sh")
-	if err := os.WriteFile(launcher, []byte(strings.Repeat("x", len("reviewed launcher"))), 0755); err != nil {
-		t.Fatal(err)
-	}
-	status, err := manager.Status(pkg.ID)
-	if err != nil || status.Healthy || len(status.Issues) != 1 || status.Issues[0].Check != "content changed" {
-		t.Fatalf("same-size rewrite with a new modification time was trusted: %#v, %v", status, err)
-	}
-}
-
 func TestModeIssueCoversEveryCapabilityClass(t *testing.T) {
 	file := InstalledFile{Path: "/userdata/roms/tools/demo/launch.sh"}
 	tests := []struct {
@@ -792,10 +728,7 @@ func TestModeIssueCoversEveryCapabilityClass(t *testing.T) {
 	}
 }
 
-func TestSignatureTrustBoundaryIsSizeAndTime(t *testing.T) {
-	// The recorded signature is size and modification time, so a rewrite that
-	// restores both is trusted without reading content. This test pins that
-	// documented trade-off: only a size or time change triggers a rehash.
+func TestHealthCheckHashesContentWhenSizeAndTimeMatch(t *testing.T) {
 	root := t.TempDir()
 	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
 	server := serveAsset(t, asset)
@@ -805,179 +738,21 @@ func TestSignatureTrustBoundaryIsSizeAndTime(t *testing.T) {
 	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
 		t.Fatal(err)
 	}
-	baseGuard, err := safefs.NewGuard(root, []string{managerPath})
-	if err != nil {
-		t.Fatal(err)
-	}
-	state, err := loadState(baseGuard, pkg.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	recorded := state.Files[0]
-	if recorded.Modified == "" || recorded.Size != int64(len("reviewed launcher")) {
-		t.Fatalf("install did not record a content signature: %#v", recorded)
-	}
-	modified, err := time.Parse(time.RFC3339Nano, recorded.Modified)
-	if err != nil {
-		t.Fatal(err)
-	}
 	launcher := filepath.Join(root, "userdata/roms/tools/demo/launch.sh")
+	info, err := os.Stat(launcher)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(launcher, []byte(strings.Repeat("x", len("reviewed launcher"))), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chtimes(launcher, modified, modified); err != nil {
-		t.Fatal(err)
-	}
-	status, err := manager.Status(pkg.ID)
-	if err != nil || !status.Healthy {
-		t.Fatalf("a restored signature was not trusted: %#v, %v", status, err)
-	}
-}
-
-func TestStateWithoutSignatureIsBackfilledAfterVerification(t *testing.T) {
-	// State written before signatures existed keeps full verification, and the
-	// check that proves the content records the signature it verified.
-	root := t.TempDir()
-	logger, err := diagnostics.Open(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
-	server := serveAsset(t, asset)
-	defer server.Close()
-	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	manager := Manager{Root: root, Client: rewriteClient(t, server), Diagnostics: logger}.WithPlatform(testPlatform())
-	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
-		t.Fatal(err)
-	}
-	baseGuard, err := safefs.NewGuard(root, []string{managerPath})
-	if err != nil {
-		t.Fatal(err)
-	}
-	state, err := loadState(baseGuard, pkg.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for index := range state.Files {
-		state.Files[index].Size = 0
-		state.Files[index].Modified = ""
-	}
-	writeState(t, baseGuard, pkg.ID, *state)
-	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
-		t.Fatalf("check without a signature: %#v, %v", status, err)
-	}
-	if event := lastHealthEvent(t, root); !strings.Contains(event, `hashed="1"`) {
-		t.Fatalf("signature-free state was not verified: %s", event)
-	}
-	backfilled, err := loadState(baseGuard, pkg.ID)
-	if err != nil || backfilled.Files[0].Modified == "" || backfilled.Files[0].Size == 0 {
-		t.Fatalf("verified signature was not recorded: %#v, %v", backfilled, err)
-	}
-	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
-		t.Fatalf("check after backfill: %#v, %v", status, err)
-	}
-	if event := lastHealthEvent(t, root); !strings.Contains(event, `hashed="0"`) {
-		t.Fatalf("backfilled state was hashed again: %s", event)
-	}
-	launcher := filepath.Join(root, "userdata/roms/tools/demo/launch.sh")
-	if err := os.WriteFile(launcher, []byte("changed content"), 0755); err != nil {
+	if err := os.Chtimes(launcher, info.ModTime(), info.ModTime()); err != nil {
 		t.Fatal(err)
 	}
 	status, err := manager.Status(pkg.ID)
 	if err != nil || status.Healthy || len(status.Issues) != 1 || status.Issues[0].Check != "content changed" {
-		t.Fatalf("backfilled state stopped detecting damage: %#v, %v", status, err)
+		t.Fatalf("same-size content change with restored time was not detected: %#v, %v", status, err)
 	}
-}
-
-func TestStatusSkipsTheSignatureWriteWhileAnOperationHoldsTheLock(t *testing.T) {
-	// The refresh writes state outside an operation, so an operation that holds
-	// the manager lock must win and the check must still report the truth.
-	root := t.TempDir()
-	logger, err := diagnostics.Open(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
-	server := serveAsset(t, asset)
-	defer server.Close()
-	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	manager := Manager{Root: root, Client: rewriteClient(t, server), Diagnostics: logger}.WithPlatform(testPlatform())
-	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
-		t.Fatal(err)
-	}
-	baseGuard, err := safefs.NewGuard(root, []string{managerPath})
-	if err != nil {
-		t.Fatal(err)
-	}
-	state, err := loadState(baseGuard, pkg.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for index := range state.Files {
-		state.Files[index].Size = 0
-		state.Files[index].Modified = ""
-	}
-	writeState(t, baseGuard, pkg.ID, *state)
-
-	lock, err := acquireLock(filepath.Join(root, "userdata/system/knulli-app-store", "lock"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
-		t.Fatalf("status while an operation holds the lock: %#v, %v", status, err)
-	}
-	held, err := loadState(baseGuard, pkg.ID)
-	if err != nil || held.Files[0].Modified != "" {
-		t.Fatalf("signature was written while an operation held the lock: %#v, %v", held, err)
-	}
-	logData, err := os.ReadFile(filepath.Join(root, "userdata/system/logs/knulli-app-store.log"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(logData), "verified_signature_recorded") {
-		t.Fatalf("refresh was not skipped: %s", logData)
-	}
-	releaseLock(lock)
-	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
-		t.Fatalf("status after the lock was released: %#v, %v", status, err)
-	}
-	released, err := loadState(baseGuard, pkg.ID)
-	if err != nil || released.Files[0].Modified == "" {
-		t.Fatalf("signature was not recorded once the lock was free: %#v, %v", released, err)
-	}
-}
-
-func writeState(t *testing.T, guard *safefs.Guard, id string, state Installed) {
-	t.Helper()
-	data, err := encodeState(state)
-	if err != nil {
-		t.Fatal(err)
-	}
-	host, err := guard.Resolve(statePath(id))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(host, data, 0600); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func lastHealthEvent(t *testing.T, root string) string {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join(root, "userdata/system/logs/knulli-app-store.log"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	last := ""
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.Contains(line, "event=package_health_checked") {
-			last = line
-		}
-	}
-	if last == "" {
-		t.Fatal("no package health event was logged")
-	}
-	return last
 }
 
 func TestForceReinstallBacksUpEverythingPreservesDataAndCanRepeat(t *testing.T) {

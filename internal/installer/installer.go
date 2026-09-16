@@ -368,8 +368,6 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 				if err != nil {
 					return Installed{}, err
 				}
-				// Preserved files are never health-checked, so a content signature
-				// would be state nobody reads.
 				state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: digest, Mode: uint32(info.Mode().Perm()), Preserved: true})
 				continue
 			} else if !os.IsNotExist(err) {
@@ -396,8 +394,7 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 		if err != nil {
 			return Installed{}, err
 		}
-		size, modified := verificationSignature(installedInfo)
-		state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: file.SHA256, Mode: uint32(installedInfo.Mode().Perm()), Size: size, Modified: modified, Preserved: preserved})
+		state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: file.SHA256, Mode: uint32(installedInfo.Mode().Perm()), Preserved: preserved})
 	}
 	if old != nil {
 		for _, stale := range old.Files {
@@ -469,12 +466,16 @@ func (m Manager) backupRecoveryDestination(tx *safefs.Transaction, pkg manifest.
 		if err := tx.Copy(file.Host, backup, file.Mode); err != nil {
 			return fmt.Errorf("create recovery backup for %s: %w", file.Virtual, err)
 		}
+		info, err := os.Stat(file.Host)
+		if err != nil {
+			return err
+		}
 		record.Files = append(record.Files, recoveryBackupFile{
 			OriginalPath: file.Virtual,
 			BackupPath:   backup,
 			SHA256:       file.SHA256,
 			Mode:         uint32(file.Mode.Perm()),
-			Size:         file.Size,
+			Size:         info.Size(),
 		})
 	}
 	data, err := json.MarshalIndent(record, "", "  ")
@@ -504,10 +505,8 @@ func (m Manager) adoptFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg man
 				return Installed{}, err
 			}
 		}
-		entry := InstalledFile{Path: virtual, SHA256: releaseFile.SHA256, Mode: uint32(releaseFile.Mode.Perm()), Preserved: preserved, Unmanaged: !managed}
+		mode := releaseFile.Mode.Perm()
 		if managed {
-			// The release hash and these bytes agree, so the signature can
-			// spare a later health check from hashing them again.
 			if err := tx.Chmod(virtual, releaseFile.Mode); err != nil {
 				return Installed{}, err
 			}
@@ -515,12 +514,11 @@ func (m Manager) adoptFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg man
 			if err != nil {
 				return Installed{}, err
 			}
-			entry.Mode = uint32(info.Mode().Perm())
-			entry.Size, entry.Modified = verificationSignature(info)
+			mode = info.Mode().Perm()
 		} else if found {
-			entry.Mode = uint32(existingFile.Mode.Perm())
+			mode = existingFile.Mode.Perm()
 		}
-		state.Files = append(state.Files, entry)
+		state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: releaseFile.SHA256, Mode: uint32(mode), Preserved: preserved, Unmanaged: !managed})
 		delete(existingByPath, virtual)
 	}
 	for _, file := range existingByPath {
@@ -665,12 +663,10 @@ func (m Manager) event(name string, fields ...string) {
 const maximumAdoptionBytes = 512 << 20
 
 type existingFile struct {
-	Virtual  string
-	Host     string
-	Mode     os.FileMode
-	SHA256   string
-	Size     int64
-	Modified string
+	Virtual string
+	Host    string
+	Mode    os.FileMode
+	SHA256  string
 }
 
 func inventoryExisting(destinationHost, destination string) ([]existingFile, uint64, error) {
@@ -700,16 +696,16 @@ func inventoryExisting(destinationHost, destination string) ([]existingFile, uin
 		if err != nil {
 			return err
 		}
-		size, modified := verificationSignature(info)
-		if uint64(size) > maximumAdoptionBytes || total > maximumAdoptionBytes-uint64(size) {
+		size := uint64(info.Size())
+		if size > maximumAdoptionBytes || total > maximumAdoptionBytes-size {
 			return fmt.Errorf("pre-existing package exceeds the 512 MiB adoption limit; move it aside before retrying")
 		}
-		total += uint64(size)
+		total += size
 		digest, err := safefs.SHA256(host)
 		if err != nil {
 			return err
 		}
-		files = append(files, existingFile{Virtual: path.Join(destination, filepath.ToSlash(relative)), Host: host, Mode: info.Mode(), SHA256: digest, Size: size, Modified: modified})
+		files = append(files, existingFile{Virtual: path.Join(destination, filepath.ToSlash(relative)), Host: host, Mode: info.Mode(), SHA256: digest})
 		return nil
 	})
 	sort.Slice(files, func(i, j int) bool { return files[i].Virtual < files[j].Virtual })
