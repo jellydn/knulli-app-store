@@ -6,6 +6,9 @@
   <a href="https://github.com/jellydn/knulli-app-store/actions/workflows/check.yml">
     <img alt="CI" src="https://github.com/jellydn/knulli-app-store/actions/workflows/check.yml/badge.svg" />
   </a>
+  <a href="https://github.com/jellydn/knulli-app-store/releases/latest">
+    <img alt="Release" src="https://img.shields.io/github/v/release/jellydn/knulli-app-store?include_prereleases&sort=semver&label=release" />
+</a>
   <img alt="Go" src="https://img.shields.io/badge/Go-%3E%3D1.27-00ADD8.svg" />
   <a href="https://knulli.org/">
     <img alt="Knulli" src="https://img.shields.io/badge/Knulli-community-blue.svg" />
@@ -19,6 +22,8 @@
 </p>
 
 > Safe community package manager for [Knulli](https://knulli.org/) utilities, themes, and integrations. Reviewable catalogue, transactional installer, controller-only SDL2 interface.
+>
+> Builds are published as dated experimental pre-releases on every green push to `main`; pushing a `v*` tag cuts a full release.
 
 ## ✨ Features
 
@@ -52,7 +57,7 @@
 
 ## Install
 
-Download the newest device build from [GitHub Actions](https://github.com/jellydn/knulli-app-store/actions/workflows/check.yml), then follow the [TrimUI Smart Pro](docs/trimui-smart-pro.md) or [MagicX Zero 28](docs/magicx-zero-28.md) guide.
+Download the newest device build from [GitHub Releases](https://github.com/jellydn/knulli-app-store/releases), then follow the [TrimUI Smart Pro](docs/trimui-smart-pro.md) or [MagicX Zero 28](docs/magicx-zero-28.md) guide.
 
 Build the CLI locally:
 
@@ -134,7 +139,7 @@ If **Manage existing** fails, the recovery screen shows the exact reason and off
 
 Failed operation context is stored under `/userdata/system/knulli-app-store/lifecycle/`. A retry stays bound to its originating operation: failed fresh installs retry **Install**, while update, repair, management, force-reinstall, and uninstall failures retry their own operation only when the current package state still permits it. An absent package never routes to **Manage existing**. Normal compatibility and integrity checks run again on every retry.
 
-GitHub Actions publishes separate `knulli-app-store-trimui-smart-pro-experimental` and `knulli-app-store-magicx-zero-28-experimental` artifacts after all checks pass.
+Every green push to `main` publishes a dated experimental pre-release with the device zips and `SHA256SUMS.txt`. The same zips stay available as `check` workflow artifacts for pull-request review.
 
 ## Run tests
 
