@@ -39,8 +39,12 @@ func run() error {
 	resolution := flag.String("resolution", "", "resolution override")
 	windowed := flag.Bool("windowed", false, "use a window instead of fullscreen")
 	screenshot := flag.String("screenshot", "", "save one rendered frame and exit")
+	input := flag.String("input", string(sdlui.InputAuto), "input source: auto (SDL GameController) or keyboard (desktop verification)")
 	flag.Parse()
-
+	inputMode, err := sdlui.ParseInputMode(*input)
+	if err != nil {
+		return err
+	}
 	diagnosticLog, err := diagnostics.Open(*root)
 	if err != nil {
 		return fmt.Errorf("open diagnostics log: %w", err)
@@ -63,7 +67,14 @@ func run() error {
 		diagnosticLog.Event("startup_error", "error", err.Error())
 		return err
 	}
-	err = sdlui.Run(context.Background(), service, sdlui.Options{Windowed: *windowed || *screenshot != "", Screenshot: *screenshot, Platform: current, Diagnostics: diagnosticLog, Root: *root})
+	err = sdlui.Run(context.Background(), service, sdlui.Options{
+		Windowed:    *windowed || *screenshot != "",
+		Screenshot:  *screenshot,
+		Platform:    current,
+		Diagnostics: diagnosticLog,
+		Root:        *root,
+		Input:       inputMode,
+	})
 	if err != nil {
 		diagnosticLog.Event("final_error", "error", err.Error())
 	}

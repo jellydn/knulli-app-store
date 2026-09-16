@@ -123,6 +123,15 @@ func TestHandleKeyUsesFirstRunMapping(t *testing.T) {
 	}
 }
 
+func TestHandleKeyUsesNonDefaultActiveMapping(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	controls.Mapping[storeinput.Up], controls.Mapping[storeinput.Down] = controls.Mapping[storeinput.Down], controls.Mapping[storeinput.Up]
+	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyDown})
+	if effects.Action != storeinput.Down {
+		t.Fatalf("key used the default binding instead of the active mapping: action=%q", effects.Action)
+	}
+}
+
 func TestHandleModeDependentButtons(t *testing.T) {
 	for _, test := range []struct {
 		name       string
