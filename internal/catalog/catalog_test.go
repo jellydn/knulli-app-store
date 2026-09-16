@@ -44,8 +44,8 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 			t.Fatalf("unexpected approval state: %s", first.Packages[index].ID)
 		}
 	}
-	if experimental != 1 || verified != 1 {
-		t.Fatalf("expected one experimental and one verified package, got %d and %d", experimental, verified)
+	if experimental != 2 || verified != 0 {
+		t.Fatalf("expected two broad experimental packages and no current device-verified release, got %d and %d", experimental, verified)
 	}
 }
 

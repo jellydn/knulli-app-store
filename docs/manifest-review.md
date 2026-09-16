@@ -3,7 +3,7 @@
 ## States
 
 - `candidate`: informative metadata only. The schema rejects release and install instructions in this state.
-- `experimental`: actionable only for the declared test matrix. It requires an explicit warning and may omit a minimum firmware version when no evidence supports one.
+- `experimental`: actionable only for declared exact devices/resolutions or reviewed broad bounds. Broad scope still requires detected Knulli, architecture, ABI, dependencies, a device identity, and display bounds. It requires an explicit warning and may omit a minimum firmware version when no evidence supports one.
 - `installable`: two reviewers have checked all evidence and the package can be used by the installer.
 - `verified`: `installable` plus linked real-device test evidence for every declared device and resolution.
 
@@ -20,7 +20,7 @@
 5. Inspect the complete archive. It must contain regular files only and one declared launcher.
 6. Review source or packaged behavior for network use and filesystem writes.
 7. List the narrowest `/userdata` destination, menu file, preserved configuration, and allowed write paths.
-8. Establish the minimum Knulli version and test `aarch64`, every declared device ID, and each listed resolution.
+8. Establish the Knulli version evidence, architecture, dynamic ABI, minimum glibc version, runtime libraries, device scope, and exact resolutions or experimental display bounds. Missing runtime facts must block with the exact reason.
 9. Have a second reviewer reproduce the checksum, archive inspection, and manifest validation.
 10. Use `experimental` for an authorized, clearly warned hardware test when mandatory release and path controls pass but compatibility evidence is incomplete. Promote to `installable` after review. Add `real-device-test` evidence and promote to `verified` only after the exact matrix passes on hardware.
 
@@ -30,4 +30,4 @@ For ROM-download software, record a visible copyright warning and review every p
 
 `knulli-app catalogue` sorts packages by ID and hashes the canonical manifest representation. It omits timestamps so identical inputs produce identical bytes. Device CI signs the exact index bytes with ed25519 and ships `catalog-index.json.sig`. The public key is compiled into that device binary. Local `make catalogue` stays unsigned for review.
 
-The binary release asset remains upstream. The generated index contains metadata and hashes only.
+The binary release asset remains upstream. A reviewed same-length binary patch is allowed only when the manifest pins the path, offset, exact source bytes, exact replacement bytes, and final SHA-256. Source or result mismatch stops before a transaction. Use this only to remove a proven unsafe runtime path when a normal upstream setting does not exist.
