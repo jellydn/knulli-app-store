@@ -20,11 +20,17 @@ const (
 )
 
 var (
-	SetupItems    = []string{"USE DETECTED MAPPING", "TEST DETECTED MAPPING", "CUSTOMIZE", "SAFE EXIT"}
-	ReviewItems   = []string{"ACCEPT", "RETRY", "START OVER", "CANCEL"}
+	SetupItems = []string{"USE DETECTED MAPPING", "TEST DETECTED MAPPING", "CUSTOMIZE", "SAFE EXIT"}
+	// ReviewItems uses the footer verb for each choice that has one: the first
+	// item confirms the assignment the way the Confirm action does, and the last
+	// one abandons it the way the Back action does.
+	ReviewItems   = []string{"SELECT", "RETRY", "START OVER", "BACK"}
 	SettingsItems = []string{"SET UP CONTROLLER", "EXPORT DIAGNOSTICS", "RESET MAPPING", "CLOSE SETTINGS"}
 )
 
+// Session is the controller input state for one device and controller
+// identity. Message reports what the last action did; a screen's own
+// instruction lives in the GUI, so a message never restates it.
 type Session struct {
 	Store           Store
 	Device          string
@@ -124,7 +130,7 @@ func (session *Session) HandleButton(button int) (Action, Effect) {
 		if action == Diagnostics {
 			session.Mode = Settings
 			session.SettingsIndex = 0
-			session.Message = "Controller settings"
+			session.Message = ""
 			return "", NoEffect
 		}
 		return action, NoEffect
@@ -186,7 +192,7 @@ func (session *Session) handleCalibration(button int) (Action, Effect) {
 		session.ValidationError = ""
 		session.Mode = Review
 		session.ReviewIndex = 0
-		session.Message = "Detected physical control: " + ButtonLabel(button)
+		session.Message = ""
 	} else {
 		session.ValidationError = session.Calibration.Error
 		session.Message = "Retry with a different physical button"
@@ -212,10 +218,10 @@ func (session *Session) handleReview(button int) (Action, Effect) {
 			if session.Calibration.Preview {
 				session.Mode = Preview
 				session.PendingSource = "saved custom mapping"
-				session.Message = "Test every mapped action before save"
+				session.Message = ""
 			} else {
 				session.Mode = Calibrating
-				session.Message = "Press one physical button for the shown action"
+				session.Message = ""
 			}
 		case 1:
 			session.retryAssignment()
@@ -279,7 +285,7 @@ func (session *Session) openSetup(firstRun bool) {
 	session.SetupIndex = 0
 	session.Calibration = nil
 	session.ValidationError = ""
-	session.Message = "Choose how to configure this controller"
+	session.Message = ""
 }
 
 func (session *Session) startCalibration() {
@@ -287,7 +293,7 @@ func (session *Session) startCalibration() {
 	session.Calibration = NewCalibration()
 	session.PendingSource = "saved custom mapping"
 	session.ValidationError = ""
-	session.Message = "Press one physical button for the shown action"
+	session.Message = ""
 }
 
 func (session *Session) startPreview(mapping Mapping, source string) {
@@ -295,7 +301,7 @@ func (session *Session) startPreview(mapping Mapping, source string) {
 	session.Calibration = NewPreview(mapping)
 	session.PendingSource = source
 	session.ValidationError = ""
-	session.Message = "Test every mapped action before save"
+	session.Message = ""
 }
 
 func (session *Session) retryAssignment() {
@@ -333,6 +339,19 @@ func (session *Session) saveMapping(mapping Mapping, source string) bool {
 	session.FirstRun = false
 	session.ValidationError = ""
 	return true
+}
+
+// ScreenMapping is the mapping the current screen accepts, so a screen can
+// label its controls without disagreeing with the buttons that work. The
+// blocked and setup screens offer the detected mapping on a first run; every
+// other screen uses the session mapping.
+func (session *Session) ScreenMapping() Mapping {
+	switch session.Mode {
+	case Blocked, Setup:
+		return session.activeMapping()
+	default:
+		return session.Mapping
+	}
 }
 
 func (session *Session) activeMapping() Mapping {
