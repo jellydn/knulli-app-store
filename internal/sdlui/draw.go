@@ -251,7 +251,7 @@ func drawList(frame *image.RGBA, model *storeui.Model) {
 			name += "  " + strings.ToUpper(item.Package.Version)
 		}
 		text(frame, 34, y+15, palette.text, shorten(name, 24))
-		text(frame, 34, y+31, statusColor(item), shorten(rowTrustLabel(item)+"  |  "+installState(item), 26))
+		text(frame, 34, y+31, statusColor(item), shorten(rowTrustLabel(item)+"  |  "+rowInstallState(item), 26))
 	}
 }
 
@@ -287,7 +287,7 @@ func drawDetails(frame *image.RGBA, model *storeui.Model, controls *storeinput.S
 	}
 	text(frame, 258, y, palette.muted, "COMPATIBILITY")
 	y += 18
-	y = drawWrapped(frame, 258, y, compatibilityColor(item), item.Compatibility, 48, 4)
+	y = drawWrapped(frame, 258, y, compatibilityColor(item), item.Verdict.Message(), 48, 4)
 	notice := item.RecoveryReason
 	noticeColor := palette.error
 	if notice != "" && item.RecoverySummary != "" {
@@ -332,19 +332,25 @@ func trustLabel(item appstore.Item) string {
 }
 
 func installState(item appstore.Item) string {
-	if item.Installed {
-		if !item.Healthy {
-			return "ISSUE"
-		}
+	if item.Verdict.HasReason(appstore.ReasonPlatform) {
+		return "INCOMPATIBLE"
+	}
+	switch item.Verdict.State {
+	case appstore.StateIssue:
+		return "ISSUE"
+	case appstore.StateInstalled:
 		return "INSTALLED"
-	}
-	if item.PreExisting {
+	case appstore.StateExternal:
 		return "EXTERNAL"
-	}
-	if item.Compatible && item.Package.Installable() {
+	case appstore.StateAvailable:
 		return "AVAILABLE"
+	case appstore.StateCandidate:
+		return "CANDIDATE"
+	case appstore.StateIncompatible:
+		return "INCOMPATIBLE"
+	default:
+		return "BLOCKED"
 	}
-	return "BLOCKED"
 }
 
 func rowTrustLabel(item appstore.Item) string {
@@ -352,6 +358,13 @@ func rowTrustLabel(item appstore.Item) string {
 		return "TESTED"
 	}
 	return trustLabel(item)
+}
+
+func rowInstallState(item appstore.Item) string {
+	if installState(item) == "INCOMPATIBLE" {
+		return "INCOMPAT."
+	}
+	return installState(item)
 }
 
 func trustColor(item appstore.Item) color.Color {
@@ -362,17 +375,17 @@ func trustColor(item appstore.Item) color.Color {
 }
 
 func statusColor(item appstore.Item) color.Color {
-	if item.Installed && !item.Healthy {
+	if item.Verdict.State == appstore.StateIssue || item.Verdict.HasReason(appstore.ReasonPlatform) {
 		return palette.error
 	}
-	if item.Compatible || item.Installed {
+	if item.Verdict.State == appstore.StateAvailable || item.Verdict.State == appstore.StateInstalled {
 		return palette.accent
 	}
 	return palette.warning
 }
 
 func compatibilityColor(item appstore.Item) color.Color {
-	if item.Compatible {
+	if item.Verdict.Compatible(item.Package) {
 		return palette.accent
 	}
 	return palette.warning

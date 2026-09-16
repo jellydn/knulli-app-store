@@ -85,6 +85,17 @@ func TestApprovedCandidateRemainsReadOnly(t *testing.T) {
 	}
 }
 
+func TestInstalledCandidateRetainsReviewReason(t *testing.T) {
+	pkg := installablePackage()
+	pkg.Review = manifest.Review{Status: "candidate", Approval: &manifest.Approval{Provenance: "community"}}
+	pkg.Release, pkg.Compatibility, pkg.Install = nil, nil, nil
+	verdict := assess(pkg, platform.Info{}, installer.Status{Installed: true, Healthy: true, Version: pkg.Version}, false)
+	if verdict.Compatible(pkg) || verdict.Message() != "Community approved; installation is blocked by technical review" {
+		t.Fatalf("installed candidate lost review reason: %#v", verdict)
+	}
+	assertActions(t, verdict.Actions, Uninstall)
+}
+
 func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 	root := t.TempDir()
 	for name, value := range map[string]string{
@@ -339,6 +350,13 @@ func TestExecuteInstallFailureAndUninstall(t *testing.T) {
 	if len(progress) != 2 || !strings.Contains(progress[1], "completed") {
 		t.Fatalf("install progress did not consume returned outcome: %v", progress)
 	}
+	incompatibleManager := manager.WithPlatform(platform.Info{Firmware: "other", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720"})
+	incompatibleService := &Service{index: service.index, manager: incompatibleManager}
+	items, err := incompatibleService.Items(context.Background())
+	if err != nil || len(items) != 1 || items[0].Compatible || !items[0].Verdict.HasReason(ReasonPlatform) {
+		t.Fatalf("installed platform failure lost its typed verdict: %#v, %v", items, err)
+	}
+	assertActions(t, items[0].Actions, Uninstall)
 
 	broken := pkg
 	broken.Release = &manifest.Release{}

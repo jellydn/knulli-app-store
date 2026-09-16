@@ -58,7 +58,11 @@ func assess(pkg manifest.Package, current platform.Info, status installer.Status
 		actions := []Action{Uninstall}
 		compatible := pkg.Installable()
 		if !compatible {
-			verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonReview, Detail: "Installation is blocked by technical review"})
+			if pkg.Review.Approval != nil {
+				verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonCommunity, Detail: "Community approved; installation is blocked by technical review"})
+			} else {
+				verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonReview, Detail: "Candidate: compatibility is not approved"})
+			}
 		} else {
 			if err := platform.Check(pkg, current); err != nil {
 				compatible = false
@@ -133,7 +137,7 @@ func assess(pkg manifest.Package, current platform.Info, status installer.Status
 }
 
 func experimentalReason(current platform.Info) string {
-	return fmt.Sprintf("Experimental compatibility: Knulli identity confirmed from %s; no minimum version is claimed; device=%s architecture=%s resolution=%s source=%s version=%s", current.Evidence.FirmwareSource, current.Device, current.Arch, current.Resolution, current.ResolutionSource, current.Version)
+	return fmt.Sprintf("Experimental compatibility: Knulli identity confirmed from %s; no minimum version is claimed; device=%s architecture=%s resolution=%s source=%s version=%s", current.Evidence(platform.FieldFirmware).Location, current.Device, current.Arch, current.Resolution, current.Evidence(platform.FieldResolution).Location, current.Version)
 }
 
 // Message renders the verdict's first reason for display. A verdict without
