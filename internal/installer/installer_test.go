@@ -970,6 +970,26 @@ func TestCandidateCannotBeInstalled(t *testing.T) {
 	}
 }
 
+func TestApplyRejectsUnsupportedOperation(t *testing.T) {
+	pkg := testPackage("https://example.com/releases/download/v1/demo.zip", []byte("x"), "1.0.0")
+	_, err := (Manager{}).WithPlatform(testPlatform()).Apply(context.Background(), Op("uninstall"), pkg)
+	if err == nil || !strings.Contains(err.Error(), "unsupported lifecycle operation") {
+		t.Fatalf("expected unsupported operation rejection, got %v", err)
+	}
+}
+
+func TestWithPlatformCopiesSlices(t *testing.T) {
+	info := testPlatform()
+	info.ResolutionCandidates = []platform.ResolutionCandidate{{Source: "framebuffer", Width: 640, Height: 480}}
+	manager := (Manager{}).WithPlatform(info)
+	info.Dependencies[0] = "mutated"
+	info.ResolutionCandidates[0].Source = "mutated"
+	bound := manager.Platform()
+	if bound.Dependencies[0] == "mutated" || bound.ResolutionCandidates[0].Source == "mutated" {
+		t.Fatalf("bound platform aliases caller slices: %#v", bound)
+	}
+}
+
 func testPackage(url string, asset []byte, version string) manifest.Package {
 	digest := sha256.Sum256(asset)
 	installedSize := int64(0)
