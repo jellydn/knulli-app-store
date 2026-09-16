@@ -166,16 +166,15 @@ func (m Manager) Status(id string) (Status, error) {
 
 // modeIssue reports a permission regression. The destination filesystem owns
 // the mode bits and a Knulli SD card can report 0777 for a file the installer
-// requested as 0755 or 0644, so only the read, write, and execute capabilities
-// the recorded mode granted are required back; wider bits are not an issue.
+// requested as 0755 or 0644, so wider bits are not an issue. What matters is
+// that the owner keeps the read, write, and execute permission the recorded
+// mode granted, because Knulli runs the package as that owner.
 func modeIssue(file InstalledFile, actual os.FileMode) *HealthIssue {
 	expected := os.FileMode(file.Mode).Perm()
-	for _, class := range [...]os.FileMode{0444, 0222, 0111} {
-		if expected&class != 0 && actual.Perm()&class == 0 {
-			return &HealthIssue{Path: file.Path, Check: "mode changed", Expected: fmt.Sprintf("%04o", expected), Actual: fmt.Sprintf("%04o", actual.Perm())}
-		}
+	if expected&0700&^actual.Perm() == 0 {
+		return nil
 	}
-	return nil
+	return &HealthIssue{Path: file.Path, Check: "mode changed", Expected: fmt.Sprintf("%04o", expected), Actual: fmt.Sprintf("%04o", actual.Perm())}
 }
 
 func (status *Status) addIssue(manager Manager, packageID string, issue HealthIssue) {

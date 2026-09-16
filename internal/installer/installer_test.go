@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -746,6 +747,40 @@ func TestHealthCheckDetectsContentChangeWhenSizeOrTimeMoves(t *testing.T) {
 	status, err := manager.Status(pkg.ID)
 	if err != nil || status.Healthy || len(status.Issues) != 1 || status.Issues[0].Check != "content changed" {
 		t.Fatalf("same-size rewrite with a new modification time was trusted: %#v, %v", status, err)
+	}
+}
+
+func TestModeIssueCoversEveryCapabilityClass(t *testing.T) {
+	file := InstalledFile{Path: "/userdata/roms/tools/demo/launch.sh"}
+	tests := []struct {
+		name     string
+		recorded os.FileMode
+		actual   os.FileMode
+		issue    bool
+	}{
+		{name: "unchanged", recorded: 0755, actual: 0755},
+		{name: "wider mode from a normalizing filesystem", recorded: 0755, actual: 0777},
+		{name: "world permissions narrowed", recorded: 0777, actual: 0755},
+		{name: "mode without recorded permissions", recorded: 0, actual: 0600},
+		{name: "lost execute", recorded: 0755, actual: 0644, issue: true},
+		{name: "lost write", recorded: 0644, actual: 0444, issue: true},
+		{name: "lost read", recorded: 0644, actual: 0200, issue: true},
+		{name: "owner loses read and write while group keeps read", recorded: 0640, actual: 0040, issue: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			file.Mode = uint32(test.recorded)
+			issue := modeIssue(file, test.actual)
+			if (issue != nil) != test.issue {
+				t.Fatalf("modeIssue(%04o, %04o) = %v, want issue %v", test.recorded, test.actual, issue, test.issue)
+			}
+			if issue == nil {
+				return
+			}
+			if issue.Check != "mode changed" || issue.Expected != fmt.Sprintf("%04o", test.recorded) || issue.Actual != fmt.Sprintf("%04o", test.actual) {
+				t.Fatalf("mode issue did not report expected and actual modes: %#v", issue)
+			}
+		})
 	}
 }
 
