@@ -262,8 +262,17 @@ func drawDetails(frame *image.RGBA, model *storeui.Model, controls *storeinput.S
 	next := drawBadge(frame, 258, 94, trustLabel(item), trustColor(item))
 	drawBadge(frame, next+8, 94, installState(item), statusColor(item))
 	y := 132
-	if model.Error != "" {
+	if model.Error != "" && item.RecoveryReason == "" {
 		drawActions(frame, model, item, controls)
+		return
+	}
+	if model.Focus == storeui.Health {
+		text(frame, 258, y, palette.error, "HEALTH CHECK")
+		y += 20
+		drawWrapped(frame, 258, y, palette.error, item.HealthReason, 48, 8)
+		text(frame, 258, 289, palette.muted, "REMEDIATION")
+		text(frame, 258, 307, palette.text, "REPAIR RESTORES REVIEWED BYTES AND MODES")
+		text(frame, 258, 320, palette.muted, "CONFIRM: ACTIONS  BACK: CATALOGUE")
 		return
 	}
 	if model.Focus == storeui.Browse {
@@ -279,8 +288,14 @@ func drawDetails(frame *image.RGBA, model *storeui.Model, controls *storeinput.S
 	text(frame, 258, y, palette.muted, "COMPATIBILITY")
 	y += 18
 	y = drawWrapped(frame, 258, y, compatibilityColor(item), item.Compatibility, 48, 4)
-	notice := item.HealthReason
+	notice := item.RecoveryReason
 	noticeColor := palette.error
+	if notice != "" && item.RecoverySummary != "" {
+		notice += " " + item.RecoverySummary
+	}
+	if notice == "" {
+		notice = item.HealthReason
+	}
 	if notice == "" && item.PreExisting {
 		notice = "Lists files; no reinstall. Records safe ownership and backs up unknown files."
 		noticeColor = palette.warning
@@ -427,7 +442,14 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item, co
 	text(frame, 258, y-14, palette.muted, "ACTIONS")
 	x := 258
 	for index, action := range item.Actions {
-		label := " " + strings.ToUpper(actionLabel(action)) + " "
+		labelText := actionLabel(action)
+		if item.RetryAction == action {
+			labelText = "Retry " + strings.ToLower(labelText)
+		}
+		if action == appstore.Adopt && item.RecoveryReason != "" {
+			labelText = "Retry manage"
+		}
+		label := " " + strings.ToUpper(labelText) + " "
 		background := palette.selected
 		if model.Focus != storeui.Browse && index == model.Action {
 			background = palette.accent
@@ -437,8 +459,27 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item, co
 		text(frame, x+4, y+15, palette.text, label)
 		x += width + 8
 	}
-	if model.Focus == storeui.Confirm {
+	if item.RecoveryReason != "" && model.Focus == storeui.Actions {
+		text(frame, 258, 316, palette.muted, recoveryHelp(controls))
+	}
+	if model.Focus == storeui.Confirm || model.Focus == storeui.ForceConfirm {
 		action := item.Actions[model.Action]
+		if action == appstore.ForceReinstall {
+			fill(frame, image.Rect(250, 94, 616, 318), color.RGBA{R: 74, G: 31, B: 39, A: 255})
+			step := "STEP 1 OF 2 - REVIEW RECOVERY"
+			instruction := "CONFIRM AGAIN TO CONTINUE"
+			if model.Focus == storeui.ForceConfirm {
+				step = "STEP 2 OF 2 - CONFIRM REINSTALL"
+				instruction = "CONFIRM REPLACES REVIEWED APP FILES"
+			}
+			text(frame, 266, 120, palette.error, step)
+			text(frame, 266, 143, palette.text, instruction)
+			drawWrapped(frame, 266, 165, palette.warning, item.RecoverySummary, 44, 4)
+			text(frame, 266, 258, palette.muted, "BACKUP: /USERDATA/SYSTEM/KNULLI-APP-STORE/")
+			text(frame, 266, 273, palette.muted, "RECOVERY-BACKUPS/<PACKAGE>/<TIMESTAMP>/")
+			text(frame, 266, 302, palette.muted, confirmationHelp(controls))
+			return
+		}
 		if item.Package.Install != nil && item.Package.Install.Warning != "" && (action == appstore.Install || action == appstore.Adopt) {
 			fill(frame, image.Rect(250, 108, 616, 318), color.RGBA{R: 35, G: 46, B: 64, A: 255})
 			text(frame, 266, 132, trustColor(item), "PACKAGE NOTICE  |  "+trustLabel(item))
@@ -464,6 +505,9 @@ func actionLabel(action appstore.Action) string {
 	if action == appstore.Adopt {
 		return "Manage existing"
 	}
+	if action == appstore.ForceReinstall {
+		return "Force reinstall"
+	}
 	return string(action)
 }
 
@@ -473,6 +517,14 @@ func confirmationHelp(controls *storeinput.Session) string {
 		mapping = controls.Mapping
 	}
 	return "CONFIRM (" + storeinput.ButtonLabel(mapping[storeinput.Confirm]) + ") ACCEPT  BACK (" + storeinput.ButtonLabel(mapping[storeinput.Back]) + ") CANCEL"
+}
+
+func recoveryHelp(controls *storeinput.Session) string {
+	mapping := storeinput.AutoMapping()
+	if controls != nil {
+		mapping = controls.Mapping
+	}
+	return "EXPORT DIAGNOSTICS (" + storeinput.ButtonLabel(mapping[storeinput.Diagnostics]) + ")  CANCEL (" + storeinput.ButtonLabel(mapping[storeinput.Back]) + ")"
 }
 
 func drawStatus(frame *image.RGBA, model *storeui.Model) {

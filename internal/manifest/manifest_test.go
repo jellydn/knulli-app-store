@@ -65,6 +65,35 @@ func TestExperimentalPackageAllowsUnknownMinimumWithWarning(t *testing.T) {
 	}
 }
 
+func TestBroadCompatibilityCanOnlyBeExperimental(t *testing.T) {
+	pkg := validPackage()
+	pkg.Compatibility.Devices = nil
+	pkg.Compatibility.Resolutions = nil
+	pkg.Compatibility.DeviceScope = "any"
+	pkg.Compatibility.DisplayBounds = &DisplayBounds{MinimumWidth: 640, MinimumHeight: 480, MaximumWidth: 1280, MaximumHeight: 720}
+	if err := pkg.Validate(); err == nil || !strings.Contains(err.Error(), "broad device scope") || !strings.Contains(err.Error(), "display bounds") {
+		t.Fatalf("non-experimental broad scope was accepted: %v", err)
+	}
+	pkg.Review.Status = "experimental"
+	pkg.Compatibility.MinimumVersion = ""
+	pkg.Install.Warning = "Unverified broad device test."
+	if err := pkg.Validate(); err != nil {
+		t.Fatalf("reviewed broad experiment was rejected: %v", err)
+	}
+}
+
+func TestMinimumGLIBCMustBeNumericMajorMinor(t *testing.T) {
+	pkg := validPackage()
+	pkg.Compatibility.MinimumGLIBC = "glibc-2.34"
+	if err := pkg.Validate(); err == nil || !strings.Contains(err.Error(), "numeric major.minor") {
+		t.Fatalf("invalid glibc version was accepted: %v", err)
+	}
+	pkg.Compatibility.MinimumGLIBC = "2.34"
+	if err := pkg.Validate(); err != nil {
+		t.Fatalf("valid glibc version was rejected: %v", err)
+	}
+}
+
 func TestExecutablePathsMustBeSafeAndUnique(t *testing.T) {
 	pkg := validPackage()
 	pkg.Install.Executables = []string{"run.sh", "../escape", "run.sh"}
@@ -115,6 +144,8 @@ func validPackage() Package {
 			Firmware:       "knulli",
 			MinimumVersion: "2025.1",
 			Architectures:  []string{"aarch64"},
+			ABIs:           []string{"linux-aarch64-glibc"},
+			Dependencies:   []string{"sdl2"},
 			Devices:        []string{"h700"},
 			Resolutions:    []string{"640x480"},
 		},
