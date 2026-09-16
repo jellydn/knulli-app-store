@@ -120,7 +120,7 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 	}
 	for _, item := range items {
 		if item.Package.Experimental() {
-			if !item.Compatible || len(item.Actions) != 1 || item.Verdict.State != StateAvailable || !hasReason(item.Verdict, "review", "no minimum version is claimed") || !hasReason(item.Verdict, "review", "/etc/os-release:OS_NAME") || !hasReason(item.Verdict, "review", "source=SDL renderer output") {
+			if !item.Compatible || len(item.Actions) != 1 || item.Verdict.State != StateAvailable || !hasReason(item.Verdict, ReasonReview, "no minimum version is claimed") || !hasReason(item.Verdict, ReasonReview, "/etc/os-release:OS_NAME") || !hasReason(item.Verdict, ReasonReview, "source=SDL renderer output") {
 				t.Fatalf("latest Knulli experimental decision is wrong: %#v", item)
 			}
 		}
@@ -192,7 +192,7 @@ func TestRecoveryStateRefinesVerdictActions(t *testing.T) {
 	assertActions(t, actions(item))
 }
 
-func hasReason(verdict Verdict, kind, fragment string) bool {
+func hasReason(verdict Verdict, kind ReasonKind, fragment string) bool {
 	for _, reason := range verdict.Reasons {
 		if reason.Kind == kind && strings.Contains(reason.Detail, fragment) {
 			return true

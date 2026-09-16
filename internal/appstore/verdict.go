@@ -21,11 +21,21 @@ const (
 	StateAvailable    State = "available"    // ready to install
 )
 
+type ReasonKind string
+
+const (
+	ReasonCommunity ReasonKind = "community"
+	ReasonPlatform  ReasonKind = "platform"
+	ReasonReview    ReasonKind = "review"
+	ReasonInstall   ReasonKind = "install"
+	ReasonHealth    ReasonKind = "health"
+)
+
 // Reason is one typed element of why the state is what it is. Reasons are
 // data so every consumer renders from the same truth instead of parsing
 // English prose.
 type Reason struct {
-	Kind   string // community | platform | review | install | health
+	Kind   ReasonKind
 	Detail string // rendered text, for diagnostics and UI display
 }
 
@@ -48,23 +58,23 @@ func assess(pkg manifest.Package, current platform.Info, status installer.Status
 		actions := []Action{Uninstall}
 		compatible := pkg.Installable()
 		if !compatible {
-			verdict.Reasons = append(verdict.Reasons, Reason{Kind: "review", Detail: "Installation is blocked by technical review"})
+			verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonReview, Detail: "Installation is blocked by technical review"})
 		} else {
 			if err := platform.Check(pkg, current); err != nil {
 				compatible = false
-				verdict.Reasons = append(verdict.Reasons, Reason{Kind: "platform", Detail: err.Error()})
+				verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonPlatform, Detail: err.Error()})
 			}
 		}
 		if compatible {
 			if pkg.Experimental() {
-				verdict.Reasons = append(verdict.Reasons, Reason{Kind: "review", Detail: experimentalReason(current)})
+				verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonReview, Detail: experimentalReason(current)})
 			}
 			if status.Healthy {
 				verdict.State = StateInstalled
 			} else {
 				verdict.State = StateIssue
 				if len(status.Issues) > 0 {
-					verdict.Reasons = append(verdict.Reasons, Reason{Kind: "health", Detail: status.Issues[0].String()})
+					verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonHealth, Detail: status.Issues[0].String()})
 				}
 			}
 			if status.Version != pkg.Version {
@@ -77,7 +87,7 @@ func assess(pkg manifest.Package, current platform.Info, status installer.Status
 			} else {
 				verdict.State = StateIssue
 				if len(status.Issues) > 0 {
-					verdict.Reasons = append(verdict.Reasons, Reason{Kind: "health", Detail: status.Issues[0].String()})
+					verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonHealth, Detail: status.Issues[0].String()})
 				}
 			}
 		}
@@ -90,9 +100,9 @@ func assess(pkg manifest.Package, current platform.Info, status installer.Status
 	if !pkg.Installable() {
 		verdict.State = StateCandidate
 		if pkg.Review.Approval != nil {
-			verdict.Reasons = append(verdict.Reasons, Reason{Kind: "community", Detail: "Community approved; installation is blocked by technical review"})
+			verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonCommunity, Detail: "Community approved; installation is blocked by technical review"})
 		} else {
-			verdict.Reasons = append(verdict.Reasons, Reason{Kind: "review", Detail: "Candidate: compatibility is not approved"})
+			verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonReview, Detail: "Candidate: compatibility is not approved"})
 		}
 		return verdict
 	}
@@ -101,19 +111,19 @@ func assess(pkg manifest.Package, current platform.Info, status installer.Status
 	// platform.
 	if err := platform.Check(pkg, current); err != nil {
 		verdict.State = StateIncompatible
-		verdict.Reasons = append(verdict.Reasons, Reason{Kind: "platform", Detail: err.Error()})
+		verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonPlatform, Detail: err.Error()})
 		return verdict
 	}
 
 	// Experimental packages stay actionable but record the weaker evidence
 	// in the verdict.
 	if pkg.Experimental() {
-		verdict.Reasons = append(verdict.Reasons, Reason{Kind: "review", Detail: experimentalReason(current)})
+		verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonReview, Detail: experimentalReason(current)})
 	}
 
 	if preExisting {
 		verdict.State = StateExternal
-		verdict.Reasons = append(verdict.Reasons, Reason{Kind: "install", Detail: "An external installation exists; use Manage existing"})
+		verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonInstall, Detail: "An external installation exists; use Manage existing"})
 		verdict.Actions = []Action{Adopt}
 		return verdict
 	}
@@ -135,7 +145,7 @@ func (v Verdict) Message() string {
 	return v.Reasons[0].Detail
 }
 
-func (v Verdict) HasReason(kind string) bool {
+func (v Verdict) HasReason(kind ReasonKind) bool {
 	for _, reason := range v.Reasons {
 		if reason.Kind == kind {
 			return true
@@ -145,5 +155,5 @@ func (v Verdict) HasReason(kind string) bool {
 }
 
 func (v Verdict) Compatible(pkg manifest.Package) bool {
-	return pkg.Installable() && !v.HasReason("platform")
+	return pkg.Installable() && !v.HasReason(ReasonPlatform)
 }

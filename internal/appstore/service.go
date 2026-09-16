@@ -213,7 +213,7 @@ func (s *Service) item(ctx context.Context, entry catalog.Entry) (Item, error) {
 			preserved = len(entry.Package.Install.Preserve)
 		}
 		item.RecoverySummary = fmt.Sprintf("Replaces reviewed app files; preserves %d declared data paths; backs up the complete existing destination for manual restore.", preserved)
-		item.Verdict.Reasons = append(item.Verdict.Reasons, Reason{Kind: "install", Detail: item.RecoveryReason})
+		item.Verdict.Reasons = append(item.Verdict.Reasons, Reason{Kind: ReasonInstall, Detail: item.RecoveryReason})
 	}
 	s.manager.Diagnostics.Event("compatibility_decision", "package", entry.ID, "allowed", fmt.Sprint(item.Compatible), "decision", item.Compatibility)
 	item.Actions = actions(item)
