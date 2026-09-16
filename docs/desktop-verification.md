@@ -3,10 +3,13 @@
 The SDL GUI can be walked end to end on a development machine, with no handheld
 and no controller attached. The keyboard carries the eight semantic actions and a
 scratch fixture root supplies the Knulli files that platform detection reads, so
-a desktop run reports the same device matrix a handheld would.
+a desktop run can simulate the selected device matrix. The target architecture
+and resolution are explicit desktop overrides; they are not measurements from a
+real handheld.
 
-Use this to check wording, layout, focus order, and every flow before touching a
-device. It does not replace a device run: only a device exercises a real SDL
+Use this to check wording, layout, focus order, offline flows, and optional
+network-backed lifecycle flows before touching a device. It does not replace a
+device run: only a device exercises a real SDL
 GameController, and only a device writes to real `/userdata`.
 
 ## Prerequisites
@@ -55,9 +58,10 @@ scripts/desktop-fixture.sh trimui-smart-pro "$PWD/build/scratch-root"
   -catalog build/catalog-index.json
 ```
 
-Drop `-resolution` to use the resolution the fixture root reports, the way a
-device does. Add `-screenshot out.png` to render one frame and exit instead of
-opening a window, which is how a screen is captured for a pull request.
+Keep `-resolution` to pin the target size. Without it, SDL renderer and window
+sizes can take precedence over the fixture's framebuffer value. Add
+`-screenshot out.png` to show the SDL window, render and save one frame, and
+exit without waiting for interaction.
 
 ## The walkthrough
 
@@ -65,10 +69,20 @@ opening a window, which is how a screen is captured for a pull request.
 make walkthrough
 ```
 
-That walks every flow below with the keyboard, captures one frame per step under
-`build/walkthrough/<flow>/`, and renders every screen state under
-`build/walkthrough/screens/`. It needs no display: `SDL_VIDEODRIVER=dummy` runs
-the same code path on a runner with no window server.
+That walks the offline flows below with the keyboard and writes their opening,
+post-key, and operation-completion frames under `build/walkthrough/<flow>/`. It
+also renders every screen state under `build/walkthrough/screens/`. For a host
+with no window server, run:
+
+```sh
+SDL_VIDEODRIVER=dummy make walkthrough
+```
+
+Include the network-backed package lifecycle flows with:
+
+```sh
+make walkthrough WALK_FLAGS=--install
+```
 
 A flow is a key sequence:
 
@@ -84,11 +98,13 @@ A flow is a key sequence:
 - `-keys` accepts `up`, `down`, `left`, `right`, `enter`, `esc`, `y`, `q`, in
   the order to press them. Each key goes through the same handler as a real
   keystroke, so a walkthrough reaches the same screens a user does.
-- `-shot-dir` keeps one frame per step and a `walk.tsv` record, and needs
-  `-keys`: without a sequence there is no step to capture. A key waits for any
+- `-shot-dir` keeps the opening frame, each post-key frame, any
+  operation-completion frames, and a `walk.tsv` record. It needs `-keys`:
+  without a sequence there is no walkthrough to capture. A key waits for any
   operation it started, so an install finishes before the next key.
 - `-walk-timeout` fails a stuck flow instead of hanging a runner.
-- The run ends when the sequence is spent, or when a key exits the app.
+- The run ends when the sequence is spent. An exit key must be the final key;
+  an early exit fails and records its final frame.
 
 | Flow | Covers |
 | --- | --- |
@@ -105,7 +121,7 @@ A flow is a key sequence:
 | `installed-uninstall` | The installed action list and uninstall (`--install`) |
 
 The `--install` flows download a real package, so they need network access and
-are left out of CI. Everything else runs offline.
+are left out of the default run and CI. Everything else runs offline.
 
 ### Reading the evidence
 
@@ -145,7 +161,7 @@ button.
 
 ## The fixture root
 
-`scripts/desktop-fixture.sh` writes only the files the detector reads:
+`scripts/desktop-fixture.sh` writes the files the detector reads:
 
 | File | Supplies |
 | --- | --- |
@@ -155,6 +171,9 @@ button.
 | `/lib/ld-linux-aarch64.so.1`, `/lib/libc.so.6` | Architecture ABI and glibc version |
 | `/usr/lib/libSDL2*.so.0`, `/lib/libresolv.so.2`, `/lib/libpthread.so.0` | Declared runtime dependencies |
 | `/sys/class/graphics/fb0/mode` | Display resolution |
+
+It also writes `.desktop-fixture`, a safety marker that permits the script to
+refresh only a fixture directory it created.
 
 Everything else the run writes — installs, logs, saved mappings, recovery
 backups — lands below `ROOT`, which is exactly how the device path is exercised
@@ -174,9 +193,11 @@ it beside the binary or from `-catalog`.
 
 ## What this covers, and what it does not
 
-Covers: every screen, the footer on each one, focus order, wording, layout
-bounds, setup, calibration, preview, settings, catalogue, details, health,
-confirmations, recovery, blocked, and error states.
+Covers: every rendered screen state, the footer on each one, focus order,
+wording, layout bounds, setup, calibration, preview, settings, catalogue,
+details, health, confirmations, recovery, blocked, and error states. The
+default scripted flows are offline; package lifecycle flows require
+`WALK_FLAGS=--install`.
 
 Does not cover: a real SDL GameController, real kernel SDL library loading, real
 device filesystem behaviour, or a real `/userdata` write. Record those runs in

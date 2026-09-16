@@ -86,4 +86,4 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Fixture root** — A throwaway directory holding the Knulli files platform detection reads, written for desktop verification only. Installs, logs, and mappings are written below it, so it stands in for a device root without a device and is never a real device root.
 
-**Walkthrough** — A scripted key sequence a desktop run replays through the real binary, one key per step, capturing a frame and a record of the screen each key reached. A walkthrough is evidence that a flow still works, not a substitute for a device run: it never exercises a real GameController, a real `/userdata` write, or the kernel's SDL loading.
+**Walkthrough** — A scripted key sequence a desktop run replays through the real binary. It records the opening frame, each post-key frame, and operation completions. A walkthrough is evidence that a flow still works, not a substitute for a device run: it never exercises a real GameController, a real `/userdata` write, or the kernel's SDL loading.
