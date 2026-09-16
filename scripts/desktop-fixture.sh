@@ -33,8 +33,12 @@ if [ "$ROOT" = "/" ] || [ -z "$ROOT" ]; then
   echo "refusing to write a desktop fixture into /" >&2
   exit 2
 fi
-if [ -e "$ROOT/etc/os-release" ] && [ ! -e "$ROOT/$MARKER" ]; then
-  echo "refusing to replace an existing device tree at $ROOT" >&2
+if [ -L "$ROOT" ]; then
+  echo "refusing to write a desktop fixture through a symlink at $ROOT" >&2
+  exit 1
+fi
+if [ -d "$ROOT" ] && [ ! -e "$ROOT/$MARKER" ] && [ -n "$(ls -A "$ROOT")" ]; then
+  echo "refusing to replace a non-empty directory at $ROOT" >&2
   echo "choose an empty directory, or remove it first if it is a scratch tree" >&2
   exit 1
 fi
