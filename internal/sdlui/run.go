@@ -71,6 +71,8 @@ type Options struct {
 const walkSettleFrames = 3
 
 func Run(ctx context.Context, backend appstore.Backend, options Options) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	if C.SDL_Init(C.SDL_INIT_VIDEO|C.SDL_INIT_GAMECONTROLLER|C.SDL_INIT_EVENTS) != 0 {
@@ -155,6 +157,7 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	}
 	ticker := time.NewTicker(time.Second / 30)
 	defer ticker.Stop()
+	exitRequested := false
 	for {
 		var event C.SDL_Event
 		for C.SDL_PollEvent(&event) != 0 {
@@ -186,19 +189,26 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 					return err
 				}
 			}
+			if exitRequested {
+				if walk.Sent() != len(options.Keys) {
+					return fmt.Errorf("walkthrough exited after %d of %d keys", walk.Sent(), len(options.Keys))
+				}
+				walkFinished(options, walk)
+				return nil
+			}
 			if key, ok := walk.Step(model.Busy); ok {
 				// The key goes through the same handler as a real keystroke, so a
 				// walkthrough reaches the same screens a user would.
 				if Handle(ctx, model, controls, options.Diagnostics, Event{Kind: EventKey, Key: key}).Exit {
-					walkFinished(options, walk)
-					return nil
+					exitRequested = true
 				}
 			}
-			if walk.Done(model.Busy) {
+			if !exitRequested && walk.Done(model.Busy) {
 				walkFinished(options, walk)
 				return nil
 			}
 			if !deadline.IsZero() && time.Now().After(deadline) {
+				cancel()
 				return fmt.Errorf("walkthrough timed out after %s: sent %d of %d keys, captured %d frames", options.WalkTimeout, walk.Sent(), len(options.Keys), walk.Steps())
 			}
 		}
