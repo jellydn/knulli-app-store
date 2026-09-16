@@ -1,10 +1,18 @@
 package appstore
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -286,6 +294,86 @@ func TestOnlyRecoverableAdoptionFailuresAllowForceReinstall(t *testing.T) {
 			t.Fatalf("recoverableAdoptionFailure(%q) = %v, want %v", test.err, got, test.allowed)
 		}
 	}
+}
+
+func TestExecuteInstallFailureAndUninstall(t *testing.T) {
+	root := t.TempDir()
+	asset := testZip(t, map[string]string{"run.sh": "#!/bin/sh\n"})
+	digest := sha256.Sum256(asset)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Length", strconv.Itoa(len(asset)))
+		_, _ = writer.Write(asset)
+	}))
+	defer server.Close()
+	client := server.Client()
+	client.Transport = testRewriteTransport{base: client.Transport, host: strings.TrimPrefix(server.URL, "https://")}
+	log, err := diagnostics.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg := installablePackage()
+	pkg.Release.SHA256 = hex.EncodeToString(digest[:])
+	pkg.Release.Size = int64(len(asset))
+	pkg.Release.InstalledSize = int64(len("#!/bin/sh\n"))
+	manager := installer.Manager{Root: root, Client: client, Diagnostics: log}.WithPlatform(platform.Info{
+		Firmware: "knulli", Version: "2026.05", Arch: "aarch64", ABI: "linux-aarch64-glibc", Dependencies: []string{"sdl2"}, Device: "trimui-smart-pro", Resolution: "1280x720",
+	})
+	service := &Service{index: catalog.Index{Packages: []catalog.Entry{{ID: pkg.ID, Package: pkg}}}, manager: manager}
+	var progress []string
+	if err := service.Execute(context.Background(), pkg.ID, Install, func(message string) { progress = append(progress, message) }); err != nil {
+		t.Fatalf("install through Execute: %v", err)
+	}
+	if len(progress) != 2 || !strings.Contains(progress[1], "completed") {
+		t.Fatalf("install progress did not consume returned outcome: %v", progress)
+	}
+
+	broken := pkg
+	broken.Release = &manifest.Release{}
+	*broken.Release = *pkg.Release
+	broken.Version = "2.0.0"
+	broken.Release.SHA256 = strings.Repeat("0", 64)
+	service.index.Packages[0].Package = broken
+	if err := service.Execute(context.Background(), pkg.ID, Update, func(string) {}); err == nil || !strings.Contains(err.Error(), "SHA-256 mismatch") {
+		t.Fatalf("update failure through Execute = %v", err)
+	}
+	service.index.Packages[0].Package = pkg
+	if err := service.Execute(context.Background(), pkg.ID, Uninstall, func(string) {}); err != nil {
+		t.Fatalf("uninstall through Execute: %v", err)
+	}
+}
+
+type testRewriteTransport struct {
+	base http.RoundTripper
+	host string
+}
+
+func (transport testRewriteTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	clone := request.Clone(request.Context())
+	clone.URL.Scheme = "https"
+	clone.URL.Host = transport.host
+	clone.Host = transport.host
+	return transport.base.RoundTrip(clone)
+}
+
+func testZip(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buffer bytes.Buffer
+	writer := zip.NewWriter(&buffer)
+	for name, body := range files {
+		header := &zip.FileHeader{Name: name, Method: zip.Store}
+		header.SetMode(0755)
+		entry, err := writer.CreateHeader(header)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.WriteString(entry, body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buffer.Bytes()
 }
 
 func TestCompletionMessageReportsRefreshOrRestartPrecisely(t *testing.T) {
