@@ -728,6 +728,14 @@ func TestUnchangedContentIsNotHashedAgain(t *testing.T) {
 	if event := lastHealthEvent(t, root); !strings.Contains(event, `hashed="1"`) {
 		t.Fatalf("moved metadata did not trigger a rehash: %s", event)
 	}
+	// The check that read the bytes records the signature it verified, so the
+	// next load is free again.
+	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
+		t.Fatalf("check after recording a signature: %#v, %v", status, err)
+	}
+	if event := lastHealthEvent(t, root); !strings.Contains(event, `hashed="0"`) {
+		t.Fatalf("a verified signature was not reused: %s", event)
+	}
 }
 
 func TestHealthCheckDetectsContentChangeWhenSizeOrTimeMoves(t *testing.T) {
@@ -826,15 +834,19 @@ func TestSignatureTrustBoundaryIsSizeAndTime(t *testing.T) {
 	}
 }
 
-func TestStateWithoutSignatureStillVerifiesContent(t *testing.T) {
-	// State written before signatures existed must keep full verification
-	// until its next operation records one.
+func TestStateWithoutSignatureIsBackfilledAfterVerification(t *testing.T) {
+	// State written before signatures existed keeps full verification, and the
+	// check that proves the content records the signature it verified.
 	root := t.TempDir()
+	logger, err := diagnostics.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
 	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
 	server := serveAsset(t, asset)
 	defer server.Close()
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	manager := Manager{Root: root, Client: rewriteClient(t, server), Diagnostics: logger}.WithPlatform(testPlatform())
 	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
 		t.Fatal(err)
 	}
@@ -850,16 +862,22 @@ func TestStateWithoutSignatureStillVerifiesContent(t *testing.T) {
 		state.Files[index].Size = 0
 		state.Files[index].Modified = ""
 	}
-	data, err := encodeState(*state)
-	if err != nil {
-		t.Fatal(err)
+	writeState(t, baseGuard, pkg.ID, *state)
+	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
+		t.Fatalf("check without a signature: %#v, %v", status, err)
 	}
-	host, err := baseGuard.Resolve(statePath(pkg.ID))
-	if err != nil {
-		t.Fatal(err)
+	if event := lastHealthEvent(t, root); !strings.Contains(event, `hashed="1"`) {
+		t.Fatalf("signature-free state was not verified: %s", event)
 	}
-	if err := os.WriteFile(host, data, 0600); err != nil {
-		t.Fatal(err)
+	backfilled, err := loadState(baseGuard, pkg.ID)
+	if err != nil || backfilled.Files[0].Modified == "" || backfilled.Files[0].Size == 0 {
+		t.Fatalf("verified signature was not recorded: %#v, %v", backfilled, err)
+	}
+	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
+		t.Fatalf("check after backfill: %#v, %v", status, err)
+	}
+	if event := lastHealthEvent(t, root); !strings.Contains(event, `hashed="0"`) {
+		t.Fatalf("backfilled state was hashed again: %s", event)
 	}
 	launcher := filepath.Join(root, "userdata/roms/tools/demo/launch.sh")
 	if err := os.WriteFile(launcher, []byte("changed content"), 0755); err != nil {
@@ -867,7 +885,22 @@ func TestStateWithoutSignatureStillVerifiesContent(t *testing.T) {
 	}
 	status, err := manager.Status(pkg.ID)
 	if err != nil || status.Healthy || len(status.Issues) != 1 || status.Issues[0].Check != "content changed" {
-		t.Fatalf("state without a signature skipped content verification: %#v, %v", status, err)
+		t.Fatalf("backfilled state stopped detecting damage: %#v, %v", status, err)
+	}
+}
+
+func writeState(t *testing.T, guard *safefs.Guard, id string, state Installed) {
+	t.Helper()
+	data, err := encodeState(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, err := guard.Resolve(statePath(id))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(host, data, 0600); err != nil {
+		t.Fatal(err)
 	}
 }
 

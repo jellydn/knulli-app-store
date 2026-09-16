@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/jellydn/knulli-app-store/internal/manifest"
@@ -122,7 +123,10 @@ func (m Manager) Status(id string) (Status, error) {
 	}
 	status := Status{Installed: true, Version: state.Manifest.Version, Healthy: true}
 	hashed := 0
-	for _, file := range state.Files {
+	// updated holds the state this check verified, with the signature it just
+	// confirmed, so the next load can skip reading those bytes again.
+	var updated []InstalledFile
+	for index, file := range state.Files {
 		if file.Preserved {
 			continue
 		}
@@ -154,14 +158,59 @@ func (m Manager) Status(id string) (Status, error) {
 			}
 			if digest != file.SHA256 {
 				status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "content changed", Expected: file.SHA256, Actual: digest})
+			} else if size, modified := verificationSignature(info); size != file.Size || modified != file.Modified {
+				if updated == nil {
+					updated = append([]InstalledFile(nil), state.Files...)
+				}
+				updated[index].Size, updated[index].Modified = size, modified
 			}
 		}
 		if issue := modeIssue(file, info.Mode()); issue != nil {
 			status.addIssue(m, state.Manifest.ID, *issue)
 		}
 	}
+	if updated != nil {
+		m.recordVerifiedSignatures(baseGuard, state, updated)
+	}
 	m.event("package_health_checked", "package", state.Manifest.ID, "healthy", fmt.Sprint(status.Healthy), "issues", fmt.Sprint(len(status.Issues)), "files", fmt.Sprint(len(state.Files)), "hashed", fmt.Sprint(hashed))
 	return status, nil
+}
+
+// recordVerifiedSignatures stores the signatures a check just verified, so a
+// state file from an earlier release, or one whose file metadata moved, stops
+// being hashed on every load. This writes outside an operation, so it takes
+// the manager lock and writes only while the state it verified is still the
+// state on disk: a concurrent operation owns whichever state it commits.
+func (m Manager) recordVerifiedSignatures(guard *safefs.Guard, checked *Installed, updated []InstalledFile) {
+	id := checked.Manifest.ID
+	managerHost, err := guard.Resolve(managerPath)
+	if err != nil {
+		return
+	}
+	lock, err := acquireLock(filepath.Join(managerHost, "lock"))
+	if err != nil {
+		return
+	}
+	defer releaseLock(lock)
+	current, err := loadState(guard, id)
+	if err != nil || current == nil || !slices.Equal(current.Files, checked.Files) {
+		return
+	}
+	state := *current
+	state.Files = updated
+	data, err := encodeState(state)
+	if err != nil {
+		return
+	}
+	host, err := guard.Resolve(statePath(id))
+	if err != nil {
+		return
+	}
+	if err := safefs.AtomicWrite(host, data, 0600); err != nil {
+		m.event("verified_signature_write_failed", "package", id, "error", err.Error())
+		return
+	}
+	m.event("verified_signature_recorded", "package", id, "files", fmt.Sprint(len(updated)))
 }
 
 // modeIssue reports a permission regression. The destination filesystem owns
