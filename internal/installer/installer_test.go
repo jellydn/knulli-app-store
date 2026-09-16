@@ -619,6 +619,23 @@ func TestRolledBackDestinationSkeletonIsNotAnExternalInstallation(t *testing.T) 
 	}
 }
 
+func TestDestinationFileIsReportedInsteadOfFailingTheCatalogue(t *testing.T) {
+	root := t.TempDir()
+	writeRootFile(t, root, "userdata/roms/tools/demo", "not a directory")
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	manager := Manager{Root: root}.WithPlatform(testPlatform())
+	// A non-directory destination is still something the user must move aside,
+	// and it must not break status for every package in the catalogue.
+	existing, err := manager.PreExisting(pkg)
+	if err != nil || !existing {
+		t.Fatalf("file at the destination was not reported: existing=%v err=%v", existing, err)
+	}
+	if _, err := manager.Apply(context.Background(), OpAdopt, pkg); err == nil || !strings.Contains(err.Error(), "destination is not a directory") {
+		t.Fatalf("adoption of a file at the destination = %v", err)
+	}
+}
+
 func TestFilesystemNormalizedModeIsNotAHealthIssue(t *testing.T) {
 	root := t.TempDir()
 	asset := zipBytesWithModes(t, map[string]zipFixture{

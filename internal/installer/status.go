@@ -76,7 +76,9 @@ func (m Manager) RecoveryStatus(pkg manifest.Package) (RecoveryStatus, error) {
 // skeleton left behind by a rolled-back write is an absent package, not an
 // external installation: reporting it as external offers Manage existing for
 // a copy adoption can never find. Anything else at the destination still
-// needs the user to move it aside first.
+// needs the user to move it aside first. This stops at the first entry
+// instead of hashing the destination like adoption does, because the
+// catalogue asks every package on every load.
 func (m Manager) PreExisting(pkg manifest.Package) (bool, error) {
 	if !pkg.Installable() || pkg.Install == nil {
 		return false, nil
@@ -174,16 +176,12 @@ func (m Manager) Status(id string) (Status, error) {
 // the recorded mode granted are required back; wider bits are not an issue.
 func modeIssue(file InstalledFile, actual os.FileMode) *HealthIssue {
 	expected := os.FileMode(file.Mode).Perm()
-	missing := os.FileMode(0)
 	for _, class := range [...]os.FileMode{0444, 0222, 0111} {
 		if expected&class != 0 && actual.Perm()&class == 0 {
-			missing |= class
+			return &HealthIssue{Path: file.Path, Check: "mode changed", Expected: fmt.Sprintf("%04o", expected), Actual: fmt.Sprintf("%04o", actual.Perm())}
 		}
 	}
-	if missing == 0 {
-		return nil
-	}
-	return &HealthIssue{Path: file.Path, Check: "mode changed", Expected: fmt.Sprintf("%04o", expected), Actual: fmt.Sprintf("%04o", actual.Perm())}
+	return nil
 }
 
 func (status *Status) addIssue(manager Manager, packageID string, issue HealthIssue) {

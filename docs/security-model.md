@@ -30,7 +30,7 @@ Upstream package code runs later when the user launches it. The installer does n
 - Atomically replace regular files and installed state.
 - Snapshot every changed file, persist a journal before destination mutation, and roll back a failed operation in reverse order. Recover an open journal on the next locked start.
 - Keep a persistent backup when installation overwrites a file the package did not own.
-- Show a detected external copy as the row state **EXTERNAL** with the action **Manage existing**, then inventory it before adoption. Detection and adoption read the same inventory, so a destination that holds no files is never offered for adoption. Exact release-hash matches can become manager-owned; changed and unknown files are marked unmanaged and backed up because ownership is not proven.
+- Show a detected external copy as the row state **EXTERNAL** with the action **Manage existing**, then inventory it before adoption. Detection and adoption both require at least one file at the destination, so an empty directory is never offered for adoption. Exact release-hash matches can become manager-owned; changed and unknown files are marked unmanaged and backed up because ownership is not proven.
 - Preserve declared configuration during repair, update, and uninstall.
 - Track installed paths, hashes, modes, and original-file backups.
 - Persist the requested operation, detected install type, and safe retry target below manager state. Revalidate the current package state before showing a retry; never convert an absent fresh install into adoption.
