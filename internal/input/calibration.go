@@ -32,7 +32,7 @@ func (calibration *Calibration) Assign(button int) error {
 	}
 	for assignedAction, assignedButton := range calibration.Mapping {
 		if assignedButton == button {
-			calibration.Error = fmt.Sprintf("%s is already assigned to %s; try another button", ButtonLabel(button), Label(assignedAction))
+			calibration.Error = fmt.Sprintf("%s is already assigned to %s; try another button", ButtonLabel(button), Verb(assignedAction))
 			return fmt.Errorf("button conflict")
 		}
 	}

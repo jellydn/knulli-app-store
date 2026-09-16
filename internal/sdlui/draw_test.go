@@ -65,6 +65,7 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		"installed-healthy":   {Items: []appstore.Item{verified}},
 		"verified":            {Items: []appstore.Item{verified}, Focus: storeui.Actions},
 		"experimental":        {Items: []appstore.Item{experimental}, Focus: storeui.Actions},
+		"candidate":           {Items: []appstore.Item{candidate}, Focus: storeui.Actions},
 		"external":            {Items: []appstore.Item{external}, Focus: storeui.Actions},
 		"external-confirm":    {Items: []appstore.Item{external}, Focus: storeui.Confirm},
 		"recovery":            {Items: []appstore.Item{recovery}, Focus: storeui.Actions, Error: recovery.RecoveryReason},
@@ -108,7 +109,6 @@ func TestRenderRepresentativeStates(t *testing.T) {
 			}
 		}
 		controls.Mode = storeinput.Settings
-		controls.Message = "Controller settings"
 		settings := draw(&storeui.Model{}, platformHeader(device), controls)
 		if output := renderOutput(settings, width, height); output.Bounds() != image.Rect(0, 0, width, height) {
 			t.Fatalf("%s settings has unexpected bounds %v", device, output.Bounds())
@@ -118,6 +118,126 @@ func TestRenderRepresentativeStates(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+	}
+}
+
+// catalogueItem is a verified package with two safe actions, used to prove the
+// action row stays visible under every kind of status block.
+func catalogueItem() appstore.Item {
+	return appstore.Item{
+		Package:    manifest.Package{ID: "app.romm.grout", Name: "Grout", Version: "5.2.0.0", Type: "integration", Review: manifest.Review{Status: "verified"}},
+		Compatible: true, Compatibility: "Compatible with detected platform",
+		Actions: []appstore.Action{appstore.Install, appstore.Repair},
+	}
+}
+
+func TestFooterCharacterLimitTracksTheCanvasWidth(t *testing.T) {
+	if want := (canvasWidth - 2*panelLeft) / 7; footerCharacterLimit != want {
+		t.Fatalf("footer limit %d does not match the %dpx canvas (%d)", footerCharacterLimit, canvasWidth, want)
+	}
+}
+
+func TestStatusBlockSitsAboveTheActionRow(t *testing.T) {
+	labelTop := actionLabelBaseline - 11
+	if statusBoxBottom >= labelTop {
+		t.Fatalf("status block (bottom %d) reaches the action row (label top %d)", statusBoxBottom, labelTop)
+	}
+	if statusBoxBottom-statusBaseline-(statusLines-1)*15 < 0 {
+		t.Fatal("status block is shorter than the lines it must show")
+	}
+}
+
+func TestStatusBlockNeverCoversTheActionRow(t *testing.T) {
+	recovery := catalogueItem()
+	recovery.RecoveryReason = "adoption backup already exists for /userdata/roms/tools/Grout/grout"
+	recovery.RecoverySummary = "Replaces reviewed app files; preserves declared data."
+	recovery.Actions = []appstore.Action{appstore.Adopt, appstore.ForceReinstall}
+	states := map[string]*storeui.Model{
+		"error":    {Items: []appstore.Item{catalogueItem()}, Error: "Install failed: checksum mismatch on /userdata/roms/tools/Grout/grout"},
+		"message":  {Items: []appstore.Item{catalogueItem()}, Message: "Diagnostics saved to /userdata/system/knulli-app-store/diagnostics/knulli-app-store-diagnostics-20260915T073500Z.txt"},
+		"recovery": {Items: []appstore.Item{recovery}, Focus: storeui.Actions, Error: recovery.RecoveryReason},
+	}
+	for name, model := range states {
+		t.Run(name, func(t *testing.T) {
+			frame := draw(model, platformHeader("trimui-smart-pro"), nil)
+			painted := 0
+			for y := actionRowBaseline; y < actionRowBaseline+22; y++ {
+				for x := panelInset; x < panelRight; x++ {
+					if frame.RGBAAt(x, y) == palette.selected {
+						painted++
+					}
+				}
+			}
+			if painted == 0 {
+				t.Fatal("the status block covered the action buttons")
+			}
+		})
+	}
+}
+
+func TestFooterIsTheOnlyHintOnEveryScreen(t *testing.T) {
+	item := appstore.Item{Compatible: true, Actions: []appstore.Action{appstore.Install}}
+	normal := func() *storeinput.Session {
+		controls := storeinput.NewSession(t.TempDir(), "trimui-smart-pro")
+		controls.Connected = true
+		controls.FirstRun = false
+		controls.Mode = storeinput.Normal
+		return controls
+	}
+	mode := func(value storeinput.Mode, prepare func(*storeinput.Session)) *storeinput.Session {
+		controls := storeinput.NewSession(t.TempDir(), "trimui-smart-pro")
+		controls.Connected = true
+		controls.FirstRun = value == storeinput.Setup
+		controls.Mode = value
+		if prepare != nil {
+			prepare(controls)
+		}
+		return controls
+	}
+	type screen struct {
+		name     string
+		model    *storeui.Model
+		controls *storeinput.Session
+	}
+	screens := []screen{
+		{name: "catalogue", model: &storeui.Model{Items: []appstore.Item{item}, Focus: storeui.Browse}, controls: normal()},
+		{name: "health", model: &storeui.Model{Items: []appstore.Item{item}, Focus: storeui.Health}, controls: normal()},
+		{name: "actions", model: &storeui.Model{Items: []appstore.Item{item}, Focus: storeui.Actions}, controls: normal()},
+		{name: "confirmation", model: &storeui.Model{Items: []appstore.Item{item}, Focus: storeui.Confirm}, controls: normal()},
+		{name: "force-confirmation", model: &storeui.Model{Items: []appstore.Item{item}, Focus: storeui.ForceConfirm}, controls: normal()},
+		{name: "blocked", model: &storeui.Model{}, controls: mode(storeinput.Blocked, nil)},
+		{name: "settings", model: &storeui.Model{}, controls: mode(storeinput.Settings, nil)},
+		{name: "review", model: &storeui.Model{}, controls: mode(storeinput.Review, func(controls *storeinput.Session) { controls.Calibration = storeinput.NewCalibration() })},
+		{name: "calibrating", model: &storeui.Model{}, controls: mode(storeinput.Calibrating, func(controls *storeinput.Session) { controls.Calibration = storeinput.NewCalibration() })},
+		{name: "preview", model: &storeui.Model{}, controls: mode(storeinput.Preview, func(controls *storeinput.Session) {
+			controls.Calibration = storeinput.NewPreview(storeinput.AutoMapping())
+		})},
+	}
+	for _, current := range screens {
+		t.Run(current.name, func(t *testing.T) {
+			frame := draw(current.model, platformHeader("trimui-smart-pro"), current.controls)
+			// The gap between the panel and the footer must stay empty, so no
+			// screen can squeeze a second hint next to the shared footer line.
+			for y := panelBottom; y < footerBaseline-11; y++ {
+				for x := 0; x < canvasWidth; x++ {
+					if got := frame.RGBAAt(x, y); got != palette.background {
+						t.Fatalf("pixel (%d,%d) is %#v, want background between panel and footer", x, y, got)
+					}
+				}
+			}
+			painted := false
+			for y := footerBaseline - 11; y <= footerBaseline && !painted; y++ {
+				for x := 0; x < canvasWidth; x++ {
+					if frame.RGBAAt(x, y) == palette.muted {
+						painted = true
+						break
+					}
+				}
+			}
+			if !painted {
+				t.Fatal("the shared footer hint was not painted below the panel")
+			}
+		})
 	}
 }
 
@@ -199,6 +319,14 @@ func TestRenderControllerPreviewAndBlockedState(t *testing.T) {
 	frame := draw(model, "MagicX Zero 28 / 640x480", blocked)
 	if frame.Bounds() != image.Rect(0, 0, canvasWidth, canvasHeight) {
 		t.Fatalf("blocked frame failed: %v", frame.Bounds())
+	}
+	if directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR"); directory != "" {
+		if err := os.MkdirAll(directory, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := saveOutputScreenshot(filepath.Join(directory, "magicx-zero-28-controller-blocked.png"), frame, 640, 480); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	preview := storeinput.NewSession(t.TempDir(), "trimui-smart-pro")
@@ -339,9 +467,9 @@ func TestSwappedConfirmBackMappingControlsCatalogueAndConfirmation(t *testing.T)
 			if model.Focus != storeui.Confirm {
 				t.Fatalf("swapped Confirm did not open package confirmation: %v", model.Focus)
 			}
-			help := confirmationHelp(controls)
-			if !strings.Contains(help, "CONFIRM (SDL B)") || !strings.Contains(help, "BACK (SDL A)") {
-				t.Fatalf("confirmation did not show active physical labels: %q", help)
+			help := footerText(model, controls)
+			if !strings.Contains(help, "SELECT (SDL B)") || !strings.Contains(help, "BACK (SDL A)") {
+				t.Fatalf("footer did not show active physical labels: %q", help)
 			}
 			width, height := targetSize(device)
 			frame := renderOutput(draw(model, platformHeader(device), controls), width, height)
