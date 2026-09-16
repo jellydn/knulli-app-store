@@ -102,6 +102,52 @@ func TestModelShowsOperationFailure(t *testing.T) {
 	}
 }
 
+func TestIssueSelectionOpensHealthBeforeActions(t *testing.T) {
+	backend := &fakeBackend{items: []appstore.Item{{
+		Package: manifest.Package{ID: "app.romm.grout", Name: "Grout"}, Healthy: false,
+		HealthReason: "mode changed: /userdata/roms/tools/Grout/grout (expected 0755, got 0777)",
+		Actions:      []appstore.Action{appstore.Repair, appstore.Uninstall},
+	}}}
+	model := New(backend)
+	if err := model.Load(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	model.Select(context.Background())
+	if model.Focus != Health {
+		t.Fatalf("Issue opened focus %v, want health", model.Focus)
+	}
+	model.Select(context.Background())
+	if model.Focus != Actions {
+		t.Fatalf("health confirmation opened focus %v, want actions", model.Focus)
+	}
+}
+
+func TestForceReinstallRequiresTwoConfirmationSteps(t *testing.T) {
+	backend := &fakeBackend{items: []appstore.Item{{
+		Package: manifest.Package{ID: "org.example.alpha", Name: "Alpha"},
+		Actions: []appstore.Action{appstore.Adopt, appstore.ForceReinstall},
+	}}}
+	model := New(backend)
+	if err := model.Load(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	model.Select(context.Background())
+	model.Move(1)
+	model.Select(context.Background())
+	if model.Focus != Confirm || model.Busy {
+		t.Fatalf("force reinstall skipped first review: focus=%d busy=%v", model.Focus, model.Busy)
+	}
+	model.Select(context.Background())
+	if model.Focus != ForceConfirm || model.Busy {
+		t.Fatalf("force reinstall skipped second confirmation: focus=%d busy=%v", model.Focus, model.Busy)
+	}
+	model.Select(context.Background())
+	waitForModel(t, model)
+	if backend.action != appstore.ForceReinstall {
+		t.Fatalf("executed %q, want force reinstall", backend.action)
+	}
+}
+
 func TestModelDoesNotOfferCandidateAction(t *testing.T) {
 	backend := &fakeBackend{items: []appstore.Item{{Package: manifest.Package{ID: "org.example.candidate", Name: "Candidate"}}}}
 	model := New(backend)

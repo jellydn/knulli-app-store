@@ -40,6 +40,7 @@
 - [Architecture](docs/architecture.md)
 - [How to add a package](docs/how-to-add-a-package.md)
 - [Manifest review](docs/manifest-review.md)
+- [Current catalogue review](docs/catalogue-review-2026-09-15.md)
 - [Real-device tests](docs/real-device-tests.md)
 - [Architecture decisions](docs/adr/)
 
@@ -102,8 +103,8 @@ The catalogue has four packages. Community approval records provenance separatel
 
 | Package | Status | Remaining blocker |
 | --- | --- | --- |
-| [PlayTime 1.0.0](https://github.com/unitreign/playtime) | Smart Pro tested; MagicX experimental | The Smart Pro report did not itemize lifecycle steps; no MagicX package result |
-| [Grout 5.1.0.0](https://github.com/rommapp/grout) | Verified on Smart Pro | The report was positive but did not itemize lifecycle steps; built-in updater must not be used |
+| [PlayTime 1.0.0](https://github.com/unitreign/playtime) | Broad experimental Knulli | Exact 1.0.0 Smart Pro evidence only; other matching devices are experimental |
+| [Grout 5.2.0.0](https://github.com/rommapp/grout) | Broad experimental Knulli | No 5.2.0.0 device test; Store staging disables the self-updater with a verified binary patch |
 | [RAOfflineProxy](https://github.com/misantronic/RAOfflineProxy) v1.13.0-alpha1 | Approved; blocked | The Knulli asset is a self-extracting script; supported archive, extracted size, dependencies, narrow writes, and updater safety are unresolved |
 | [PocketCurator](https://github.com/tomtombombadil/PocketCurator) v1.1.2 | Approved; blocked | The release is mutable; extracted inventory/size, narrow ROM and game-list writes, updater safety, and exact Knulli evidence are unresolved |
 
@@ -111,13 +112,13 @@ These notes record evidence reviewed on 2026-09-15. Upstream facts can change. T
 
 ## Current scope
 
-- Manifest-driven packages for reviewed Knulli `aarch64` devices; the original installer test matrix is H700
+- Manifest-driven packages for detected Knulli `aarch64` devices with a supported glibc ABI, declared runtime libraries, a known device identity, and validated display bounds
 - Experimental GUI artifacts for TrimUI Smart Pro at 1280×720 and MagicX Zero 28 at 640×480
-- One or more explicit resolutions per approved manifest; no resolution is assumed
+- Exact tested resolutions or reviewed experimental display bounds; no resolution is assumed
 - ZIP and `tar.gz` release archives, up to 512 MiB compressed and installed
 - Writes below `/userdata` only
 
-The GUI is functional on one community-tested TrimUI Smart Pro. A real MagicX diagnostic confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController `magicx-input`; full GUI testing is still incomplete. Grout remains unsupported on MagicX. PlayTime remains experimental there.
+The GUI is functional on one community-tested TrimUI Smart Pro. A real MagicX diagnostic confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController `magicx-input`; full GUI testing is still incomplete. PlayTime and Grout are available for experimental tests on any detected device that satisfies their exact architecture, ABI, dependency, and display bounds. A matching device is not verified unless the manifest has evidence for that exact package version and matrix.
 
 ROM-download sources are outside the official catalogue policy.
 
@@ -127,7 +128,11 @@ The controller-native SDL2 GUI browses the catalogue, shows package details and 
 
 Current Knulli is identified through `OS_NAME="knulli"` in `/etc/os-release`, not its inherited `ID=buildroot`. The release identifier comes from `/usr/share/knulli/knulli.version`. Compatibility errors include the selected raw value, normalized value, source, and full detected device matrix. Use Settings to export a redacted diagnostic text bundle. The active log is capped at 512 KiB with one rotated copy at `/userdata/system/logs/knulli-app-store.log.1`.
 
-Package health checks report the exact managed path and failed content or mode check. State records the mode that the destination filesystem applies, not only the requested staging mode. This prevents a false Repair state when a Knulli filesystem normalizes permissions. PlayTime's runtime database, hook, and other data outside its three immutable release files do not cause a health failure.
+Package health checks report the exact managed path and full expected and actual hash or mode. Selecting **Issue** opens this health section before the action list and gives the Repair step. State records the mode that the destination filesystem applies, not only the requested staging mode. This prevents a false Repair state when a Knulli filesystem normalizes permissions. PlayTime's runtime database, hook, and other data outside its three immutable release files do not cause a health failure.
+
+If **Manage existing** fails, the recovery screen shows the exact reason and offers **Retry manage**, **Export diagnostics**, and **Cancel**. **Force reinstall** also appears for a recoverable ownership failure or validated stale transaction, but not for an active transaction or a security, compatibility, licensing, or space failure. Force reinstall is never a normal first action. It needs two confirmations, keeps every mandatory security check, preserves declared data, and writes a complete timestamped recovery backup under `/userdata/system/knulli-app-store/recovery-backups/<package-id>/`.
+
+Failed operation context is stored under `/userdata/system/knulli-app-store/lifecycle/`. A retry stays bound to its originating operation: failed fresh installs retry **Install**, while update, repair, management, force-reinstall, and uninstall failures retry their own operation only when the current package state still permits it. An absent package never routes to **Manage existing**. Normal compatibility and integrity checks run again on every retry.
 
 GitHub Actions publishes separate `knulli-app-store-trimui-smart-pro-experimental` and `knulli-app-store-magicx-zero-28-experimental` artifacts after all checks pass.
 

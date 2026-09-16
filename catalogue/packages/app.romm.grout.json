@@ -2,21 +2,21 @@
   "schema": "org.knulli.app-store/package-manifest/v1",
   "id": "app.romm.grout",
   "name": "Grout",
-  "version": "5.1.0.0",
+  "version": "5.2.0.0",
   "type": "integration",
   "summary": "Connects a Linux retro handheld to a RomM server.",
   "repository": "https://github.com/rommapp/grout",
   "license": "MIT",
   "review": {
-    "status": "verified",
+    "status": "experimental",
     "approval": {
       "provenance": "community"
     },
     "notes": [
-      "Real-device validation is limited to Grout 5.1.0.0 on TrimUI Smart Pro with Knulli Scarab. The tester reported only that the test was all good; individual lifecycle steps were not reported.",
-      "Do not use Grout's built-in updater. It cannot be disabled through a supported setting; use Knulli App Store for repair or future updates.",
-      "The manager preserves and backs up pre-existing config.json, save_slots.json, cache, logs, and unknown files before adoption.",
-      "MagicX Zero 28 remains blocked: the tagged Knulli release does not establish MagicX orientation, input handling, SDL ABI, or readable 640x480 behavior."
+      "Grout 5.2.0.0 is authorized for broad experimental Knulli testing only on detected aarch64 glibc systems with the declared SDL libraries and a validated 640x480 through 1280x720 display. This is not universal verification.",
+      "The Store replaces the one pinned updater-metadata URL in the reviewed binary with a reserved .invalid URL and verifies the exact transformed SHA-256. This prevents Grout's self-updater from obtaining release metadata.",
+      "The manager preserves config.json, save_slots.json, .cache, and logs during update, repair, force reinstall, and uninstall. Recovery backups remain available for manual restore.",
+      "Real-device validation is limited to Grout 5.1.0.0 on TrimUI Smart Pro with Knulli Scarab; it does not verify this 5.2.0.0 release or another device."
     ],
     "evidence": [
       {
@@ -25,23 +25,23 @@
       },
       {
         "kind": "release-asset",
-        "url": "https://github.com/rommapp/grout/releases/download/v5.1.0.0/Grout-Knulli.zip",
-        "note": "Version-pinned Knulli ZIP; 24,279,213 bytes compressed, 95,180,746 bytes extracted, SHA-256 1af9924fc42dd7213c45f09c1a8d93726c7ade5cdac8394a020a433260cbb356."
+        "url": "https://github.com/rommapp/grout/releases/download/v5.2.0.0/Grout-Knulli.zip",
+        "note": "Version-pinned Knulli ZIP asset 566533951; 24,277,451 bytes compressed, 47,590,773 bytes across six regular files, SHA-256 bd1d4eea3cc262a50cf6c58369d95a1c3c474d95e7f4745406f2a5bd449e3b9d. GitHub marks the release itself non-immutable, so the Store relies on exact size and digest and rejects replacement bytes."
       },
       {
         "kind": "license",
-        "url": "https://github.com/rommapp/grout/blob/a812d0cb9bc802f61eb88e4d4b522e3d1eee0483/LICENSE",
+        "url": "https://github.com/rommapp/grout/blob/fd470ab8e1ff63d643432727724b5b05b9317ced/LICENSE",
         "note": "MIT license reviewed at the tagged commit."
       },
       {
         "kind": "device-compatibility-claim",
-        "url": "https://github.com/rommapp/grout/blob/v5.1.0.0/docs/getting-started/install-knulli.md",
-        "note": "Upstream lists TrimUI Smart Pro as tested with Knulli, without a firmware version or test report."
+        "url": "https://github.com/rommapp/grout/blob/fd470ab8e1ff63d643432727724b5b05b9317ced/docs/getting-started/install-knulli.md",
+        "note": "Upstream lists RG34XX, RG35XX SP, and TrimUI Smart Pro as tested with Knulli, without firmware, release digest, lifecycle detail, or a Store test report."
       },
       {
         "kind": "filesystem-and-network-review",
-        "url": "https://github.com/rommapp/grout/blob/v5.1.0.0/cfw/knulli/knulli.go",
-        "note": "Reviewed paths are /userdata/roms/tools/Grout, /userdata/roms/tools/.update, /userdata/roms/tools/gamelist.xml, /userdata/roms, /userdata/bios, and /userdata/saves. Network access is required for RomM and updates. The launcher executes local files; the binary updater checks a supplied SHA-256 before staging release code."
+        "url": "https://github.com/rommapp/grout/blob/fd470ab8e1ff63d643432727724b5b05b9317ced/cfw/knulli/knulli.go",
+        "note": "Reviewed runtime paths are /userdata/roms/tools/Grout, /userdata/roms/tools/gamelist.xml, /userdata/roms, /userdata/bios, and /userdata/saves. Network access is required for RomM. Store installation never executes the upstream launcher or updater."
       },
       {
         "kind": "real-device-test",
@@ -59,35 +59,50 @@
     ]
   },
   "release": {
-    "url": "https://github.com/rommapp/grout/releases/download/v5.1.0.0/Grout-Knulli.zip",
-    "sha256": "1af9924fc42dd7213c45f09c1a8d93726c7ade5cdac8394a020a433260cbb356",
-    "size": 24279213,
-    "installed_size": 95180746,
+    "url": "https://github.com/rommapp/grout/releases/download/v5.2.0.0/Grout-Knulli.zip",
+    "sha256": "bd1d4eea3cc262a50cf6c58369d95a1c3c474d95e7f4745406f2a5bd449e3b9d",
+    "size": 24277451,
+    "installed_size": 47590773,
     "format": "zip",
     "immutable": true
   },
   "compatibility": {
     "firmware": "knulli",
-    "minimum_version": "scarab",
     "architectures": ["aarch64"],
-    "devices": ["trimui-smart-pro"],
-    "resolutions": ["1280x720"]
+    "abis": ["linux-aarch64-glibc"],
+    "minimum_glibc": "2.17",
+    "dependencies": ["sdl2", "sdl2-image", "sdl2-ttf", "libc", "libresolv", "libpthread"],
+    "device_scope": "any",
+    "display_bounds": {
+      "minimum_width": 640,
+      "minimum_height": 480,
+      "maximum_width": 1280,
+      "maximum_height": 720
+    }
   },
   "install": {
     "destination": "/userdata/roms/tools/Grout",
     "strip_components": 1,
     "launcher": "Grout.sh",
     "executables": ["Grout.sh", "grout"],
-    "warning": "Do not use Grout updater. Update only through Knulli App Store.",
+    "warning": "Experimental on this device. Store integrity controls disable Grout's self-updater; update only through the Store.",
     "preserve": ["config.json", "save_slots.json", ".cache", "logs"],
     "network": true,
     "allowed_write_paths": [
       "/userdata/roms/tools/Grout",
-      "/userdata/roms/tools/.update",
       "/userdata/roms/tools/gamelist.xml",
       "/userdata/roms",
       "/userdata/bios",
       "/userdata/saves"
+    ],
+    "binary_patches": [
+      {
+        "path": "grout",
+        "offset": 9490992,
+        "before_hex": "68747470733a2f2f67726f75742e726f6d6d2e6170702f76657273696f6e732e6a736f6e",
+        "after_hex": "68747470733a2f2f73656c662d7570646174652e64697361626c65642e696e76616c6964",
+        "sha256": "39b5ba053913620aea2db051c2fad2fa0bf05b59c2cc88bcb01734dd048882e7"
+      }
     ]
   }
 }
