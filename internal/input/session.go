@@ -96,7 +96,9 @@ func (session *Session) Connect(identity Identity, knulliMapping bool) {
 // connect binds the session to an identity and the name of the source that
 // reported it, then loads the mapping saved for that identity.
 func (session *Session) connect(identity Identity, source string) {
-	identity.Device = session.Device
+	if source != KeyboardSourceName {
+		identity.Device = session.Device
+	}
 	session.Identity = identity
 	session.Connected = true
 	session.Mapping = session.detected().Clone()
@@ -109,9 +111,13 @@ func (session *Session) connect(identity Identity, source string) {
 	} else if found {
 		session.Mapping = saved
 		session.Source = "saved controller mapping"
+		session.Message = "Saved controller mapping loaded"
+		if source == KeyboardSourceName {
+			session.Source = "saved keyboard mapping"
+			session.Message = "Saved keyboard mapping loaded"
+		}
 		session.Mode = Normal
 		session.FirstRun = false
-		session.Message = "Saved controller mapping loaded"
 		return
 	}
 	session.openSetup(true)
