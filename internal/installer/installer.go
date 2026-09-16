@@ -57,9 +57,7 @@ const (
 
 // WithPlatform returns a copy of the manager bound to the given detected platform.
 func (m Manager) WithPlatform(info platform.Info) Manager {
-	info.ResolutionCandidates = append([]platform.ResolutionCandidate(nil), info.ResolutionCandidates...)
-	info.Dependencies = append([]string(nil), info.Dependencies...)
-	m.platform = info
+	m.platform = info.Clone()
 	return m
 }
 

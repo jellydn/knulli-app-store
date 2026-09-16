@@ -979,13 +979,13 @@ func TestApplyRejectsUnsupportedOperation(t *testing.T) {
 }
 
 func TestWithPlatformCopiesSlices(t *testing.T) {
-	info := testPlatform()
-	info.ResolutionCandidates = []platform.ResolutionCandidate{{Source: "framebuffer", Width: 640, Height: 480}}
+	info := testPlatform().WithCandidates([]platform.ResolutionCandidate{{Source: "framebuffer", Width: 640, Height: 480}})
 	manager := (Manager{}).WithPlatform(info)
 	info.Dependencies[0] = "mutated"
-	info.ResolutionCandidates[0].Source = "mutated"
+	candidates := info.ResolutionCandidates()
+	candidates[0].Source = "mutated"
 	bound := manager.Platform()
-	if bound.Dependencies[0] == "mutated" || bound.ResolutionCandidates[0].Source == "mutated" {
+	if bound.Dependencies[0] == "mutated" || bound.ResolutionCandidates()[0].Source == "mutated" {
 		t.Fatalf("bound platform aliases caller slices: %#v", bound)
 	}
 }

@@ -230,7 +230,7 @@ func compatibility(pkg manifest.Package, current platform.Info) (bool, string) {
 		return false, err.Error()
 	}
 	if pkg.Experimental() {
-		return true, fmt.Sprintf("Experimental compatibility: Knulli identity confirmed from %s; no minimum version is claimed; device=%s architecture=%s resolution=%s source=%s version=%s", current.Evidence.FirmwareSource, current.Device, current.Arch, current.Resolution, current.ResolutionSource, current.Version)
+		return true, fmt.Sprintf("Experimental compatibility: Knulli identity confirmed from %s; no minimum version is claimed; device=%s architecture=%s resolution=%s source=%s version=%s", current.Evidence(platform.FieldFirmware).Location, current.Device, current.Arch, current.Resolution, current.Evidence(platform.FieldResolution).Location, current.Version)
 	}
 	return true, "Compatible with detected platform"
 }

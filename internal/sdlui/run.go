@@ -81,10 +81,10 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	defer C.SDL_DestroyRenderer(renderer)
 	runtimeCandidates := runtimeResolutionCandidates(window, renderer)
 	allCandidates := append([]platform.ResolutionCandidate(nil), runtimeCandidates...)
-	if options.Platform.ResolutionSource == "command-line override" {
-		allCandidates = append(append([]platform.ResolutionCandidate(nil), options.Platform.Evidence.Candidates...), runtimeCandidates...)
+	if options.Platform.Evidence(platform.FieldResolution).Location == "command-line override" {
+		allCandidates = append(options.Platform.ResolutionCandidates(), runtimeCandidates...)
 	} else {
-		allCandidates = append(allCandidates, options.Platform.Evidence.Candidates...)
+		allCandidates = append(allCandidates, options.Platform.ResolutionCandidates()...)
 	}
 	options.Platform = options.Platform.WithCandidates(allCandidates)
 	logResolutionCandidates(options.Diagnostics, platform.AssessResolutions(allCandidates), options.Platform)
@@ -174,7 +174,7 @@ func logResolutionCandidates(logger *diagnostics.Log, assessments []platform.Res
 	for _, candidate := range assessments {
 		logger.Event("resolution_candidate", "source", candidate.Source, "width", fmt.Sprint(candidate.Width), "height", fmt.Sprint(candidate.Height), "valid", fmt.Sprint(candidate.Valid), "reason", candidate.Reason)
 	}
-	logger.Event("resolution_selected", "resolution", selected.Resolution, "source", selected.ResolutionSource)
+	logger.Event("resolution_selected", "resolution", selected.Resolution, "source", selected.Evidence(platform.FieldResolution).Location)
 	logger.Event("platform_detected", "details", platform.Summary(selected))
 }
 
