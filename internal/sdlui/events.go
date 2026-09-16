@@ -23,16 +23,37 @@ const (
 	// EventQuit asks the UI to exit.
 	EventQuit
 	// EventButton is one button press, already mapped to a raw button code.
-	// Keyboards and the active controller both produce it.
+	// The active controller produces it.
 	EventButton
+	// EventKey is one portable keyboard key.
+	EventKey
+	// EventControllerConnected means a controller became active.
+	EventControllerConnected
 	// EventControllerRemoved means the active controller went away.
 	EventControllerRemoved
 )
 
+type Key int
+
+const (
+	KeyNone Key = iota
+	KeyUp
+	KeyLeft
+	KeyDown
+	KeyRight
+	KeyConfirm
+	KeyBack
+	KeyDiagnostics
+	KeyExit
+)
+
 // Event is one translated device event.
 type Event struct {
-	Kind   EventKind
-	Button int // raw button code; only for EventButton
+	Kind          EventKind
+	Button        int // raw button code; only for EventButton
+	Key           Key
+	Identity      storeinput.Identity
+	KnulliMapping bool
 }
 
 // Effects reports what Handle did with an event.
@@ -52,6 +73,15 @@ func Handle(ctx context.Context, model *storeui.Model, controls *storeinput.Sess
 	switch event.Kind {
 	case EventQuit:
 		return Effects{Exit: true}
+	case EventControllerConnected:
+		beforeMode, beforeSource := controls.Mode, controls.Source
+		controls.Connect(event.Identity, event.KnulliMapping)
+		logger.Event("controller_connected", "device", controls.Device, "name", event.Identity.Name, "guid", event.Identity.GUID, "mapping_source", controls.Source)
+		logControllerTransition(logger, controls, beforeMode, beforeSource)
+		if controls.ValidationError != "" {
+			logger.Event("controller_mapping_validation_failed", "error", controls.ValidationError)
+		}
+		return Effects{}
 	case EventControllerRemoved:
 		beforeMode, beforeSource := controls.Mode, controls.Source
 		controls.Disconnect()
@@ -59,8 +89,41 @@ func Handle(ctx context.Context, model *storeui.Model, controls *storeinput.Sess
 		return Effects{}
 	case EventButton:
 		return processButton(ctx, model, controls, event.Button, logger)
+	case EventKey:
+		action := keyAction(event.Key)
+		if action == "" {
+			return Effects{}
+		}
+		mapping := controls.Mapping
+		if controls.FirstRun {
+			mapping = storeinput.AutoMapping()
+		}
+		return processButton(ctx, model, controls, int(mapping[action]), logger)
 	}
 	return Effects{}
+}
+
+func keyAction(key Key) storeinput.Action {
+	switch key {
+	case KeyUp:
+		return storeinput.Up
+	case KeyLeft:
+		return storeinput.Left
+	case KeyDown:
+		return storeinput.Down
+	case KeyRight:
+		return storeinput.Right
+	case KeyConfirm:
+		return storeinput.Confirm
+	case KeyBack:
+		return storeinput.Back
+	case KeyDiagnostics:
+		return storeinput.Diagnostics
+	case KeyExit:
+		return storeinput.Exit
+	default:
+		return ""
+	}
 }
 func processButton(ctx context.Context, model *storeui.Model, controls *storeinput.Session, button int, logger *diagnostics.Log) Effects {
 	beforeMode := controls.Mode
