@@ -32,9 +32,12 @@ var (
 // identity. Message reports what the last action did; a screen's own
 // instruction lives in the GUI, so a message never restates it.
 type Session struct {
-	Store           Store
-	Device          string
-	Identity        Identity
+	Store    Store
+	Device   string
+	Identity Identity
+	// Detected is the mapping the input source reported before the user chose
+	// one. A desktop run reports the keyboard; a controller reports SDL's.
+	Detected        Mapping
 	Mapping         Mapping
 	Source          string
 	AutoSource      string
@@ -50,10 +53,17 @@ type Session struct {
 	ValidationError string
 }
 
+// sourceGameController and sourceKnulli name the SDL sources a session detects.
+const (
+	sourceGameController = "SDL GameController mapping"
+	sourceKnulli         = "Knulli SDL_GAMECONTROLLERCONFIG"
+)
+
 func NewSession(root, device string) *Session {
 	return &Session{
 		Store:    NewStore(root),
 		Device:   device,
+		Detected: AutoMapping(),
 		Mapping:  AutoMapping(),
 		Source:   "no controller",
 		Mode:     Blocked,
@@ -62,16 +72,36 @@ func NewSession(root, device string) *Session {
 	}
 }
 
+// NewDesktopSession is the session a desktop run uses instead of a controller:
+// the keyboard is the detected source, so every screen and every setup step is
+// reachable without a physical device. It follows the same first-run rule as a
+// controller, and its mapping is stored under its own identity.
+func NewDesktopSession(root, device string) *Session {
+	session := NewSession(root, device)
+	session.Detected = KeyboardMapping()
+	session.connect(KeyboardIdentity(device), KeyboardSourceName)
+	return session
+}
+
+// Connect binds the session to a controller identity and the SDL source that
+// reported its mapping.
 func (session *Session) Connect(identity Identity, knulliMapping bool) {
+	source := sourceGameController
+	if knulliMapping {
+		source = sourceKnulli
+	}
+	session.connect(identity, source)
+}
+
+// connect binds the session to an identity and the name of the source that
+// reported it, then loads the mapping saved for that identity.
+func (session *Session) connect(identity Identity, source string) {
 	identity.Device = session.Device
 	session.Identity = identity
 	session.Connected = true
-	session.Mapping = AutoMapping()
-	session.Source = "SDL GameController mapping"
-	if knulliMapping {
-		session.Source = "Knulli SDL_GAMECONTROLLERCONFIG"
-	}
-	session.AutoSource = session.Source
+	session.Mapping = session.detected().Clone()
+	session.Source = source
+	session.AutoSource = source
 	session.ValidationError = ""
 	saved, found, loadErr := session.Store.Load(identity)
 	if loadErr != nil {
@@ -173,11 +203,11 @@ func (session *Session) handleSetup(button int) (Action, Effect) {
 	case Confirm:
 		switch session.SetupIndex {
 		case 0:
-			if session.saveMapping(AutoMapping(), "saved detected mapping") {
+			if session.saveMapping(session.detected(), "saved detected mapping") {
 				session.Message = "Detected mapping saved"
 			}
 		case 1:
-			session.startPreview(AutoMapping(), "tested detected mapping")
+			session.startPreview(session.detected(), "tested detected mapping")
 		case 2:
 			session.startCalibration()
 		case 3:
@@ -267,7 +297,7 @@ func (session *Session) handleSettings(button int) (Action, Effect) {
 			if err := session.Store.Reset(session.Identity); err != nil {
 				session.ValidationError = err.Error()
 			} else {
-				session.Mapping = AutoMapping()
+				session.Mapping = session.detected().Clone()
 				session.Source = session.AutoSource
 				session.openSetup(true)
 				session.Message = "Saved mapping removed; choose and test a mapping"
@@ -343,20 +373,47 @@ func (session *Session) saveMapping(mapping Mapping, source string) bool {
 
 // ScreenMapping is the mapping the current screen accepts, so a screen can
 // label its controls without disagreeing with the buttons that work. The
-// blocked and setup screens offer the detected mapping on a first run; every
-// other screen uses the session mapping.
+// blocked and setup screens offer the detected mapping on a first run, the
+// preview accepts only the mapping it is testing, and every other screen uses
+// the session mapping.
 func (session *Session) ScreenMapping() Mapping {
 	switch session.Mode {
 	case Blocked, Setup:
 		return session.activeMapping()
+	case Preview:
+		if session.Calibration != nil {
+			return session.Calibration.Mapping
+		}
+		return session.Mapping
 	default:
 		return session.Mapping
 	}
 }
 
+// Binding returns the code that carries an action on the current screen. A
+// caller translating a keyboard key into a binding uses this instead of reading
+// a mapping directly, so a key reaches the same screen a controller would.
+func (session *Session) Binding(action Action) (int, bool) {
+	code, ok := session.ScreenMapping()[action]
+	return code, ok
+}
+
+// DetectedMapping is the mapping the input source reported before the user
+// chose one.
+func (session *Session) DetectedMapping() Mapping {
+	return session.detected()
+}
+
+func (session *Session) detected() Mapping {
+	if session.Detected == nil {
+		return AutoMapping()
+	}
+	return session.Detected
+}
+
 func (session *Session) activeMapping() Mapping {
 	if session.FirstRun {
-		return AutoMapping()
+		return session.detected()
 	}
 	return session.Mapping
 }

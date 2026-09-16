@@ -65,6 +65,8 @@ func (mapping Mapping) Clone() Mapping {
 	return result
 }
 
+// ButtonLabel names the control carrying an action, whether it is an SDL
+// GameController button or a keyboard binding on a desktop run.
 func ButtonLabel(button int) string {
 	labels := map[int]string{
 		0: "SDL A", 1: "SDL B", 2: "SDL X", 3: "SDL Y",
@@ -73,6 +75,9 @@ func ButtonLabel(button int) string {
 		11: "DPAD UP", 12: "DPAD DOWN", 13: "DPAD LEFT", 14: "DPAD RIGHT",
 	}
 	if label := labels[button]; label != "" {
+		return label
+	}
+	if label := keyboardLabels[button]; label != "" {
 		return label
 	}
 	return fmt.Sprintf("BUTTON %d", button)
