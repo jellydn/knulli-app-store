@@ -13,7 +13,7 @@
       "provenance": "community"
     },
     "notes": [
-      "User-authorized experimental test package for TrimUI Smart Pro and MagicX Zero 28; this is not an upstream compatibility claim or a verified package.",
+      "User-authorized broad experimental Knulli package for detected aarch64 glibc systems with the declared SDL libraries and validated 640x480 through 1280x720 displays; this is not universal verification.",
       "Real-device validation is limited to PlayTime 1.0.0 on TrimUI Smart Pro with Knulli Scarab. The tester reported only that the test was all good; individual lifecycle steps were not reported.",
       "MagicX testing is authorized from confirmed Knulli, aarch64, 640x480, and SDL GameController runtime facts; package install and launch remain untested.",
       "The manager restores execute permission only for the reviewed playtime binary and playtime.sh launcher.",
@@ -76,8 +76,16 @@
   "compatibility": {
     "firmware": "knulli",
     "architectures": ["aarch64"],
-    "devices": ["trimui-smart-pro", "magicx-zero-28"],
-    "resolutions": ["1280x720", "640x480"]
+    "abis": ["linux-aarch64-glibc"],
+    "minimum_glibc": "2.34",
+    "dependencies": ["sdl2", "sdl2-image", "sdl2-ttf", "libc"],
+    "device_scope": "any",
+    "display_bounds": {
+      "minimum_width": 640,
+      "minimum_height": 480,
+      "maximum_width": 1280,
+      "maximum_height": 720
+    }
   },
   "install": {
     "destination": "/userdata/roms/tools/PlayTime",

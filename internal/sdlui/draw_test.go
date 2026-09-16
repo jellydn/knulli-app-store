@@ -23,7 +23,7 @@ func TestRenderRepresentativeStates(t *testing.T) {
 	issue := appstore.Item{
 		Package:   manifest.Package{ID: "org.example.demo", Name: "Demo Utility", Type: "utility", Summary: "A safe package used to verify action and error layouts.", Review: manifest.Review{Status: "installable"}},
 		Installed: true, InstalledVersion: "1.0.0", Healthy: false, Compatible: true,
-		HealthReason: "mode changed: /userdata/roms/tools/Demo/demo (expected 0755, got 0644)", Compatibility: "Compatible with detected platform", Actions: []appstore.Action{appstore.Repair, appstore.Uninstall},
+		HealthReason: "content changed: /userdata/roms/tools/Grout/grout (expected 39b5ba053913620aea2db051c2fad2fa0bf05b59c2cc88bcb01734dd048882e7, got 31da1b650f285f47c27e1c94567c50e2b25a59893bde831aa175d722de269adb)", Compatibility: "Compatible with detected platform", Actions: []appstore.Action{appstore.Repair, appstore.Uninstall},
 	}
 	verified := appstore.Item{
 		Package: manifest.Package{
@@ -43,6 +43,10 @@ func TestRenderRepresentativeStates(t *testing.T) {
 	external := experimental
 	external.PreExisting = true
 	external.Actions = []appstore.Action{appstore.Adopt}
+	recovery := external
+	recovery.RecoveryReason = "adoption backup already exists for /userdata/roms/tools/PlayTime/playtime"
+	recovery.RecoverySummary = "Replaces reviewed app files; preserves declared data; backs up the complete existing destination for manual restore."
+	recovery.Actions = []appstore.Action{appstore.Adopt, appstore.ForceReinstall}
 	incompatible := experimental
 	incompatible.Compatible = false
 	incompatible.Actions = nil
@@ -59,8 +63,11 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		"experimental":        {Items: []appstore.Item{experimental}, Focus: storeui.Actions},
 		"external":            {Items: []appstore.Item{external}, Focus: storeui.Actions},
 		"external-confirm":    {Items: []appstore.Item{external}, Focus: storeui.Confirm},
+		"recovery":            {Items: []appstore.Item{recovery}, Focus: storeui.Actions, Error: recovery.RecoveryReason},
+		"force-review":        {Items: []appstore.Item{recovery}, Focus: storeui.Confirm, Action: 1},
+		"force-confirm":       {Items: []appstore.Item{recovery}, Focus: storeui.ForceConfirm, Action: 1},
 		"issue":               {Items: []appstore.Item{issue}},
-		"issue-details":       {Items: []appstore.Item{issue}, Focus: storeui.Actions},
+		"issue-details":       {Items: []appstore.Item{issue}, Focus: storeui.Health},
 		"compatibility-error": {Items: []appstore.Item{incompatible}, Focus: storeui.Actions},
 		"confirm":             {Items: []appstore.Item{experimental}, Focus: storeui.Confirm},
 		"verified-confirm":    {Items: []appstore.Item{{Package: verified.Package, Compatible: true, Actions: []appstore.Action{appstore.Install}}}, Focus: storeui.Confirm},

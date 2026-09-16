@@ -197,6 +197,43 @@ func TestCheckAllowsExperimentalCompatibilityWithoutInventedMinimum(t *testing.T
 	}
 }
 
+func TestBroadExperimentalCompatibilityRequiresEveryRuntimeConstraint(t *testing.T) {
+	pkg := manifest.Package{Compatibility: &manifest.Compatibility{
+		Firmware: "knulli", Architectures: []string{"aarch64"}, ABIs: []string{"linux-aarch64-glibc"}, MinimumGLIBC: "2.34",
+		Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf"}, DeviceScope: "any",
+		DisplayBounds: &manifest.DisplayBounds{MinimumWidth: 640, MinimumHeight: 480, MaximumWidth: 1280, MaximumHeight: 720},
+	}}
+	valid := Info{Firmware: "knulli", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf"}, Device: "new-knulli-board", Resolution: "1024x600"}
+	if err := Check(pkg, valid); err != nil {
+		t.Fatalf("matching unknown device was not allowed as experimental: %v", err)
+	}
+	tests := []struct {
+		name string
+		edit func(*Info)
+		want string
+	}{
+		{name: "unknown architecture", edit: func(info *Info) { info.Arch = "" }, want: "field=architecture"},
+		{name: "incompatible architecture", edit: func(info *Info) { info.Arch = "armv7" }, want: "field=architecture"},
+		{name: "unknown ABI", edit: func(info *Info) { info.ABI = "" }, want: "field=abi"},
+		{name: "old glibc", edit: func(info *Info) { info.GLIBCVersion = "2.17" }, want: `glibc>="2.34"`},
+		{name: "missing dependency", edit: func(info *Info) { info.Dependencies = []string{"sdl2", "sdl2-ttf"} }, want: `runtime dependency="sdl2-image"`},
+		{name: "unknown device", edit: func(info *Info) { info.Device = "" }, want: "device identity is empty"},
+		{name: "unknown display", edit: func(info *Info) { info.Resolution = "" }, want: "no validated display"},
+		{name: "display outside bounds", edit: func(info *Info) { info.Resolution = "320x240" }, want: "display bounds=640x480..1280x720"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			current := valid
+			current.Dependencies = append([]string(nil), valid.Dependencies...)
+			test.edit(&current)
+			err := Check(pkg, current)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("constraint %q did not block with exact reason: %v", test.name, err)
+			}
+		})
+	}
+}
+
 func TestCheckFailureIncludesDetectedEvidenceAndConstraint(t *testing.T) {
 	pkg := manifest.Package{Compatibility: &manifest.Compatibility{Firmware: "knulli", Architectures: []string{"aarch64"}, Devices: []string{"trimui-smart-pro"}, Resolutions: []string{"1280x720"}}}
 	current := Info{Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720", Evidence: Evidence{FirmwareRaw: "buildroot", FirmwareSource: "/etc/os-release:ID"}}

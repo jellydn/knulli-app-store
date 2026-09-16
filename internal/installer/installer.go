@@ -1,9 +1,11 @@
 package installer
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"syscall"
+	"time"
 
 	storearchive "github.com/jellydn/knulli-app-store/internal/archive"
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
@@ -22,23 +25,34 @@ import (
 )
 
 type Manager struct {
-	Root          string
-	Client        *http.Client
-	RefreshClient *http.Client
-	RefreshURL    string
-	Diagnostics   *diagnostics.Log
+	Root           string
+	Client         *http.Client
+	RefreshClient  *http.Client
+	RefreshURL     string
+	Diagnostics    *diagnostics.Log
+	Now            func() time.Time
+	AvailableBytes func(string) (uint64, error)
 
 	platform platform.Info
+}
+
+type AdoptionConflictError struct {
+	Path string
+}
+
+func (err *AdoptionConflictError) Error() string {
+	return fmt.Sprintf("adoption backup already exists for %s; move the existing package aside before retrying", err.Path)
 }
 
 // Op names one lifecycle operation applied to a package.
 type Op string
 
 const (
-	OpInstall Op = "install"
-	OpAdopt   Op = "adopt"
-	OpUpdate  Op = "update"
-	OpRepair  Op = "repair"
+	OpInstall        Op = "install"
+	OpAdopt          Op = "adopt"
+	OpUpdate         Op = "update"
+	OpRepair         Op = "repair"
+	OpForceReinstall Op = "force-reinstall"
 )
 
 // WithPlatform returns a copy of the manager bound to the given detected platform.
@@ -177,7 +191,7 @@ func (m Manager) stage(ctx context.Context, operation string, pkg manifest.Packa
 	if (operation == "install" || operation == "adopt") && old != nil {
 		return nil, fmt.Errorf("package %s is already installed", pkg.ID)
 	}
-	if operation != "install" && operation != "adopt" && old == nil {
+	if operation != "install" && operation != "adopt" && operation != "force-reinstall" && old == nil {
 		return nil, fmt.Errorf("package %s is not installed", pkg.ID)
 	}
 	if operation == "repair" && (old.Manifest.Version != pkg.Version || old.Manifest.Release.SHA256 != pkg.Release.SHA256) {
@@ -198,7 +212,7 @@ func (m Manager) stage(ctx context.Context, operation string, pkg manifest.Packa
 	}
 	var existing []existingFile
 	var existingBytes uint64
-	if old == nil {
+	if old == nil || operation == "force-reinstall" {
 		existing, existingBytes, err = inventoryExisting(destinationHost, pkg.Install.Destination)
 		if err != nil {
 			return nil, fmt.Errorf("inventory pre-existing installation: %w", err)
@@ -211,7 +225,14 @@ func (m Manager) stage(ctx context.Context, operation string, pkg manifest.Packa
 	if operation == "adopt" && len(existing) == 0 {
 		return nil, fmt.Errorf("no external installation was found; use Install")
 	}
-	available, err := safefs.AvailableBytes(destinationHost)
+	if operation == "force-reinstall" && len(existing) == 0 && old == nil {
+		return nil, fmt.Errorf("no stale, partial, or external installation was found; use Install")
+	}
+	availableBytes := safefs.AvailableBytes
+	if m.AvailableBytes != nil {
+		availableBytes = m.AvailableBytes
+	}
+	available, err := availableBytes(destinationHost)
 	if err != nil {
 		return nil, err
 	}
@@ -245,6 +266,9 @@ func (m Manager) stage(ctx context.Context, operation string, pkg manifest.Packa
 	if err := applyExecutableModes(files, pkg.Install.Executables); err != nil {
 		return nil, err
 	}
+	if err := applyBinaryPatches(files, pkg.Install.BinaryPatches); err != nil {
+		return nil, err
+	}
 	if !containsArchiveFile(files, pkg.Install.Launcher) {
 		return nil, fmt.Errorf("release archive does not contain launcher %s", pkg.Install.Launcher)
 	}
@@ -267,12 +291,21 @@ func (m Manager) commit(ctx context.Context, operation string, pkg manifest.Pack
 		return err
 	}
 	m.event("transaction_begin", "package", pkg.ID, "action", operation)
-	defer m.rollback(pkg.ID, operation, tx, &result)
+	recoveryBackupPath := ""
+	defer m.rollback(pkg.ID, operation, tx, guard, &recoveryBackupPath, &result)
 	var state Installed
 	if operation == "adopt" {
 		state, err = m.adoptFiles(tx, guard, pkg, staged.files, staged.existing)
 	} else {
-		state, err = m.installFiles(tx, guard, pkg, old, staged.files)
+		if operation == "force-reinstall" {
+			recoveryBackupPath = m.recoveryBackupDirectory(pkg)
+			backupErr := m.backupRecoveryDestination(tx, pkg, staged.existing, recoveryBackupPath)
+			if backupErr != nil {
+				return backupErr
+			}
+			m.event("recovery_backup_complete", "package", pkg.ID, "path", recoveryBackupPath, "files", fmt.Sprint(len(staged.existing)))
+		}
+		state, err = m.installFiles(tx, guard, pkg, old, staged.files, operation == "force-reinstall")
 	}
 	if err != nil {
 		return err
@@ -304,7 +337,7 @@ func (m Manager) commit(ctx context.Context, operation string, pkg manifest.Pack
 	return nil
 }
 
-func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg manifest.Package, old *Installed, files []storearchive.File) (Installed, error) {
+func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg manifest.Package, old *Installed, files []storearchive.File, recovery bool) (Installed, error) {
 	state := Installed{Schema: "org.knulli.app-store/installed-state/v1", Manifest: pkg, Originals: make(map[string]string)}
 	oldTracked := make(map[string]bool)
 	if old != nil {
@@ -336,7 +369,7 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 				return Installed{}, err
 			}
 		}
-		if !oldTracked[virtual] {
+		if !recovery && !oldTracked[virtual] {
 			if info, err := os.Stat(host); err == nil {
 				backup := originalPath(pkg.ID, virtual)
 				if _, exists := state.Originals[virtual]; !exists {
@@ -388,6 +421,69 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 	return state, nil
 }
 
+type recoveryBackup struct {
+	Schema    string               `json:"schema"`
+	PackageID string               `json:"package_id"`
+	CreatedAt string               `json:"created_at"`
+	Files     []recoveryBackupFile `json:"files"`
+}
+
+type recoveryBackupFile struct {
+	OriginalPath string `json:"original_path"`
+	BackupPath   string `json:"backup_path"`
+	SHA256       string `json:"sha256"`
+	Mode         uint32 `json:"mode"`
+	Size         int64  `json:"size"`
+}
+
+func (m Manager) recoveryBackupDirectory(pkg manifest.Package) string {
+	now := time.Now().UTC()
+	if m.Now != nil {
+		now = m.Now().UTC()
+	}
+	return managerPath + "/recovery-backups/" + pkg.ID + "/" + now.Format("20060102T150405.000000000Z")
+}
+
+func (m Manager) backupRecoveryDestination(tx *safefs.Transaction, pkg manifest.Package, existing []existingFile, directory string) error {
+	now := time.Now().UTC()
+	if m.Now != nil {
+		now = m.Now().UTC()
+	}
+	record := recoveryBackup{
+		Schema:    "org.knulli.app-store/recovery-backup/v1",
+		PackageID: pkg.ID,
+		CreatedAt: now.Format(time.RFC3339Nano),
+		Files:     make([]recoveryBackupFile, 0, len(existing)),
+	}
+	for _, file := range existing {
+		digest := sha256.Sum256([]byte(file.Virtual))
+		backup := directory + "/files/" + hex.EncodeToString(digest[:])
+		if err := tx.Copy(file.Host, backup, file.Mode); err != nil {
+			return fmt.Errorf("create recovery backup for %s: %w", file.Virtual, err)
+		}
+		info, err := os.Stat(file.Host)
+		if err != nil {
+			return err
+		}
+		record.Files = append(record.Files, recoveryBackupFile{
+			OriginalPath: file.Virtual,
+			BackupPath:   backup,
+			SHA256:       file.SHA256,
+			Mode:         uint32(file.Mode.Perm()),
+			Size:         info.Size(),
+		})
+	}
+	data, err := json.MarshalIndent(record, "", "  ")
+	if err != nil {
+		return err
+	}
+	manifestPath := directory + "/manifest.json"
+	if err := tx.Write(manifestPath, append(data, '\n'), 0600); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (m Manager) adoptFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg manifest.Package, files []storearchive.File, existing []existingFile) (Installed, error) {
 	state := Installed{Schema: "org.knulli.app-store/installed-state/v1", Manifest: pkg, Originals: make(map[string]string)}
 	existingByPath := make(map[string]existingFile, len(existing))
@@ -398,13 +494,26 @@ func (m Manager) adoptFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg man
 		virtual := path.Join(pkg.Install.Destination, releaseFile.Relative)
 		existingFile, found := existingByPath[virtual]
 		preserved := isPreserved(releaseFile.Relative, pkg.Install.Preserve)
-		managed := found && existingFile.SHA256 == releaseFile.SHA256 && existingFile.Mode.Perm() == releaseFile.Mode.Perm() && !preserved
-		if found && !managed {
+		managed := found && existingFile.SHA256 == releaseFile.SHA256 && !preserved
+		if found {
 			if err := backupExisting(tx, guard, pkg.ID, existingFile, &state); err != nil {
 				return Installed{}, err
 			}
 		}
-		state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: releaseFile.SHA256, Mode: uint32(releaseFile.Mode.Perm()), Preserved: preserved, Unmanaged: !managed})
+		mode := releaseFile.Mode.Perm()
+		if managed {
+			if err := tx.Chmod(virtual, releaseFile.Mode); err != nil {
+				return Installed{}, err
+			}
+			info, err := os.Stat(existingFile.Host)
+			if err != nil {
+				return Installed{}, err
+			}
+			mode = info.Mode().Perm()
+		} else if found {
+			mode = existingFile.Mode.Perm()
+		}
+		state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: releaseFile.SHA256, Mode: uint32(mode), Preserved: preserved, Unmanaged: !managed})
 		delete(existingByPath, virtual)
 	}
 	for _, file := range existingByPath {
@@ -424,7 +533,7 @@ func backupExisting(tx *safefs.Transaction, guard *safefs.Guard, id string, file
 		return err
 	}
 	if _, err := os.Stat(backupHost); err == nil {
-		return fmt.Errorf("adoption backup already exists for %s; move the existing package aside before retrying", file.Virtual)
+		return &AdoptionConflictError{Path: file.Virtual}
 	} else if !os.IsNotExist(err) {
 		return err
 	}
@@ -474,7 +583,7 @@ func (m Manager) uninstall(ctx context.Context, id string, outcome *OperationOut
 		return err
 	}
 	m.event("transaction_begin", "package", id, "action", "uninstall")
-	defer m.rollback(id, "uninstall", tx, &result)
+	defer m.rollback(id, "uninstall", tx, nil, nil, &result)
 	for _, file := range state.Files {
 		if file.Preserved || file.Unmanaged {
 			continue
@@ -522,7 +631,7 @@ func (m Manager) uninstall(ctx context.Context, id string, outcome *OperationOut
 
 // rollback rolls the transaction back when the operation failed, folding any
 // rollback failure into the operation error.
-func (m Manager) rollback(id, action string, tx *safefs.Transaction, result *error) {
+func (m Manager) rollback(id, action string, tx *safefs.Transaction, guard *safefs.Guard, cleanupPath *string, result *error) {
 	if *result == nil {
 		return
 	}
@@ -532,6 +641,11 @@ func (m Manager) rollback(id, action string, tx *safefs.Transaction, result *err
 		m.event("rollback_error", "package", id, "error", rollbackErr.Error())
 	} else {
 		m.event("rollback_complete", "package", id)
+	}
+	if guard != nil && cleanupPath != nil && *cleanupPath != "" {
+		if host, err := guard.Resolve(*cleanupPath); err == nil {
+			_ = os.RemoveAll(host)
+		}
 	}
 }
 
@@ -607,6 +721,40 @@ func applyExecutableModes(files []storearchive.File, executables []string) error
 	return nil
 }
 
+func applyBinaryPatches(files []storearchive.File, patches []manifest.BinaryPatch) error {
+	byPath := make(map[string]*storearchive.File, len(files))
+	for index := range files {
+		byPath[files[index].Relative] = &files[index]
+	}
+	for _, patch := range patches {
+		file := byPath[patch.Path]
+		if file == nil {
+			return fmt.Errorf("binary patch target is absent: %s", patch.Path)
+		}
+		before, _ := hex.DecodeString(patch.BeforeHex)
+		after, _ := hex.DecodeString(patch.AfterHex)
+		data, err := os.ReadFile(file.Path)
+		if err != nil {
+			return err
+		}
+		end := patch.Offset + int64(len(before))
+		if patch.Offset < 0 || end > int64(len(data)) || !bytes.Equal(data[patch.Offset:end], before) {
+			return fmt.Errorf("binary patch source mismatch for %s at offset %d", patch.Path, patch.Offset)
+		}
+		copy(data[patch.Offset:end], after)
+		digest := sha256.Sum256(data)
+		actual := hex.EncodeToString(digest[:])
+		if actual != patch.SHA256 {
+			return fmt.Errorf("binary patch result mismatch for %s: expected %s, got %s", patch.Path, patch.SHA256, actual)
+		}
+		if err := os.WriteFile(file.Path, data, file.Mode); err != nil {
+			return err
+		}
+		file.SHA256 = actual
+	}
+	return nil
+}
+
 func isPreserved(relative string, preserved []string) bool {
 	for _, entry := range preserved {
 		if relative == entry || strings.HasPrefix(relative, entry+"/") {
@@ -650,8 +798,11 @@ func acquireLock(path string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		file.Close()
+		if err == syscall.EWOULDBLOCK || err == syscall.EAGAIN {
+			return nil, fmt.Errorf("another package operation is active")
+		}
 		return nil, err
 	}
 	return file, nil

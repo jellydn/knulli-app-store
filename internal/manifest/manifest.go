@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
@@ -13,8 +14,9 @@ import (
 const SchemaV1 = "org.knulli.app-store/package-manifest/v1"
 
 var (
-	idPattern     = regexp.MustCompile(`^[a-z][a-z0-9]*(\.[a-z0-9][a-z0-9-]*){2,}$`)
-	sha256Pattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
+	idPattern      = regexp.MustCompile(`^[a-z][a-z0-9]*(\.[a-z0-9][a-z0-9-]*){2,}$`)
+	sha256Pattern  = regexp.MustCompile(`^[a-f0-9]{64}$`)
+	versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
 )
 
 type Package struct {
@@ -67,23 +69,44 @@ type Release struct {
 }
 
 type Compatibility struct {
-	Firmware       string   `json:"firmware"`
-	MinimumVersion string   `json:"minimum_version"`
-	Architectures  []string `json:"architectures"`
-	Devices        []string `json:"devices"`
-	Resolutions    []string `json:"resolutions"`
+	Firmware       string         `json:"firmware"`
+	MinimumVersion string         `json:"minimum_version"`
+	Architectures  []string       `json:"architectures"`
+	ABIs           []string       `json:"abis,omitempty"`
+	MinimumGLIBC   string         `json:"minimum_glibc,omitempty"`
+	Dependencies   []string       `json:"dependencies,omitempty"`
+	Devices        []string       `json:"devices,omitempty"`
+	DeviceScope    string         `json:"device_scope,omitempty"`
+	Resolutions    []string       `json:"resolutions,omitempty"`
+	DisplayBounds  *DisplayBounds `json:"display_bounds,omitempty"`
+}
+
+type DisplayBounds struct {
+	MinimumWidth  int `json:"minimum_width"`
+	MinimumHeight int `json:"minimum_height"`
+	MaximumWidth  int `json:"maximum_width"`
+	MaximumHeight int `json:"maximum_height"`
 }
 
 type Install struct {
-	Destination       string   `json:"destination"`
-	StripComponents   int      `json:"strip_components,omitempty"`
-	Launcher          string   `json:"launcher"`
-	Executables       []string `json:"executables,omitempty"`
-	Warning           string   `json:"warning,omitempty"`
-	Menu              *Menu    `json:"menu,omitempty"`
-	Preserve          []string `json:"preserve,omitempty"`
-	Network           bool     `json:"network"`
-	AllowedWritePaths []string `json:"allowed_write_paths"`
+	Destination       string        `json:"destination"`
+	StripComponents   int           `json:"strip_components,omitempty"`
+	Launcher          string        `json:"launcher"`
+	Executables       []string      `json:"executables,omitempty"`
+	Warning           string        `json:"warning,omitempty"`
+	Menu              *Menu         `json:"menu,omitempty"`
+	Preserve          []string      `json:"preserve,omitempty"`
+	Network           bool          `json:"network"`
+	AllowedWritePaths []string      `json:"allowed_write_paths"`
+	BinaryPatches     []BinaryPatch `json:"binary_patches,omitempty"`
+}
+
+type BinaryPatch struct {
+	Path      string `json:"path"`
+	Offset    int64  `json:"offset"`
+	BeforeHex string `json:"before_hex"`
+	AfterHex  string `json:"after_hex"`
+	SHA256    string `json:"sha256"`
 }
 
 type Menu struct {
@@ -197,11 +220,34 @@ func (p Package) validateInstallable() []string {
 		if !contains(p.Compatibility.Architectures, "aarch64") {
 			problems = append(problems, "initial catalogue packages must include aarch64")
 		}
-		if len(p.Compatibility.Devices) == 0 {
-			problems = append(problems, "at least one declared device is required")
+		if p.Compatibility.DeviceScope == "any" {
+			if !p.Experimental() {
+				problems = append(problems, "broad device scope is allowed only for experimental packages")
+			}
+		} else if p.Compatibility.DeviceScope != "" {
+			problems = append(problems, "device_scope must be any when set")
+		} else if len(p.Compatibility.Devices) == 0 {
+			problems = append(problems, "at least one declared device or experimental broad device scope is required")
 		}
-		if len(p.Compatibility.Resolutions) == 0 {
-			problems = append(problems, "at least one declared resolution is required")
+		if p.Compatibility.DisplayBounds != nil {
+			bounds := p.Compatibility.DisplayBounds
+			if !p.Experimental() {
+				problems = append(problems, "display bounds are allowed only for experimental packages")
+			}
+			if bounds.MinimumWidth < 320 || bounds.MinimumHeight < 200 || bounds.MaximumWidth < bounds.MinimumWidth || bounds.MaximumHeight < bounds.MinimumHeight || bounds.MaximumWidth > 7680 || bounds.MaximumHeight > 4320 {
+				problems = append(problems, "display_bounds must be ordered within 320x200 and 7680x4320")
+			}
+		} else if len(p.Compatibility.Resolutions) == 0 {
+			problems = append(problems, "at least one declared resolution or experimental display bound is required")
+		}
+		if len(p.Compatibility.ABIs) == 0 {
+			problems = append(problems, "compatibility must declare at least one runtime ABI")
+		}
+		if len(p.Compatibility.Dependencies) == 0 {
+			problems = append(problems, "compatibility must declare runtime dependencies")
+		}
+		if p.Compatibility.MinimumGLIBC != "" && !versionPattern.MatchString(p.Compatibility.MinimumGLIBC) {
+			problems = append(problems, "minimum_glibc must be a numeric major.minor version")
 		}
 	}
 	if p.Install == nil {
@@ -232,6 +278,13 @@ func (p Package) validateInstallable() []string {
 	for _, preserve := range p.Install.Preserve {
 		if !safeRelative(preserve) {
 			problems = append(problems, "preserved paths must be safe relative paths")
+		}
+	}
+	for _, patch := range p.Install.BinaryPatches {
+		before, beforeErr := hex.DecodeString(patch.BeforeHex)
+		after, afterErr := hex.DecodeString(patch.AfterHex)
+		if !safeRelative(patch.Path) || patch.Offset < 0 || beforeErr != nil || afterErr != nil || len(before) == 0 || len(before) != len(after) || !sha256Pattern.MatchString(patch.SHA256) {
+			problems = append(problems, "binary patches require a safe path, non-negative offset, equal non-empty hexadecimal bytes, and final SHA-256")
 		}
 	}
 	if len(p.Install.AllowedWritePaths) == 0 {

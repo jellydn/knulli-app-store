@@ -47,7 +47,9 @@ func assess(pkg manifest.Package, current platform.Info, status installer.Status
 	if status.Installed {
 		actions := []Action{Uninstall}
 		compatible := pkg.Installable()
-		if compatible {
+		if !compatible {
+			verdict.Reasons = append(verdict.Reasons, Reason{Kind: "review", Detail: "Installation is blocked by technical review"})
+		} else {
 			if err := platform.Check(pkg, current); err != nil {
 				compatible = false
 				verdict.Reasons = append(verdict.Reasons, Reason{Kind: "platform", Detail: err.Error()})
@@ -131,4 +133,17 @@ func (v Verdict) Message() string {
 		return "Compatible with detected platform"
 	}
 	return v.Reasons[0].Detail
+}
+
+func (v Verdict) HasReason(kind string) bool {
+	for _, reason := range v.Reasons {
+		if reason.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func (v Verdict) Compatible(pkg manifest.Package) bool {
+	return pkg.Installable() && !v.HasReason("platform")
 }
