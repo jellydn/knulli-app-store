@@ -889,6 +889,64 @@ func TestStateWithoutSignatureIsBackfilledAfterVerification(t *testing.T) {
 	}
 }
 
+func TestStatusSkipsTheSignatureWriteWhileAnOperationHoldsTheLock(t *testing.T) {
+	// The refresh writes state outside an operation, so an operation that holds
+	// the manager lock must win and the check must still report the truth.
+	root := t.TempDir()
+	logger, err := diagnostics.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	manager := Manager{Root: root, Client: rewriteClient(t, server), Diagnostics: logger}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+		t.Fatal(err)
+	}
+	baseGuard, err := safefs.NewGuard(root, []string{managerPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := loadState(baseGuard, pkg.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index := range state.Files {
+		state.Files[index].Size = 0
+		state.Files[index].Modified = ""
+	}
+	writeState(t, baseGuard, pkg.ID, *state)
+
+	lock, err := acquireLock(filepath.Join(root, "userdata/system/knulli-app-store", "lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
+		t.Fatalf("status while an operation holds the lock: %#v, %v", status, err)
+	}
+	held, err := loadState(baseGuard, pkg.ID)
+	if err != nil || held.Files[0].Modified != "" {
+		t.Fatalf("signature was written while an operation held the lock: %#v, %v", held, err)
+	}
+	logData, err := os.ReadFile(filepath.Join(root, "userdata/system/logs/knulli-app-store.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(logData), "verified_signature_recorded") {
+		t.Fatalf("refresh was not skipped: %s", logData)
+	}
+	releaseLock(lock)
+	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
+		t.Fatalf("status after the lock was released: %#v, %v", status, err)
+	}
+	released, err := loadState(baseGuard, pkg.ID)
+	if err != nil || released.Files[0].Modified == "" {
+		t.Fatalf("signature was not recorded once the lock was free: %#v, %v", released, err)
+	}
+}
+
 func writeState(t *testing.T, guard *safefs.Guard, id string, state Installed) {
 	t.Helper()
 	data, err := encodeState(state)
