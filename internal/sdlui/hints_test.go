@@ -47,6 +47,14 @@ func TestEmptyCatalogueFooterDropsUnavailableActions(t *testing.T) {
 	}
 }
 
+func TestBusyCatalogueDoesNotAdvertiseRejectedActions(t *testing.T) {
+	model := catalogueModel()
+	model.Busy = true
+	if got := footerText(model, normalControls(t)); got != "" {
+		t.Fatalf("busy catalogue footer = %q, want no actions", got)
+	}
+}
+
 func TestFooterLabelsFollowTheActiveMapping(t *testing.T) {
 	controls := normalControls(t)
 	controls.Mapping = storeinput.AutoMapping()

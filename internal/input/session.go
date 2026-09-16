@@ -349,7 +349,7 @@ func (session *Session) retryAssignment() {
 	}
 	session.Mode = Calibrating
 	session.ValidationError = ""
-	session.Message = "Retry: press a different physical button"
+	session.Message = ""
 }
 
 func (session *Session) cancelCalibration() {
