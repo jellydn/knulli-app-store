@@ -53,6 +53,23 @@ func Verb(action Action) string {
 	return strings.ToUpper(string(action))
 }
 
+// ActionLabel identifies an action outside the footer. Directional actions
+// keep their direction here even though they share the NAVIGATE footer verb.
+func ActionLabel(action Action) string {
+	switch action {
+	case Up:
+		return "UP"
+	case Down:
+		return "DOWN"
+	case Left:
+		return "LEFT"
+	case Right:
+		return "RIGHT"
+	default:
+		return Verb(action)
+	}
+}
+
 // Footer renders one footer line as "VERB (BUTTON)" pairs. It is the single
 // place a physical button label is written, which keeps every screen
 // consistent and free of duplicated hints.

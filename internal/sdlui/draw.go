@@ -137,7 +137,6 @@ func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName 
 		if diagnosticStatus != "" {
 			text(frame, 32, 259, statusColor, shorten(strings.ToUpper(diagnosticStatus), 78))
 		}
-		text(frame, 32, 286, palette.muted, "SELECT EXPORTS A REDACTED DIAGNOSTIC BUNDLE")
 	case storeinput.Setup:
 		text(frame, 32, modeHeadingBaseline, palette.warning, "SETUP IS REQUIRED FOR SAFE CONTROLS")
 		for index, item := range storeinput.SetupItems {
@@ -167,7 +166,7 @@ func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName 
 	case storeinput.Calibrating:
 		action, _ := controls.Calibration.Current()
 		text(frame, 32, modeHeadingBaseline, palette.warning, "ASSIGN A BUTTON TO")
-		text(frame, 32, 205, palette.text, storeinput.Verb(action))
+		text(frame, 32, 205, palette.text, storeinput.ActionLabel(action))
 		text(frame, 32, 226, palette.muted, fmt.Sprintf("ACTION %d OF %d", controls.Calibration.Index+1, len(storeinput.Actions)))
 		text(frame, 32, 252, palette.muted, "A BUTTON CAN HAVE ONLY ONE ACTION")
 		text(frame, 344, modeHeadingBaseline, palette.muted, "COMPLETED ACTIONS")
@@ -176,7 +175,7 @@ func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName 
 		if controls.Calibration.Index > 0 {
 			lastAction := storeinput.Actions[controls.Calibration.Index-1]
 			text(frame, 32, modeHeadingBaseline, palette.warning, "DETECTED  "+storeinput.ButtonLabel(controls.Calibration.Mapping[lastAction]))
-			text(frame, 32, 199, palette.text, "ASSIGNED TO  "+storeinput.Verb(lastAction))
+			text(frame, 32, 199, palette.text, "ASSIGNED TO  "+storeinput.ActionLabel(lastAction))
 		}
 		text(frame, 32, 216, palette.muted, fmt.Sprintf("ACTION %d OF %d", controls.Calibration.Index, len(storeinput.Actions)))
 		for index, item := range storeinput.ReviewItems {
@@ -217,9 +216,7 @@ func drawMappingSummary(frame *image.RGBA, mapping storeinput.Mapping, tested ma
 		}
 		column := index / 4
 		row := index % 4
-		// The summary names an action with the same verb the footer uses, so
-		// one control never reads two ways on one screen.
-		label := storeinput.Verb(action)
+		label := storeinput.ActionLabel(action)
 		text(frame, x+column*columnWidth, y+row*22, palette.text, shorten(mark+label+": "+storeinput.ButtonLabel(button), maximumCharacters))
 	}
 }
@@ -570,6 +567,9 @@ func actionLabel(action appstore.Action) string {
 // message replaces it in the same place with its own colour, so a status never
 // moves and never covers the action buttons.
 func drawStatus(frame *image.RGBA, model *storeui.Model) {
+	if model.Focus == storeui.Health || model.Focus == storeui.Confirm || model.Focus == storeui.ForceConfirm {
+		return
+	}
 	if model.Error != "" {
 		drawStatusBlock(frame, color.RGBA{R: 74, G: 31, B: 39, A: 255}, palette.error, model.Error)
 		return
