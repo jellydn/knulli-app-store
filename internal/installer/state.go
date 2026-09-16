@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/safefs"
@@ -20,11 +21,37 @@ type Installed struct {
 }
 
 type InstalledFile struct {
-	Path      string `json:"path"`
-	SHA256    string `json:"sha256"`
-	Mode      uint32 `json:"mode"`
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
+	Mode   uint32 `json:"mode"`
+	// Size and Modified are the signature of the exact bytes SHA256 was
+	// verified against. They are recorded only when SHA256 is the digest of
+	// this destination file, so a health check can skip hashing a file that
+	// still matches them instead of re-reading every managed file on every
+	// catalogue load. State written before this signature existed has no
+	// Modified value and always rehashes.
+	Size      int64  `json:"size,omitempty"`
+	Modified  string `json:"modified,omitempty"`
 	Preserved bool   `json:"preserved,omitempty"`
 	Unmanaged bool   `json:"unmanaged,omitempty"`
+}
+
+// verificationSignature captures the metadata a health check compares before
+// hashing a file again: size and modification time, at nanosecond precision
+// where the filesystem supports it.
+func verificationSignature(info os.FileInfo) (int64, string) {
+	return info.Size(), info.ModTime().UTC().Format(time.RFC3339Nano)
+}
+
+// verifiedAgainst reports whether the destination still matches the signature
+// the recorded SHA256 was verified against, so its bytes need not be read
+// again.
+func (file InstalledFile) verifiedAgainst(info os.FileInfo) bool {
+	if file.SHA256 == "" || file.Modified == "" {
+		return false
+	}
+	size, modified := verificationSignature(info)
+	return file.Size == size && file.Modified == modified
 }
 
 func statePath(id string) string {

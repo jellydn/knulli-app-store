@@ -121,6 +121,7 @@ func (m Manager) Status(id string) (Status, error) {
 		return Status{}, err
 	}
 	status := Status{Installed: true, Version: state.Manifest.Version, Healthy: true}
+	hashed := 0
 	for _, file := range state.Files {
 		if file.Preserved {
 			continue
@@ -142,18 +143,24 @@ func (m Manager) Status(id string) (Status, error) {
 		if err != nil {
 			return Status{}, err
 		}
-		digest, err := safefs.SHA256(host)
-		if err != nil {
-			return Status{}, err
-		}
-		if digest != file.SHA256 {
-			status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "content changed", Expected: file.SHA256, Actual: digest})
+		// A file that still matches the signature its hash was verified
+		// against cannot have different bytes, so its content needs no second
+		// read. A size, time, or unrecorded-signature difference does hash it.
+		if !file.verifiedAgainst(info) {
+			hashed++
+			digest, err := safefs.SHA256(host)
+			if err != nil {
+				return Status{}, err
+			}
+			if digest != file.SHA256 {
+				status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "content changed", Expected: file.SHA256, Actual: digest})
+			}
 		}
 		if issue := modeIssue(file, info.Mode()); issue != nil {
 			status.addIssue(m, state.Manifest.ID, *issue)
 		}
 	}
-	m.event("package_health_checked", "package", state.Manifest.ID, "healthy", fmt.Sprint(status.Healthy), "issues", fmt.Sprint(len(status.Issues)))
+	m.event("package_health_checked", "package", state.Manifest.ID, "healthy", fmt.Sprint(status.Healthy), "issues", fmt.Sprint(len(status.Issues)), "files", fmt.Sprint(len(state.Files)), "hashed", fmt.Sprint(hashed))
 	return status, nil
 }
 
