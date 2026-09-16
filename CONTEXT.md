@@ -79,3 +79,11 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 **Verb** — The word an action carries in a footer hint, for example `SELECT` for confirm. Directional actions share the `NAVIGATE` footer verb, while setup prompts and mapping summaries keep the direction visible.
 
 **Footer hint** — The single line below every screen's panel. It names each available action beside its binding, for example `SELECT (SDL A)  BACK (SDL B)  SETTINGS (SDL Y)`, or gives an actionless calibration instruction. Outside the footer, mapping summaries identify saved bindings but do not instruct the user to press them.
+
+**Keyboard binding** — A binding carried by a desktop keyboard key rather than a pad button, used when no GameController exists so a development machine can reach every screen. It is a binding set like any other, with its own identity, so a desktop run never reads or overwrites a mapping saved for a handheld controller.
+
+## Verification
+
+**Fixture root** — A throwaway directory holding the Knulli files platform detection reads, written for desktop verification only. Installs, logs, and mappings are written below it, so it stands in for a device root without a device and is never a real device root.
+
+**Walkthrough** — A scripted key sequence a desktop run replays through the real binary. It records the opening frame, each post-key frame, and operation completions. A walkthrough is evidence that a flow still works, not a substitute for a device run: it never exercises a real GameController, a real `/userdata` write, or the kernel's SDL loading.

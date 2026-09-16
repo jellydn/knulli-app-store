@@ -78,6 +78,8 @@ If SDL exposes no GameController, the setup screen stays blocked, automatically 
 
 The footer is the only place the interface shows controls. It names each action available on the current screen beside its binding, for example `SELECT (SDL A)  BACK (SDL B)  SETTINGS (SDL Y)` on the catalogue, and the same verb always means the same action: Select accepts or opens, Back cancels or leaves, Settings opens controller settings. No screen repeats a control hint in its body text, and the controller mapping summary lists the same verbs beside the buttons that carry them. The blocked screen uses the same footer, where Select exports diagnostics and Back leaves.
 
+Every screen can be checked on a development machine first, with no handheld and no controller: `make gui` opens the interactive GUI from the keyboard against a scratch fixture root, where the footer reads `SELECT (KEY ENTER)  BACK (KEY ESC)  SETTINGS (KEY Y)`. `make walkthrough` replays the offline flows and records the opening, post-key, and operation-completion frames; each pull request publishes that evidence as the `gui-walkthrough` artifact. Add `WALK_FLAGS=--install` for the network-backed package lifecycle flows. Neither run exercises a real GameController or touches a real `/userdata`, so the checklist below still needs the device. See [Desktop GUI verification](desktop-verification.md).
+
 ## Device test checklist
 
 - Record the exact Knulli release and device hardware revision.

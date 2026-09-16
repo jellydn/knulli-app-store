@@ -147,6 +147,8 @@ git diff --exit-code -- build/catalog-index.json
 
 `make check` formats, vets, and runs tests. SDL GUI compile and layout tests need `libsdl2-dev` and `go test -tags sdl ./...`.
 
+`make gui` opens an interactive desktop GUI with no handheld and no controller: the keyboard carries the semantic actions and a scratch fixture root supplies the Knulli files platform detection reads. `make walkthrough` drives the offline flows and records the opening screen, each key result, and operation completions. Use `make walkthrough WALK_FLAGS=--install` to include the network-backed install, health, repair, and uninstall flows. The `gui-walkthrough` artifact on each pull request contains the offline evidence. See [Desktop GUI verification](docs/desktop-verification.md) for the bindings, fixture contents, flows, and device-only checks.
+
 ## Author
 
 👤 **Huynh Duc Dung**
