@@ -69,8 +69,22 @@ func TestDesktopSessionOpensSetupAndSavesWithTheKeyboard(t *testing.T) {
 		t.Fatalf("keyboard mapping reached a controller identity: found=%v err=%v", found, err)
 	}
 	reloaded := NewDesktopSession(root, "trimui-smart-pro")
-	if reloaded.Mode != Normal || reloaded.FirstRun {
-		t.Fatalf("saved keyboard mapping did not load: mode=%s first=%v", reloaded.Mode, reloaded.FirstRun)
+	if reloaded.Mode != Normal || reloaded.FirstRun || reloaded.Source != "saved keyboard mapping" || reloaded.Message != "Saved keyboard mapping loaded" {
+		t.Fatalf("saved keyboard mapping did not load with keyboard labels: mode=%s first=%v source=%q message=%q", reloaded.Mode, reloaded.FirstRun, reloaded.Source, reloaded.Message)
+	}
+}
+
+func TestDesktopSessionPersistsWithoutPlatformDeviceMetadata(t *testing.T) {
+	root := t.TempDir()
+	session := NewDesktopSession(root, "")
+	pressKey(t, session, Confirm)
+	if session.Mode != Normal || session.ValidationError != "" {
+		t.Fatalf("device-less desktop mapping was not saved: mode=%s error=%q", session.Mode, session.ValidationError)
+	}
+
+	reloaded := NewDesktopSession(root, "")
+	if reloaded.Mode != Normal || reloaded.Source != "saved keyboard mapping" {
+		t.Fatalf("device-less desktop mapping was not reloaded: mode=%s source=%q error=%q", reloaded.Mode, reloaded.Source, reloaded.ValidationError)
 	}
 }
 
