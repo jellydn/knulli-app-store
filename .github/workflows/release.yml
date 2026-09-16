@@ -42,7 +42,7 @@ jobs:
         run: echo "tag=v$(date -u +%Y.%m.%d)-$(printf '%.7s' "$SHA")" >> "$GITHUB_OUTPUT"
 
       - name: Download verified device artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
@@ -146,7 +146,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Download tagged device artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: knulli-app-store-*-tag
           path: dist
