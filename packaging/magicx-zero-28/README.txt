@@ -41,8 +41,9 @@ PACKAGE STATUS
 
 Grout 5.2.0.0 and PlayTime 1.0.0 are user-authorized experimental tests only
 when architecture, glibc ABI, SDL libraries, device identity, and 640x480 pass.
-Select Install, or Manage existing for a detected external copy, and confirm
-the warning. The Store disables Grout's self-updater with a verified staging
+Select Install, or Manage existing for detected external files, and confirm
+the warning. An empty destination directory is not a copy. A card that
+reports a wider file mode than requested is not a health failure. The Store disables Grout's self-updater with a verified staging
 patch. Neither package has MagicX real-device evidence.
 
 PlayTime data stays under /userdata/system/configs/playtime. Manager state and

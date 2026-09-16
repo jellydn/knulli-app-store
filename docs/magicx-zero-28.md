@@ -30,7 +30,7 @@ The key combines Knulli device ID and controller GUID. An all-zero or absent GUI
 ## Package status
 
 - **Grout 5.2.0.0 is a user-authorized experimental test.** It is allowed only after Knulli, AArch64, glibc 2.17 or later, all SDL libraries, the device identity, and 640×480 pass detection. The Store disables its self-updater with an exact verified staging patch. No Grout version has MagicX real-device evidence.
-- **PlayTime 1.0.0 is a user-authorized experimental test.** The reviewed ARM64 archive uses the Knulli SDL2 libraries, runtime display dimensions with a 640×480 fallback, and SDL GameController actions. Select **Install**, or **Manage existing** when a detected external copy shows the row state **EXTERNAL**, and confirm the unverified warning. Its accelerated renderer, launch, tracking, and complete life cycle are not proven on MagicX.
+- **PlayTime 1.0.0 is a user-authorized experimental test.** The reviewed ARM64 archive uses the Knulli SDL2 libraries, runtime display dimensions with a 640×480 fallback, and SDL GameController actions. Select **Install**, or **Manage existing** when detected external files show the row state **EXTERNAL**, and confirm the unverified warning. An empty destination directory is not a copy and keeps the **Install** action. Its accelerated renderer, launch, tracking, and complete life cycle are not proven on MagicX.
 
 Successful App Store navigation does not prove a package. Grout and PlayTime remain unverified on MagicX.
 
@@ -47,7 +47,7 @@ Successful App Store navigation does not prove a package. Grout and PlayTime rem
 9. Install PlayTime, refresh game lists or reboot, and launch it. Track a game, close it, and relaunch it.
 10. Confirm the App Store reports PlayTime healthy. Damage only a disposable managed test copy if you test Repair; confirm Repair restores it and keeps `/userdata/system/configs/playtime/`.
 11. Uninstall PlayTime and confirm its managed files are gone while `/userdata/system/configs/playtime/` remains. If you managed an external copy and later repaired it, confirm uncertain original files are restored from `/userdata/system/knulli-app-store/originals/io.github.unitreign.playtime/`.
-12. Cause a failed fresh install before destination writes, restart the Store, and confirm **Retry install** appears. Confirm **Manage existing** is absent when no external files exist.
+12. Cause a failed fresh install before destination writes, restart the Store, and confirm **Retry install** appears. Confirm **Manage existing** is absent when no external files exist, including when rollback left empty directories behind.
 
 ### Grout 5.2.0.0 checklist
 
@@ -58,6 +58,6 @@ Successful App Store navigation does not prove a package. Grout and PlayTime rem
 5. Update a managed 5.1.0.0 test copy. Confirm the preserved data and a safe game-list refresh.
 6. Test rollback and Uninstall. Confirm preserved data remains.
 7. Cause a disposable adoption failure, use both force-reinstall confirmations, and inspect `/userdata/system/knulli-app-store/recovery-backups/app.romm.grout/<timestamp>/manifest.json`.
-8. If Grout shows **Issue**, select it and confirm the health section gives the exact path, expected and actual hash or mode, and Repair guidance. Repair and confirm the transformed binary is healthy and the effective destination mode is accepted.
+8. If Grout shows **Issue**, select it and confirm the health section gives the exact path, expected and actual hash or mode, and Repair guidance. Repair and confirm the transformed binary is healthy and the effective destination mode is accepted. A destination mode wider than the requested one, for example `0777` in place of `0755`, must not produce an issue; removing the execute bit must.
 
 The App Store log is `/userdata/system/logs/knulli-app-store.log`. Diagnostic exports are under `/userdata/system/knulli-app-store/diagnostics/`. Installed state and original-file backups are under `/userdata/system/knulli-app-store/`. If a test fails, stop the app, inspect the installed-state JSON, and restore a retained original to its recorded path. Do not send PlayTime data in a report.

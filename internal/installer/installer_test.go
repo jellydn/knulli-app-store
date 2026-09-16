@@ -591,6 +591,70 @@ func TestInstallRejectsAnExternalCopyAndNamesTheOnScreenAction(t *testing.T) {
 	}
 }
 
+func TestRolledBackDestinationSkeletonIsNotAnExternalInstallation(t *testing.T) {
+	root := t.TempDir()
+	// A failed write can leave the destination directory tree behind after
+	// every file is rolled back. That skeleton is not an external copy.
+	if err := os.MkdirAll(filepath.Join(root, "userdata/roms/tools/demo/icons"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	existing, err := manager.PreExisting(pkg)
+	if err != nil || existing {
+		t.Fatalf("directory skeleton was treated as an external copy: existing=%v err=%v", existing, err)
+	}
+	if _, err := manager.Apply(context.Background(), OpAdopt, pkg); err == nil || err.Error() != "no external installation was found; use Install" {
+		t.Fatalf("adoption of a directory skeleton = %v", err)
+	}
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "reviewed launcher")
+	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
+		t.Fatalf("install over a directory skeleton was not healthy: %#v, %v", status, err)
+	}
+}
+
+func TestFilesystemNormalizedModeIsNotAHealthIssue(t *testing.T) {
+	root := t.TempDir()
+	asset := zipBytesWithModes(t, map[string]zipFixture{
+		"launch.sh": {body: "reviewed launcher", mode: 0644},
+		"data.txt":  {body: "data", mode: 0644},
+	})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	pkg.Install.Executables = []string{"launch.sh"}
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+		t.Fatal(err)
+	}
+	launcher := filepath.Join(root, "userdata/roms/tools/demo/launch.sh")
+	data := filepath.Join(root, "userdata/roms/tools/demo/data.txt")
+	// Knulli SD-card filesystems own the mode bits and report 0777 for files
+	// the installer requested as 0755 or 0644.
+	for path, mode := range map[string]os.FileMode{launcher: 0777, data: 0666} {
+		if err := os.Chmod(path, mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	status, err := manager.Status(pkg.ID)
+	if err != nil || !status.Healthy || len(status.Issues) != 0 {
+		t.Fatalf("a wider filesystem mode was reported as a change: %#v, %v", status, err)
+	}
+	if err := os.Chmod(launcher, 0644); err != nil {
+		t.Fatal(err)
+	}
+	status, err = manager.Status(pkg.ID)
+	if err != nil || status.Healthy || len(status.Issues) != 1 || status.Issues[0].Check != "mode changed" || status.Issues[0].Path != "/userdata/roms/tools/demo/launch.sh" {
+		t.Fatalf("a lost execute capability was not reported: %#v, %v", status, err)
+	}
+}
+
 func TestForceReinstallBacksUpEverythingPreservesDataAndCanRepeat(t *testing.T) {
 	root := t.TempDir()
 	writeRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "damaged launcher")
