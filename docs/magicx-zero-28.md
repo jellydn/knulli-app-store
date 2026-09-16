@@ -29,10 +29,10 @@ The key combines Knulli device ID and controller GUID. An all-zero or absent GUI
 
 ## Package status
 
-- **Grout 5.1.0.0 remains blocked.** Its tagged Knulli release does not establish MagicX orientation, input dispatch, SDL ABI, or readable 640×480 behavior. Its known Zero 28 handling is in a MinUI path that the Knulli launcher does not select.
+- **Grout 5.2.0.0 is a user-authorized experimental test.** It is allowed only after Knulli, AArch64, glibc 2.17 or later, all SDL libraries, the device identity, and 640×480 pass detection. The Store disables its self-updater with an exact verified staging patch. No Grout version has MagicX real-device evidence.
 - **PlayTime 1.0.0 is a user-authorized experimental test.** The reviewed ARM64 archive uses the Knulli SDL2 libraries, runtime display dimensions with a 640×480 fallback, and SDL GameController actions. Select **Install**, or **Manage existing** when a detected external copy shows the row state **EXTERNAL**, and confirm the unverified warning. Its accelerated renderer, launch, tracking, and complete life cycle are not proven on MagicX.
 
-Successful App Store navigation does not prove a package. Grout remains blocked, and PlayTime remains unverified.
+Successful App Store navigation does not prove a package. Grout and PlayTime remain unverified on MagicX.
 
 ## Test checklist
 
@@ -43,9 +43,21 @@ Successful App Store navigation does not prove a package. Grout remains blocked,
 5. Restart and confirm the saved mapping loads. Reset it, confirm setup becomes required, and confirm only this controller/device record changes.
 6. Disconnect and reconnect the controller if the runtime permits it. Confirm the correct identity and mapping return.
 7. Export diagnostics. Confirm controller identity, mapping source, semantic events, and validation failure are present without private data.
-8. Confirm Grout shows the MagicX device blocker. Confirm PlayTime shows **Install** or **Manage existing** with an experimental warning.
+8. Confirm Grout and PlayTime show **Install** or **Manage existing** with an experimental warning only when ABI, libraries, and display checks pass. Remove one test dependency only in a disposable test root and confirm installation is blocked with its exact name.
 9. Install PlayTime, refresh game lists or reboot, and launch it. Track a game, close it, and relaunch it.
 10. Confirm the App Store reports PlayTime healthy. Damage only a disposable managed test copy if you test Repair; confirm Repair restores it and keeps `/userdata/system/configs/playtime/`.
 11. Uninstall PlayTime and confirm its managed files are gone while `/userdata/system/configs/playtime/` remains. If you managed an external copy and later repaired it, confirm uncertain original files are restored from `/userdata/system/knulli-app-store/originals/io.github.unitreign.playtime/`.
+12. Cause a failed fresh install before destination writes, restart the Store, and confirm **Retry install** appears. Confirm **Manage existing** is absent when no external files exist.
+
+### Grout 5.2.0.0 checklist
+
+1. Install and launch Grout at 640×480. Check all text, focus, confirm, back, and exit controls.
+2. Connect to a test RomM 5.2.0 server and complete one browse or sync action.
+3. Confirm the self-updater cannot obtain release metadata.
+4. Run Repair and confirm `config.json`, `save_slots.json`, `.cache/`, and `logs/` remain.
+5. Update a managed 5.1.0.0 test copy. Confirm the preserved data and a safe game-list refresh.
+6. Test rollback and Uninstall. Confirm preserved data remains.
+7. Cause a disposable adoption failure, use both force-reinstall confirmations, and inspect `/userdata/system/knulli-app-store/recovery-backups/app.romm.grout/<timestamp>/manifest.json`.
+8. If Grout shows **Issue**, select it and confirm the health section gives the exact path, expected and actual hash or mode, and Repair guidance. Repair and confirm the transformed binary is healthy and the effective destination mode is accepted.
 
 The App Store log is `/userdata/system/logs/knulli-app-store.log`. Diagnostic exports are under `/userdata/system/knulli-app-store/diagnostics/`. Installed state and original-file backups are under `/userdata/system/knulli-app-store/`. If a test fails, stop the app, inspect the installed-state JSON, and restore a retained original to its recorded path. Do not send PlayTime data in a report.

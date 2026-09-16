@@ -14,7 +14,7 @@ Package code runs with access to user files. A complete review protects ROMs, sa
 2. Select an immutable versioned release asset. Do not use `latest`, a branch archive, or an unrestricted remote install script.
 3. Record its exact compressed size, extracted size, SHA-256, supported ZIP or `tar.gz` format, license SPDX expression, and evidence URLs.
 4. Inspect every archive entry. Reject absolute paths, traversal, links, devices, pipes, duplicate names, and undeclared launchers.
-5. Record architecture and dynamic dependencies. Test firmware, device ID, and every resolution separately; a shared chip does not prove compatibility.
+5. Record architecture, ABI, minimum glibc symbols, and every dynamic dependency. Test firmware, device ID, and every resolution separately. Broad experimental device scope needs a known device identity and evidence-based display bounds. A shared chip does not prove compatibility.
 6. Declare the narrowest install destination and allowed `/userdata` writes. List user data and configuration in preserve paths. List each launcher or binary that needs execute mode and explain why.
 7. Review runtime writes, network use, self-updaters, uninstall behavior, menu integration, and rollback. Updates must stay inside App Store checksum and transaction controls.
 8. Add manifest, compatibility, archive, install, repeated-install, repair, uninstall, preserved-data, and rollback tests. Add GUI layout tests for each target resolution.

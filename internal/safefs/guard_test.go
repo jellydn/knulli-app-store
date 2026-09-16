@@ -116,6 +116,36 @@ func TestRecoverRestoresOpenJournalAfterCrash(t *testing.T) {
 	}
 }
 
+func TestPendingForPathValidatesAndMatchesOpenJournal(t *testing.T) {
+	root := t.TempDir()
+	guard, err := NewGuard(root, []string{"/userdata/app", "/userdata/system/manager"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent, err := guard.Resolve("/userdata/system/manager")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(parent, 0700); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := Begin(guard, parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Write("/userdata/app/run.sh", []byte("partial"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	pending, err := PendingForPath(root, parent, "/userdata/app")
+	if err != nil || !pending {
+		t.Fatalf("pending = %v, %v", pending, err)
+	}
+	pending, err = PendingForPath(root, parent, "/userdata/other")
+	if err != nil || pending {
+		t.Fatalf("unrelated pending = %v, %v", pending, err)
+	}
+}
+
 func TestRecoverLeavesCommittedJournalMutations(t *testing.T) {
 	root := t.TempDir()
 	guard, err := NewGuard(root, []string{"/userdata/test"})

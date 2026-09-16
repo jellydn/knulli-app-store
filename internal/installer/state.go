@@ -50,10 +50,24 @@ func loadState(guard *safefs.Guard, id string) (*Installed, error) {
 	if state.Schema != "org.knulli.app-store/installed-state/v1" || state.Manifest.ID != id {
 		return nil, fmt.Errorf("installed state has an invalid schema or package id")
 	}
+	state.Manifest = migrateLegacyManifest(state.Manifest)
 	if err := state.Manifest.Validate(); err != nil || !state.Manifest.Installable() {
 		return nil, fmt.Errorf("installed state contains an invalid manifest")
 	}
 	return &state, nil
+}
+
+func migrateLegacyManifest(pkg manifest.Package) manifest.Package {
+	if pkg.Compatibility == nil {
+		return pkg
+	}
+	if len(pkg.Compatibility.ABIs) == 0 && len(pkg.Compatibility.Architectures) == 1 && pkg.Compatibility.Architectures[0] == "aarch64" {
+		pkg.Compatibility.ABIs = []string{"linux-aarch64-glibc"}
+	}
+	if len(pkg.Compatibility.Dependencies) == 0 {
+		pkg.Compatibility.Dependencies = []string{"libc"}
+	}
+	return pkg
 }
 
 func encodeState(state Installed) ([]byte, error) {

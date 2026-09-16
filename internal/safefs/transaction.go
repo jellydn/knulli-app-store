@@ -88,6 +88,47 @@ func Recover(root, parent string) error {
 	return nil
 }
 
+// PendingForPath reports whether an open transaction journal contains a
+// destination path. It validates journal paths before returning a result.
+func PendingForPath(root, parent, virtual string) (bool, error) {
+	absolute, err := filepath.Abs(root)
+	if err != nil {
+		return false, err
+	}
+	absolute, err = filepath.EvalSymlinks(absolute)
+	if err != nil {
+		return false, fmt.Errorf("resolve filesystem root: %w", err)
+	}
+	matches, err := filepath.Glob(filepath.Join(parent, transactionPrefix+"*"))
+	if err != nil {
+		return false, err
+	}
+	for _, directory := range matches {
+		record, err := readJournal(directory)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return false, err
+		}
+		if record.Status != journalStatusOpen && record.Status != journalCommitted {
+			return false, fmt.Errorf("unknown transaction journal status %q in %s", record.Status, directory)
+		}
+		if _, err := snapshotsFromRecord(filepath.Clean(absolute), directory, record); err != nil {
+			return false, err
+		}
+		if record.Status != journalStatusOpen {
+			continue
+		}
+		for _, snapshot := range record.Snapshots {
+			if snapshot.Virtual == virtual || strings.HasPrefix(snapshot.Virtual, strings.TrimSuffix(virtual, "/")+"/") {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 func (t *Transaction) Write(virtual string, data []byte, mode os.FileMode) error {
 	host, err := t.prepare(virtual)
 	if err != nil {
@@ -102,6 +143,14 @@ func (t *Transaction) Copy(source, virtual string, mode os.FileMode) error {
 		return err
 	}
 	return Copy(source, host, mode)
+}
+
+func (t *Transaction) Chmod(virtual string, mode os.FileMode) error {
+	host, err := t.prepare(virtual)
+	if err != nil {
+		return err
+	}
+	return os.Chmod(host, mode.Perm())
 }
 
 func (t *Transaction) Remove(virtual string) error {
