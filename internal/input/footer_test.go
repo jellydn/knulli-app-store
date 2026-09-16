@@ -40,3 +40,12 @@ func TestFooterKeepsCanonicalVerbsDistinctFromButtonLabels(t *testing.T) {
 		}
 	}
 }
+
+func TestActionLabelKeepsDirectionsDistinct(t *testing.T) {
+	wants := map[Action]string{Up: "UP", Down: "DOWN", Left: "LEFT", Right: "RIGHT", Confirm: VerbSelect}
+	for action, want := range wants {
+		if got := ActionLabel(action); got != want {
+			t.Fatalf("ActionLabel(%q) = %q, want %q", action, got, want)
+		}
+	}
+}

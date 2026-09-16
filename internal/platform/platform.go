@@ -123,7 +123,11 @@ func Resolve(root string, options ...Option) Info {
 	for _, option := range options {
 		option(request)
 	}
-	info := detect(request.root)
+	effectiveRoot := request.root
+	if effectiveRoot == "" {
+		effectiveRoot = "/"
+	}
+	info := detect(effectiveRoot)
 	if request.firmware != "" {
 		info.Firmware = request.firmware
 		info.evidence.FirmwareRaw = request.firmware
@@ -136,6 +140,9 @@ func Resolve(root string, options ...Option) Info {
 	}
 	if request.arch != "" {
 		info.Arch = request.arch
+		// ABI detection depends on the selected architecture. Recompute it when
+		// an override describes a fixture for a different host architecture.
+		info.ABI = detectABI(effectiveRoot, info.Arch)
 	}
 	if request.device != "" {
 		info.Device = request.device

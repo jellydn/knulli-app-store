@@ -140,6 +140,17 @@ func TestWalkDetailRecordsTheSelectedItemAndError(t *testing.T) {
 	}
 }
 
+func TestWalkDetailKeepsMessagesInsideOneTSVRecord(t *testing.T) {
+	model := &storeui.Model{Message: "first\tsecond", Error: "line one\nline two\rline three"}
+	detail := WalkDetail(model, nil)
+	if strings.ContainsAny(detail, "\r\n") {
+		t.Fatalf("detail contains a line break: %q", detail)
+	}
+	if fields := strings.Split(detail, "\t"); len(fields) != 8 {
+		t.Fatalf("detail has %d fields, want 8: %q", len(fields), detail)
+	}
+}
+
 func TestWalkerSendsEveryKeyOnceAndStops(t *testing.T) {
 	walker := NewWalker([]Key{KeyDown, KeyConfirm})
 	if walker.Done() {
