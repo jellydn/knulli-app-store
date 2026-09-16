@@ -99,6 +99,9 @@ func applyStep(tx *safefs.Transaction, guard *safefs.Guard, step Step) (bool, er
 	case StepAdd:
 		return addEntry(tx, guard, step.Menu)
 	case StepReplace:
+		if step.Previous == nil {
+			return false, fmt.Errorf("replace menu step requires previous entry")
+		}
 		return replaceEntry(tx, guard, *step.Previous, step.Menu)
 	case StepRemove:
 		return removeEntry(tx, guard, step.Menu)
