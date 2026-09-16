@@ -174,8 +174,6 @@ func actionable(state State) bool {
 	return state != StateCandidate && state != StateIncompatible
 }
 
-
-
 func operationMessage(action Action, name string) string {
 	if action == Adopt {
 		return "Inventorying and backing up existing " + name
