@@ -71,14 +71,12 @@ func (m Manager) RecoveryStatus(pkg manifest.Package) (RecoveryStatus, error) {
 	return RecoveryStatus{}, nil
 }
 
-// PreExisting reports whether the destination holds something this installer
-// did not write. Adoption inventories regular files, so an empty directory
-// skeleton left behind by a rolled-back write is an absent package, not an
-// external installation: reporting it as external offers Manage existing for
-// a copy adoption can never find. Anything else at the destination still
-// needs the user to move it aside first. This stops at the first entry
-// instead of hashing the destination like adoption does, because the
-// catalogue asks every package on every load.
+// PreExisting reports whether the destination holds files this installer did
+// not write. Adoption inventories regular files, so an empty directory left by
+// a rolled-back write is absent, not an external installation: offering Manage
+// existing for it can only fail. Anything else, including an entry the walk
+// cannot read, still needs the user to move it aside. The walk stops at the
+// first entry, because the catalogue asks every package on every load.
 func (m Manager) PreExisting(pkg manifest.Package) (bool, error) {
 	if !pkg.Installable() || pkg.Install == nil {
 		return false, nil
@@ -91,26 +89,17 @@ func (m Manager) PreExisting(pkg manifest.Package) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	info, err := os.Lstat(host)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	if !info.IsDir() {
-		return true, nil
-	}
-	// Every return below stops the walk, so the walk never reports its own error
-	// and one unreadable destination never fails status for the whole catalogue.
 	found := false
-	_ = fs.WalkDir(os.DirFS(host), ".", func(_ string, entry fs.DirEntry, walkErr error) error {
+	// Every path stops the walk, so the walk itself reports no error.
+	_ = filepath.WalkDir(host, func(_ string, entry fs.DirEntry, walkErr error) error {
 		if walkErr == nil && entry.IsDir() {
 			return nil
 		}
-		// A file, or an entry that cannot be read, is something the user must
-		// inventory or move aside.
-		found = true
+		// A file, or an entry that cannot be read, is something to move aside.
+		// An absent destination reports nothing.
+		if !os.IsNotExist(walkErr) {
+			found = true
+		}
 		return fs.SkipAll
 	})
 	return found, nil
