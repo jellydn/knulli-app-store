@@ -21,15 +21,21 @@ CONTROLLER SETUP
 The first launch for each device/controller identity uses a dedicated screen
 before the catalogue. Choose Use Detected Mapping, Test Detected Mapping,
 Customize, or Safe Exit. Customize assigns one semantic action at a time. Each
-detected button has Accept, Retry, Start Over, and Cancel choices. Conflicts
+detected button has Select, Retry, Start Over, and Back choices. Conflicts
 stay on the current action. Tested and custom mappings require a complete
 eight-action preview before atomic save. No timeout skips setup.
 
-Open Settings with the displayed Details/Diagnostics control. Settings can
+Open Settings with the control the footer shows beside SETTINGS. Settings can
 rerun setup, export diagnostics, reset the active mapping, or close. Hold the
-saved Back and Details/Diagnostics controls while launching to force setup.
-Instructions do not assume physical A/B positions. A missing SDL GameController
-shows a blocked screen and diagnostic locations instead of the catalogue.
+saved Back and Settings controls while launching to force setup. Instructions
+do not assume physical A/B positions. A missing SDL GameController shows a
+blocked screen and diagnostic locations instead of the catalogue.
+
+The footer is the only place a screen shows controls. It names each available
+action beside its binding, for example SELECT (SDL A)  BACK (SDL B)  SETTINGS
+(SDL Y), and the same verb always means the same action. No screen repeats a
+control hint in its own text; the controller mapping summary uses the same
+verbs. On the blocked screen, Select exports diagnostics and Back leaves.
 
 Mappings are stored by Knulli device plus controller GUID under:
   /userdata/system/configs/knulli-app-store/controller-mappings.json

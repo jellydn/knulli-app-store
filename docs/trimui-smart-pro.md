@@ -72,9 +72,11 @@ Grout has no supported updater-disable setting. The Store therefore changes the 
 
 ## Controls
 
-The first launch for each device/controller identity opens a dedicated setup screen before the catalogue. Choose **Use Detected Mapping**, **Test Detected Mapping**, **Customize**, or **Safe Exit**. Customize assigns one semantic action at a time, then reviews each detected button with Accept, Retry, Start Over, and Cancel choices. All custom and tested mappings require an eight-action preview before atomic save. Later launches load the saved mapping directly. Settings can reopen setup, export diagnostics, or reset the active mapping. Hold the saved Back and Details/Diagnostics controls while launching for a deliberate setup override. Physical button positions are not assumed.
+The first launch for each device/controller identity opens a dedicated setup screen before the catalogue. Choose **Use Detected Mapping**, **Test Detected Mapping**, **Customize**, or **Safe Exit**. Customize assigns one semantic action at a time, then reviews each detected button with Select, Retry, Start Over, and Back choices. All custom and tested mappings require an eight-action preview before atomic save. Later launches load the saved mapping directly. Settings can reopen setup, export diagnostics, or reset the active mapping. Hold the saved Back and Settings controls while launching for a deliberate setup override. Physical button positions are not assumed.
 
 If SDL exposes no GameController, the setup screen stays blocked, automatically exports diagnostics when possible, and shows the log and export paths. It does not open the catalogue with unknown controls.
+
+The footer is the only place the interface shows controls. It names each action available on the current screen beside its binding, for example `SELECT (SDL A)  BACK (SDL B)  SETTINGS (SDL Y)` on the catalogue, and the same verb always means the same action: Select accepts or opens, Back cancels or leaves, Settings opens controller settings. No screen repeats a control hint in its body text, and the controller mapping summary lists the same verbs beside the buttons that carry them. The blocked screen uses the same footer, where Select exports diagnostics and Back leaves.
 
 ## Device test checklist
 
@@ -82,7 +84,7 @@ If SDL exposes no GameController, the setup screen stays blocked, automatically 
 - Confirm the app appears in Ports and opens at 1280×720 without replacing system libraries.
 - Confirm text, selection, trust state, and package details are readable with no clipping.
 - Confirm D-pad navigation, select, back, and exit with Knulli's default Ports layout.
-- Confirm the footer shows the active semantic controls and mapping source; record the log if no controller appears.
+- Confirm the footer is the only control hint on screen: one line of `VERB (BUTTON)` pairs for the active mapping, with no repeated hint in the panel. Record the log if no controller appears.
 - Open Settings with its displayed physical label, export diagnostics, and inspect the bundle for platform and mapping decisions. Do not send it if manual inspection finds private data.
 - Confirm the header shows `TRIMUI SMART PRO / 1280X720`. Unknown boards must show `UNKNOWN DEVICE`, and failed runtime-size detection must identify its fallback.
 - Confirm Grout shows `EXPERIMENTAL`, PlayTime shows `DEVICE TESTED`, and the other two packages remain read-only.

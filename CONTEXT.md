@@ -69,3 +69,13 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 **Device** — A specific handheld identity read from a Knulli board file. Device support is explicit per device, never inferred from a shared SoC family.
 
 **Resolution** — An explicit WIDTHxHEIGHT from a real source. No resolution is ever assumed; every actionable manifest names the resolutions it supports.
+
+## Interface
+
+**Semantic action** — One of the eight controls the GUI exposes: up, down, left, right, confirm, back, diagnostics, and exit. An action is named independently of any physical button, so a device layout never changes what an action means.
+
+**Binding** — The physical SDL GameController button that carries one semantic action for one device and controller identity. Bindings are detected, tested, and saved per identity; no physical position is assumed.
+
+**Verb** — The one word an action carries on screen, for example `SELECT` for confirm. The same action uses the same verb on every screen, in the footer hint and in the controller mapping summary alike.
+
+**Footer hint** — The single line at the foot of every screen that names each action available there beside its binding, for example `SELECT (SDL A)  BACK (SDL B)  SETTINGS (SDL Y)`. A footer hint is the only place the interface names a physical button, and a screen never repeats it inside its panel.
