@@ -63,6 +63,7 @@ jobs:
       - name: Publish pre-release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           SHA: ${{ github.event.workflow_run.head_sha }}
           TAG: ${{ steps.tag.outputs.tag }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}
@@ -165,6 +166,7 @@ jobs:
       - name: Publish full release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
           cat >notes.md <<'EOF'
