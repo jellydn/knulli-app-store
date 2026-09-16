@@ -1,6 +1,7 @@
 #!/bin/sh
-# Walks every GUI flow through the real binary, driven by the keyboard, so a
-# development machine or a CI runner produces screen evidence with no device.
+# Walks the offline GUI flows through the real binary, driven by the keyboard,
+# so a development machine or CI runner produces screen evidence with no
+# device. Pass --install to include network-backed package lifecycle flows.
 #
 # Each flow gets a throwaway fixture root and its own evidence directory. Every
 # flow must reach the screens it claims; the walk.tsv record beside the frames
