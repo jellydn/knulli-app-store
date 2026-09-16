@@ -76,9 +76,9 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Binding** — The physical SDL GameController button that carries one semantic action for one device and controller identity. Bindings are detected, tested, and saved per identity; no physical position is assumed.
 
-**Verb** — The one word an action carries on screen, for example `SELECT` for confirm. The same action uses the same verb on every screen, in the footer hint and in the controller mapping summary alike.
+**Verb** — The word an action carries in a footer hint, for example `SELECT` for confirm. Directional actions share the `NAVIGATE` footer verb, while setup prompts and mapping summaries keep the direction visible.
 
-**Footer hint** — The single line at the foot of every screen that names each action available there beside its binding, for example `SELECT (SDL A)  BACK (SDL B)  SETTINGS (SDL Y)`. A footer hint is the only place the interface names a physical button, and a screen never repeats it inside its panel.
+**Footer hint** — The single line below every screen's panel. It names each available action beside its binding, for example `SELECT (SDL A)  BACK (SDL B)  SETTINGS (SDL Y)`, or gives an actionless calibration instruction. Outside the footer, mapping summaries identify saved bindings but do not instruct the user to press them.
 
 **Keyboard binding** — A binding carried by a desktop keyboard key rather than a pad button, used when no GameController exists so a development machine can reach every screen. It is a binding set like any other, with its own identity, so a desktop run never reads or overwrites a mapping saved for a handheld controller.
 

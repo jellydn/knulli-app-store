@@ -1,6 +1,7 @@
 #!/bin/sh
-# Walks every GUI flow through the real binary, driven by the keyboard, so a
-# development machine or a CI runner produces screen evidence with no device.
+# Walks the offline GUI flows through the real binary, driven by the keyboard,
+# so a development machine or CI runner produces screen evidence with no
+# device. Pass --install to include network-backed package lifecycle flows.
 #
 # Each flow gets a throwaway fixture root and its own evidence directory. Every
 # flow must reach the screens it claims; the walk.tsv record beside the frames
@@ -12,10 +13,11 @@
 #   OUTDIR   parent directory for the per-flow frames and records
 #   --install  also walk the flows that download a package (needs network)
 #
-# Environment: WALK_BIN, WALK_INDEX, WALK_DEVICE, WALK_RESOLUTION, WALK_TIMEOUT.
+# Environment: WALK_BIN, WALK_INDEX, WALK_DEVICE, WALK_ARCH, WALK_RESOLUTION,
+# WALK_TIMEOUT, and WALK_PACKAGE_PATH.
 set -eu
 
-if [ "$#" -lt 2 ]; then
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
   echo "usage: $0 ROOT OUTDIR [--install]" >&2
   exit 2
 fi
@@ -23,9 +25,11 @@ fi
 ROOT=$1
 OUTDIR=$2
 INSTALL_FLOWS=no
-if [ "${3:-}" = "--install" ]; then
-  INSTALL_FLOWS=yes
-fi
+case "${3:-}" in
+  "") ;;
+  --install) INSTALL_FLOWS=yes ;;
+  *) echo "unknown option: $3" >&2; exit 2 ;;
+esac
 
 case "$ROOT" in
   /*) ;;
@@ -35,10 +39,19 @@ case "$OUTDIR" in
   /*) ;;
   *) echo "output directory must be an absolute path: $OUTDIR" >&2; exit 2 ;;
 esac
+if [ "$ROOT" = "/" ] || [ "$OUTDIR" = "/" ]; then
+  echo "root and output directory must not be /" >&2
+  exit 2
+fi
+if [ "$ROOT" = "$OUTDIR" ]; then
+  echo "root and output directory must be different" >&2
+  exit 2
+fi
 
 BIN=${WALK_BIN:-build/knulli-app-ui}
 INDEX=${WALK_INDEX:-build/catalog-index.json}
 DEVICE=${WALK_DEVICE:-trimui-smart-pro}
+ARCH=${WALK_ARCH:-aarch64}
 RESOLUTION=${WALK_RESOLUTION:-1280x720}
 TIMEOUT=${WALK_TIMEOUT:-60s}
 # Where the walkthrough looks for an installed package when it tampers with one.
@@ -84,6 +97,7 @@ walk() {
   if ! "$BIN" \
     -input "$input" \
     -root "$root" \
+    -arch "$ARCH" \
     -resolution "$RESOLUTION" \
     -catalog "$INDEX" \
     -keys "$keys" \
@@ -156,8 +170,8 @@ walk catalogue-walk keyboard \
   "enter,down,up,enter,enter,esc,esc,q" \
   "setup,catalogue,actions,confirm"
 
-# A read-only package offers no action and says so. The catalogue is sorted by
-# package name, so a candidate sits below the two actionable packages.
+# A read-only package offers no action and says so. Only compatible packages
+# are listed, and PocketCurator follows Grout and PlayTime in this fixture.
 walk catalogue-read-only keyboard \
   "enter,down,down,enter" \
   "setup,catalogue" \

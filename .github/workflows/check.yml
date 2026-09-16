@@ -41,7 +41,6 @@ jobs:
           cmp /tmp/index-one.json /tmp/index-two.json
 
   gui-walkthrough:
-    needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -53,13 +52,14 @@ jobs:
       - name: Install SDL2 development files
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-dev
       # The keyboard drives the real binary against a scratch root, so no device
-      # and no display are needed: every flow is walked and one frame is kept per
-      # step, together with the record naming the screen each key reached.
-      - name: Walk every GUI flow and render every screen
+      # and no display are needed. CI walks the offline flows, records opening,
+      # post-key, and operation-completion frames, and renders every screen.
+      - name: Walk offline GUI flows and render every screen
         env:
           SDL_VIDEODRIVER: dummy
         run: make walkthrough
       - name: Upload GUI screen evidence
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: gui-walkthrough
