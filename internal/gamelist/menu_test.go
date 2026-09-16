@@ -73,6 +73,20 @@ func TestDeriveFromOwnedEntry(t *testing.T) {
 	}
 }
 
+func TestDeriveMetadataUpdateAndSameGamelistMove(t *testing.T) {
+	old := menu(testGamelist, "./demo/launch.sh", "Old name", "Old description")
+	metadata := menu(testGamelist, old.Path, "New name", "New description")
+	plan := Derive(true, old, metadata)
+	if len(plan.Steps) != 1 || plan.Steps[0].Kind != StepReplace || plan.Steps[0].Previous != old {
+		t.Fatalf("metadata update should replace the owned entry: %+v", plan.Steps)
+	}
+	move := menu(testGamelist, "./demo/new.sh", "New name", "New description")
+	plan = Derive(true, old, move)
+	if len(plan.Steps) != 2 || plan.Steps[0].Kind != StepRemove || plan.Steps[1].Kind != StepAdd {
+		t.Fatalf("same-gamelist path move should remove then add: %+v", plan.Steps)
+	}
+}
+
 func TestDeriveMovesOwnershipToNewGamelist(t *testing.T) {
 	old := menu("/userdata/roms/tools/gamelist.xml", "./demo/launch.sh", "Demo", "Fixture")
 	next := menu("/userdata/roms/portmaster/gamelist.xml", "./demo/launch.sh", "Demo", "Fixture")
@@ -135,6 +149,50 @@ func TestApplyFailureTransfersNoOwnership(t *testing.T) {
 	}
 	if changed || owned {
 		t.Fatalf("failed apply must change nothing and own nothing, got changed=%v owned=%v", changed, owned)
+	}
+}
+
+func TestApplyRejectsReplaceWithoutPrevious(t *testing.T) {
+	_, guard, tx := newTx(t)
+	entry := *menu(testGamelist, "./demo/launch.sh", "Demo", "Fixture")
+	changed, owned, err := Apply(tx, guard, Plan{Steps: []Step{{Kind: StepReplace, Menu: entry}}})
+	if err == nil || !strings.Contains(err.Error(), "requires previous") || changed || owned {
+		t.Fatalf("malformed replace = changed %v, owned %v, error %v", changed, owned, err)
+	}
+}
+
+func TestApplyMetadataUpdateAndSameGamelistMove(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		next *manifest.Menu
+	}{
+		{name: "metadata update", next: menu(testGamelist, "./demo/launch.sh", "New name", "New description")},
+		{name: "path move", next: menu(testGamelist, "./demo/new.sh", "New name", "New description")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, guard, tx := newTx(t)
+			old := menu(testGamelist, "./demo/launch.sh", "Old name", "Old description")
+			writeGamelistHost(t, guard, "<gameList><game><path>./demo/launch.sh</path><name>Old name</name><desc>Old description</desc></game></gameList>")
+			changed, owned, err := Apply(tx, guard, Derive(true, old, test.next))
+			if err != nil || !changed || !owned {
+				t.Fatalf("apply = changed %v, owned %v, error %v", changed, owned, err)
+			}
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+			host, err := guard.Resolve(testGamelist)
+			if err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(host)
+			if err != nil {
+				t.Fatal(err)
+			}
+			text := string(data)
+			if strings.Contains(text, "Old name") || !strings.Contains(text, test.next.Path) || !strings.Contains(text, "New description") {
+				t.Fatalf("unexpected updated gamelist: %s", text)
+			}
+		})
 	}
 }
 

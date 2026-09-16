@@ -57,6 +57,8 @@ const (
 
 // WithPlatform returns a copy of the manager bound to the given detected platform.
 func (m Manager) WithPlatform(info platform.Info) Manager {
+	info.ResolutionCandidates = append([]platform.ResolutionCandidate(nil), info.ResolutionCandidates...)
+	info.Dependencies = append([]string(nil), info.Dependencies...)
 	m.platform = info
 	return m
 }
@@ -71,6 +73,11 @@ func (m Manager) Platform() platform.Info {
 // returned after a commit; a failed operation returns a zero outcome with the
 // error.
 func (m Manager) Apply(ctx context.Context, op Op, pkg manifest.Package) (OperationOutcome, error) {
+	switch op {
+	case OpInstall, OpAdopt, OpUpdate, OpRepair, OpForceReinstall:
+	default:
+		return OperationOutcome{}, fmt.Errorf("unsupported lifecycle operation %q", op)
+	}
 	var outcome OperationOutcome
 	err := m.apply(ctx, string(op), pkg, &outcome)
 	return outcome, err
