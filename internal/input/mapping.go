@@ -65,13 +65,6 @@ func (mapping Mapping) Clone() Mapping {
 	return result
 }
 
-func Label(action Action) string {
-	if action == Diagnostics {
-		return "DETAILS / DIAGNOSTICS"
-	}
-	return strings.ToUpper(string(action))
-}
-
 func ButtonLabel(button int) string {
 	labels := map[int]string{
 		0: "SDL A", 1: "SDL B", 2: "SDL X", 3: "SDL Y",
@@ -106,7 +99,7 @@ func Profile(device string) DeviceProfile {
 func SortedLabels(mapping Mapping) []string {
 	labels := make([]string, 0, len(Actions))
 	for _, action := range Actions {
-		labels = append(labels, fmt.Sprintf("%s: %s", Label(action), ButtonLabel(mapping[action])))
+		labels = append(labels, fmt.Sprintf("%s: %s", Verb(action), ButtonLabel(mapping[action])))
 	}
 	sort.Strings(labels)
 	return labels
