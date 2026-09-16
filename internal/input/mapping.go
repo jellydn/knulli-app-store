@@ -69,8 +69,8 @@ func (mapping Mapping) Clone() Mapping {
 // GameController button or a keyboard binding on a desktop run.
 func ButtonLabel(button int) string {
 	labels := map[int]string{
-		0: "SDL A", 1: "SDL B", 2: "SDL X", 3: "SDL Y",
-		4: "SDL BACK", 5: "SDL GUIDE", 6: "SDL START",
+		0: "A", 1: "B", 2: "X", 3: "Y",
+		4: "BACK", 5: "GUIDE", 6: "START",
 		7: "LEFT STICK", 8: "RIGHT STICK", 9: "LEFT SHOULDER", 10: "RIGHT SHOULDER",
 		11: "DPAD UP", 12: "DPAD DOWN", 13: "DPAD LEFT", 14: "DPAD RIGHT",
 	}

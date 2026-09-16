@@ -323,7 +323,7 @@ func drawDetails(frame *image.RGBA, model *storeui.Model) {
 	if model.Focus == storeui.Browse {
 		y = drawWrapped(frame, panelInset, y, palette.text, item.Package.Summary, 48, 2)
 		if item.HealthReason != "" {
-			text(frame, panelInset, y+18, palette.error, "ISSUE - SELECT OPENS THE HEALTH CHECK")
+			text(frame, panelInset, y+18, palette.error, "ISSUE - CONFIRM OPENS THE HEALTH CHECK")
 		}
 		drawActions(frame, model, item)
 		return
@@ -522,10 +522,10 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item) {
 		if action == appstore.ForceReinstall {
 			fill(frame, image.Rect(250, 94, 616, 318), color.RGBA{R: 74, G: 31, B: 39, A: 255})
 			step := "STEP 1 OF 2 - REVIEW RECOVERY"
-			instruction := "SELECT AGAIN TO CONTINUE"
+			instruction := "CONFIRM AGAIN TO CONTINUE"
 			if model.Focus == storeui.ForceConfirm {
 				step = "STEP 2 OF 2 - CONFIRM REINSTALL"
-				instruction = "SELECT TO REPLACE REVIEWED APP FILES"
+				instruction = "CONFIRM TO REPLACE REVIEWED APP FILES"
 			}
 			text(frame, 266, 120, palette.error, step)
 			text(frame, 266, 143, palette.text, instruction)

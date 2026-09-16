@@ -23,16 +23,16 @@ const KeyboardSourceName = "desktop keyboard"
 const desktopDeviceIdentity = "desktop"
 
 // keyboardLabels names each keyboard binding for the footer and the mapping
-// summary, matching the "source name" shape of the SDL labels.
+// summary, matching the "source name" shape of the controller labels.
 var keyboardLabels = map[int]string{
-	KeyEnter:      "KEY ENTER",
-	KeyEscape:     "KEY ESC",
-	KeyY:          "KEY Y",
-	KeyQ:          "KEY Q",
-	KeyArrowUp:    "KEY UP",
-	KeyArrowDown:  "KEY DOWN",
-	KeyArrowLeft:  "KEY LEFT",
-	KeyArrowRight: "KEY RIGHT",
+	KeyEnter:      "ENTER",
+	KeyEscape:     "ESC",
+	KeyY:          "Y",
+	KeyQ:          "Q",
+	KeyArrowUp:    "UP",
+	KeyArrowDown:  "DOWN",
+	KeyArrowLeft:  "LEFT",
+	KeyArrowRight: "RIGHT",
 }
 
 // KeyboardMapping is the binding set a desktop run detects for a keyboard.

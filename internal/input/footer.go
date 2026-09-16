@@ -16,13 +16,14 @@ type Hint struct {
 }
 
 // Canonical footer verbs are screen-independent for the actions that recur, so
-// the same action reads the same way on every screen.
+// the same action reads the same way on every screen. A verb is the action's
+// name in title case; the button hint beside it carries the physical label.
 const (
-	VerbNavigate    = "NAVIGATE"
-	VerbSelect      = "SELECT"
-	VerbBack        = "BACK"
-	VerbSettings    = "SETTINGS"
-	VerbExit        = "EXIT"
+	VerbNavigate    = "Navigate"
+	VerbSelect      = "Confirm"
+	VerbBack        = "Back"
+	VerbSettings    = "Settings"
+	VerbExit        = "Exit"
 	VerbAnyButton   = "PRESS ANY BUTTON"
 	VerbShownButton = "PRESS EACH SHOWN BUTTON"
 )
@@ -53,8 +54,9 @@ func Verb(action Action) string {
 	return strings.ToUpper(string(action))
 }
 
-// ActionLabel identifies an action outside the footer. Directional actions
-// keep their direction here even though they share the NAVIGATE footer verb.
+// ActionLabel identifies an action outside the footer, where panel text is
+// uppercase. Directional actions keep their direction here even though they
+// share the Navigate footer verb.
 func ActionLabel(action Action) string {
 	switch action {
 	case Up:
@@ -66,7 +68,7 @@ func ActionLabel(action Action) string {
 	case Right:
 		return "RIGHT"
 	default:
-		return Verb(action)
+		return strings.ToUpper(Verb(action))
 	}
 }
 

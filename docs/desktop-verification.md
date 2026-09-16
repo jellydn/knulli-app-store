@@ -155,7 +155,7 @@ artifact is useful evidence when a device run is not available.
 | Exit | Q |
 
 These are a binding set like any other, so the footer and the mapping summary
-name them: `SELECT (KEY ENTER)  BACK (KEY ESC)  SETTINGS (KEY Y)`. Keyboard codes
+name them: `Confirm (ENTER)  Back (ESC)  Settings (Y)`. Keyboard codes
 sit above every SDL GameController button, so a key is never mistaken for a pad
 button.
 

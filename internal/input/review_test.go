@@ -9,10 +9,10 @@ func TestReviewChoicesUseTheCanonicalVerbs(t *testing.T) {
 	if len(ReviewItems) < 2 {
 		t.Fatalf("review needs a confirming and an abandoning choice: %#v", ReviewItems)
 	}
-	if got := ReviewItems[0]; got != Verb(Confirm) {
+	if got := ReviewItems[0]; got != strings.ToUpper(Verb(Confirm)) {
 		t.Fatalf("the confirming choice is %q, want the confirm verb %q", got, Verb(Confirm))
 	}
-	if got := ReviewItems[len(ReviewItems)-1]; got != Verb(Back) {
+	if got := ReviewItems[len(ReviewItems)-1]; got != strings.ToUpper(Verb(Back)) {
 		t.Fatalf("the abandoning choice is %q, want the back verb %q", got, Verb(Back))
 	}
 }

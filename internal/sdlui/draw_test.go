@@ -468,7 +468,7 @@ func TestSwappedConfirmBackMappingControlsCatalogueAndConfirmation(t *testing.T)
 				t.Fatalf("swapped Confirm did not open package confirmation: %v", model.Focus)
 			}
 			help := footerText(model, controls)
-			if !strings.Contains(help, "SELECT (SDL B)") || !strings.Contains(help, "BACK (SDL A)") {
+			if !strings.Contains(help, "Confirm (B)") || !strings.Contains(help, "Back (A)") {
 				t.Fatalf("footer did not show active physical labels: %q", help)
 			}
 			width, height := targetSize(device)
