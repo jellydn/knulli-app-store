@@ -11,6 +11,7 @@ type Focus int
 
 const (
 	Browse Focus = iota
+	Health
 	Actions
 	Confirm
 	ForceConfirm
@@ -72,8 +73,17 @@ func (m *Model) Select(ctx context.Context) {
 	}
 	switch m.Focus {
 	case Browse:
+		if m.current().HealthReason != "" {
+			m.Focus = Health
+			return
+		}
 		if len(m.current().Actions) == 0 {
 			m.Message = "No safe action is available"
+			return
+		}
+		m.Focus = Actions
+	case Health:
+		if len(m.current().Actions) == 0 {
 			return
 		}
 		m.Focus = Actions
@@ -100,6 +110,8 @@ func (m *Model) Back() bool {
 	case Confirm:
 		m.Focus = Actions
 	case Actions:
+		m.Focus = Browse
+	case Health:
 		m.Focus = Browse
 	default:
 		return true

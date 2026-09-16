@@ -266,6 +266,15 @@ func drawDetails(frame *image.RGBA, model *storeui.Model, controls *storeinput.S
 		drawActions(frame, model, item, controls)
 		return
 	}
+	if model.Focus == storeui.Health {
+		text(frame, 258, y, palette.error, "HEALTH CHECK")
+		y += 20
+		drawWrapped(frame, 258, y, palette.error, item.HealthReason, 48, 8)
+		text(frame, 258, 289, palette.muted, "REMEDIATION")
+		text(frame, 258, 307, palette.text, "REPAIR RESTORES REVIEWED BYTES AND MODES")
+		text(frame, 258, 320, palette.muted, "CONFIRM: ACTIONS  BACK: CATALOGUE")
+		return
+	}
 	if model.Focus == storeui.Browse {
 		drawWrapped(frame, 258, y, palette.text, item.Package.Summary, 48, 2)
 		if item.HealthReason != "" {
@@ -434,6 +443,9 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item, co
 	x := 258
 	for index, action := range item.Actions {
 		labelText := actionLabel(action)
+		if item.RetryAction == action {
+			labelText = "Retry " + strings.ToLower(labelText)
+		}
 		if action == appstore.Adopt && item.RecoveryReason != "" {
 			labelText = "Retry manage"
 		}

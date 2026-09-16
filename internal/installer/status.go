@@ -134,7 +134,7 @@ func (m Manager) Status(id string) (Status, error) {
 			return Status{}, err
 		}
 		if digest != file.SHA256 {
-			status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "content changed", Expected: shortDigest(file.SHA256), Actual: shortDigest(digest)})
+			status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "content changed", Expected: file.SHA256, Actual: digest})
 		}
 		if info.Mode().Perm() != os.FileMode(file.Mode).Perm() {
 			status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "mode changed", Expected: fmt.Sprintf("%04o", os.FileMode(file.Mode).Perm()), Actual: fmt.Sprintf("%04o", info.Mode().Perm())})
@@ -148,11 +148,4 @@ func (status *Status) addIssue(manager Manager, packageID string, issue HealthIs
 	status.Healthy = false
 	status.Issues = append(status.Issues, issue)
 	manager.event("package_health_issue", "package", packageID, "path", issue.Path, "check", issue.Check, "expected", issue.Expected, "actual", issue.Actual)
-}
-
-func shortDigest(value string) string {
-	if len(value) <= 12 {
-		return value
-	}
-	return value[:12]
 }

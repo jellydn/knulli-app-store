@@ -436,13 +436,26 @@ func (m Manager) adoptFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg man
 		virtual := path.Join(pkg.Install.Destination, releaseFile.Relative)
 		existingFile, found := existingByPath[virtual]
 		preserved := isPreserved(releaseFile.Relative, pkg.Install.Preserve)
-		managed := found && existingFile.SHA256 == releaseFile.SHA256 && existingFile.Mode.Perm() == releaseFile.Mode.Perm() && !preserved
-		if found && !managed {
+		managed := found && existingFile.SHA256 == releaseFile.SHA256 && !preserved
+		if found {
 			if err := backupExisting(tx, guard, pkg.ID, existingFile, &state); err != nil {
 				return Installed{}, err
 			}
 		}
-		state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: releaseFile.SHA256, Mode: uint32(releaseFile.Mode.Perm()), Preserved: preserved, Unmanaged: !managed})
+		mode := releaseFile.Mode.Perm()
+		if managed {
+			if err := tx.Chmod(virtual, releaseFile.Mode); err != nil {
+				return Installed{}, err
+			}
+			info, err := os.Stat(existingFile.Host)
+			if err != nil {
+				return Installed{}, err
+			}
+			mode = info.Mode().Perm()
+		} else if found {
+			mode = existingFile.Mode.Perm()
+		}
+		state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: releaseFile.SHA256, Mode: uint32(mode), Preserved: preserved, Unmanaged: !managed})
 		delete(existingByPath, virtual)
 	}
 	for _, file := range existingByPath {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/jellydn/knulli-app-store/internal/catalog"
 	"github.com/jellydn/knulli-app-store/internal/installer"
@@ -40,6 +39,7 @@ type Item struct {
 	RecoverySummary  string
 	RecoveryAllowed  bool
 	RecoveryActive   bool
+	RetryAction      Action
 }
 
 type Backend interface {
@@ -54,15 +54,8 @@ func (s *Service) SetPlatform(info platform.Info) {
 }
 
 type Service struct {
-	index          catalog.Index
-	manager        installer.Manager
-	recoveryMu     sync.Mutex
-	recoveryReason map[string]recoveryFailure
-}
-
-type recoveryFailure struct {
-	reason       string
-	forceAllowed bool
+	index   catalog.Index
+	manager installer.Manager
 }
 
 func Open(indexPath string, manager installer.Manager) (*Service, error) {
@@ -72,7 +65,7 @@ func Open(indexPath string, manager installer.Manager) (*Service, error) {
 		return nil, err
 	}
 	manager.Diagnostics.Event("catalogue_loaded", "path", indexPath, "packages", fmt.Sprint(len(index.Packages)))
-	return &Service{index: index, manager: manager, recoveryReason: make(map[string]recoveryFailure)}, nil
+	return &Service{index: index, manager: manager}, nil
 }
 
 func (s *Service) Items(ctx context.Context) ([]Item, error) {
@@ -105,13 +98,17 @@ func (s *Service) Items(ctx context.Context) ([]Item, error) {
 				item.RecoveryActive = recovery.Active
 			}
 		}
+		lifecycle, lifecycleErr := s.manager.LifecycleState(entry.ID)
+		if lifecycleErr != nil {
+			return nil, fmt.Errorf("read %s lifecycle state: %w", entry.ID, lifecycleErr)
+		}
 		item.Compatible, item.Compatibility = compatibility(entry.Package, s.manager.Platform)
-		s.recoveryMu.Lock()
-		failure := s.recoveryReason[entry.ID]
-		s.recoveryMu.Unlock()
-		if failure.reason != "" {
-			item.RecoveryReason = failure.reason
-			item.RecoveryAllowed = failure.forceAllowed
+		if lifecycle != nil {
+			if item.PreExisting && lifecycle.RequestedOperation == string(Adopt) && lifecycle.Failure != "" {
+				item.RecoveryReason = lifecycle.Failure
+				item.RecoveryAllowed = lifecycle.ForceAllowed
+			}
+			item.RetryAction = validRetryAction(item, Action(lifecycle.RetryTarget))
 		}
 		if item.RecoveryReason != "" {
 			preserved := 0
@@ -122,6 +119,9 @@ func (s *Service) Items(ctx context.Context) ([]Item, error) {
 		}
 		s.manager.Diagnostics.Event("compatibility_decision", "package", entry.ID, "allowed", fmt.Sprint(item.Compatible), "decision", item.Compatibility)
 		item.Actions = actions(item)
+		if lifecycle != nil || item.HealthReason != "" {
+			s.manager.LifecycleEvent(installer.LifecycleState{PackageID: entry.ID, RequestedOperation: retryOperation(lifecycle), DetectedInstallType: installType(item), RetryTarget: string(item.RetryAction), Failure: lifecycleFailure(lifecycle)}, item.HealthReason)
+		}
 		items = append(items, item)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Package.Name < items[j].Package.Name })
@@ -150,6 +150,11 @@ func (s *Service) Execute(ctx context.Context, id string, action Action, progres
 	message := operationMessage(action, entry.Package.Name)
 	progress(message)
 	s.manager.Diagnostics.Event("action_selected", "package", id, "action", string(action))
+	lifecycle := installer.LifecycleState{PackageID: id, RequestedOperation: string(action), DetectedInstallType: installType(*selected), RetryTarget: string(action)}
+	if err := s.manager.RecordLifecycle(lifecycle); err != nil {
+		return fmt.Errorf("record lifecycle state: %w", err)
+	}
+	s.manager.LifecycleEvent(lifecycle, selected.HealthReason)
 	manager := s.manager
 	outcome := installer.OperationOutcome{}
 	manager.Outcome = func(value installer.OperationOutcome) { outcome = value }
@@ -158,11 +163,6 @@ func (s *Service) Execute(ctx context.Context, id string, action Action, progres
 		err = manager.Install(ctx, entry.Package)
 	case Adopt:
 		err = manager.Adopt(ctx, entry.Package)
-		if err != nil {
-			s.recoveryMu.Lock()
-			s.recoveryReason[id] = recoveryFailure{reason: err.Error(), forceAllowed: recoverableAdoptionFailure(err)}
-			s.recoveryMu.Unlock()
-		}
 	case Update:
 		err = manager.Update(ctx, entry.Package)
 	case Repair:
@@ -175,12 +175,16 @@ func (s *Service) Execute(ctx context.Context, id string, action Action, progres
 		return fmt.Errorf("unknown action %q", action)
 	}
 	if err != nil {
+		lifecycle.Failure = err.Error()
+		lifecycle.ForceAllowed = action == Adopt && recoverableAdoptionFailure(err)
+		if stateErr := s.manager.RecordLifecycle(lifecycle); stateErr != nil {
+			return fmt.Errorf("%w; record retry state: %v", err, stateErr)
+		}
+		s.manager.LifecycleEvent(lifecycle, selected.HealthReason)
 		return err
 	}
-	if action == Adopt || action == ForceReinstall {
-		s.recoveryMu.Lock()
-		delete(s.recoveryReason, id)
-		s.recoveryMu.Unlock()
+	if err := s.manager.ClearLifecycle(id); err != nil {
+		return fmt.Errorf("clear lifecycle state after completed %s: %w", action, err)
 	}
 	progress(completionMessage(action, outcome))
 	return nil
@@ -228,6 +232,20 @@ func compatibility(pkg manifest.Package, current platform.Info) (bool, string) {
 }
 
 func actions(item Item) []Action {
+	if item.RetryAction != "" {
+		base := actionsWithoutRetry(item)
+		result := []Action{item.RetryAction}
+		for _, action := range base {
+			if action != item.RetryAction {
+				result = append(result, action)
+			}
+		}
+		return result
+	}
+	return actionsWithoutRetry(item)
+}
+
+func actionsWithoutRetry(item Item) []Action {
 	if item.Installed {
 		result := []Action{Uninstall}
 		if item.Package.Installable() && item.Compatible {
@@ -251,6 +269,63 @@ func actions(item Item) []Action {
 		return []Action{Install}
 	}
 	return nil
+}
+
+func validRetryAction(item Item, retry Action) Action {
+	switch retry {
+	case Install:
+		if !item.Installed && (!item.PreExisting || item.RecoveryReason != "") && item.Package.Installable() && item.Compatible {
+			return retry
+		}
+	case Adopt:
+		if !item.Installed && item.PreExisting && !item.RecoveryActive && item.Package.Installable() && item.Compatible {
+			return retry
+		}
+	case Update:
+		if item.Installed && item.InstalledVersion != item.Package.Version && item.Compatible {
+			return retry
+		}
+	case Repair:
+		if item.Installed && item.Compatible {
+			return retry
+		}
+	case ForceReinstall:
+		if !item.Installed && item.PreExisting && !item.RecoveryActive && item.Compatible {
+			return retry
+		}
+	case Uninstall:
+		if item.Installed {
+			return retry
+		}
+	}
+	return ""
+}
+
+func installType(item Item) string {
+	if item.Installed {
+		return "managed"
+	}
+	if item.RecoveryActive || (item.PreExisting && item.RecoveryReason != "") {
+		return "stale-or-partial"
+	}
+	if item.PreExisting {
+		return "external"
+	}
+	return "absent"
+}
+
+func retryOperation(state *installer.LifecycleState) string {
+	if state == nil {
+		return ""
+	}
+	return state.RequestedOperation
+}
+
+func lifecycleFailure(state *installer.LifecycleState) string {
+	if state == nil {
+		return ""
+	}
+	return state.Failure
 }
 
 func recoverableAdoptionFailure(err error) bool {

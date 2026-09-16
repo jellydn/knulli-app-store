@@ -708,6 +708,113 @@ func TestBinaryPatchAppliesReviewedBytesAndFinalHash(t *testing.T) {
 	}
 }
 
+func TestGroutAdoptionUsesTransformedHashAndEffectiveDestinationMode(t *testing.T) {
+	root := t.TempDir()
+	before := []byte("prefix-https://grout.romm.app/versions.json-suffix")
+	after := []byte("prefix-https://self-update.disabled.invalid-suffix")
+	asset := zipBytesWithModes(t, map[string]zipFixture{
+		"Grout/grout":    {body: string(before), mode: 0644},
+		"Grout/Grout.sh": {body: "launcher", mode: 0644},
+	})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := groutTestPackage(asset, "https://github.com/example/demo/releases/download/v5.2/grout.zip", "5.2.0.0")
+	pkg.Install.StripComponents = 1
+	digest := sha256.Sum256(after)
+	pkg.Install.BinaryPatches = []manifest.BinaryPatch{{
+		Path: "grout", Offset: int64(len("prefix-")),
+		BeforeHex: hex.EncodeToString([]byte("https://grout.romm.app/versions.json")),
+		AfterHex:  hex.EncodeToString([]byte("https://self-update.disabled.invalid")),
+		SHA256:    hex.EncodeToString(digest[:]),
+	}}
+	writeRootFile(t, root, "userdata/roms/tools/Grout/grout", string(after))
+	writeRootFile(t, root, "userdata/roms/tools/Grout/Grout.sh", "launcher")
+	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
+	if err := manager.Adopt(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	status, err := manager.Status(pkg.ID)
+	if err != nil || !status.Healthy {
+		t.Fatalf("reviewed transformed Grout files were not healthy: %#v, %v", status, err)
+	}
+	baseGuard, err := safefs.NewGuard(root, []string{managerPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := loadState(baseGuard, pkg.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range state.Files {
+		info, statErr := os.Stat(filepath.Join(root, strings.TrimPrefix(file.Path, "/")))
+		if statErr != nil || file.Mode != uint32(info.Mode().Perm()) {
+			t.Fatalf("adoption mode was not normalized for %s: state=%04o info=%v err=%v", file.Path, file.Mode, info, statErr)
+		}
+	}
+	binary := filepath.Join(root, "userdata/roms/tools/Grout/grout")
+	if err := os.WriteFile(binary, []byte("changed transformed binary"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	changedDigest := sha256.Sum256([]byte("changed transformed binary"))
+	status, err = manager.Status(pkg.ID)
+	if err != nil || status.Healthy || len(status.Issues) == 0 || status.Issues[0].Expected != pkg.Install.BinaryPatches[0].SHA256 || status.Issues[0].Actual != hex.EncodeToString(changedDigest[:]) {
+		t.Fatalf("Grout health did not report full transformed hashes: %#v, %v", status, err)
+	}
+	if err := manager.Repair(context.Background(), pkg); err != nil {
+		t.Fatal(err)
+	}
+	if status, err = manager.Status(pkg.ID); err != nil || !status.Healthy {
+		t.Fatalf("Grout repair did not restore transformed health: %#v, %v", status, err)
+	}
+}
+
+func TestLegacyGroutInstalledStateMigratesToCurrentRuntimeMetadata(t *testing.T) {
+	root := t.TempDir()
+	pkg, err := manifest.Load("../../catalogue/packages/app.romm.grout.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg.Version = "5.1.0.0"
+	pkg.Review.Status = "verified"
+	pkg.Compatibility.MinimumVersion = "scarab"
+	pkg.Compatibility.ABIs = nil
+	pkg.Compatibility.Dependencies = nil
+	pkg.Compatibility.DeviceScope = ""
+	pkg.Compatibility.DisplayBounds = nil
+	pkg.Compatibility.Devices = []string{"trimui-smart-pro"}
+	pkg.Compatibility.Resolutions = []string{"1280x720"}
+	pkg.Install.BinaryPatches = nil
+	state := Installed{Schema: "org.knulli.app-store/installed-state/v1", Manifest: pkg, Originals: map[string]string{}}
+	data, err := encodeState(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeRootFile(t, root, "userdata/system/knulli-app-store/installed/app.romm.grout.json", string(data))
+	status, err := (Manager{Root: root}).Status(pkg.ID)
+	if err != nil || !status.Installed || status.Version != "5.1.0.0" {
+		t.Fatalf("legacy Grout state did not remain updateable: %#v, %v", status, err)
+	}
+}
+
+func TestLifecycleStatePersistsOperationContextAcrossRestart(t *testing.T) {
+	root := t.TempDir()
+	first := Manager{Root: root}
+	want := LifecycleState{PackageID: "org.example.demo", RequestedOperation: "install", DetectedInstallType: "absent", RetryTarget: "install", Failure: "download release: SHA-256 mismatch"}
+	if err := first.RecordLifecycle(want); err != nil {
+		t.Fatal(err)
+	}
+	got, err := (Manager{Root: root}).LifecycleState(want.PackageID)
+	if err != nil || got == nil || got.RequestedOperation != want.RequestedOperation || got.DetectedInstallType != want.DetectedInstallType || got.RetryTarget != want.RetryTarget || got.Failure != want.Failure {
+		t.Fatalf("lifecycle context did not survive restart: %#v, %v", got, err)
+	}
+	if err := first.ClearLifecycle(want.PackageID); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := first.LifecycleState(want.PackageID); err != nil || got != nil {
+		t.Fatalf("completed lifecycle state was not cleared: %#v, %v", got, err)
+	}
+}
+
 func TestForceReinstallRejectsArchiveTraversalAndLinks(t *testing.T) {
 	for name, mode := range map[string]os.FileMode{"../outside": 0644, "unsafe-link": os.ModeSymlink | 0777} {
 		t.Run(strings.ReplaceAll(name, "/", "_"), func(t *testing.T) {

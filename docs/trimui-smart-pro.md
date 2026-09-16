@@ -54,7 +54,9 @@ The manager restores execute mode only on reviewed paths. PlayTime needs `playti
 
 Use **Repair** to re-download, verify, and restore managed files. Use **Uninstall** to remove manager-owned files while preserving declared data. Exact pre-existing release files are removed after adoption; changed package files are restored because their ownership is uncertain. If an operation fails, the transaction rolls back. A retained backup can be restored by copying it back to the path recorded in the installed-state JSON. Do not edit that state by hand while the app is running.
 
-Health checks compare only immutable managed release files. PlayTime's database, generated hook, and other runtime data do not make the install unhealthy. The installed state records each destination file's observed mode because a target filesystem can normalize the requested mode. If Repair appears, the details panel and log identify every missing, changed, or mode-mismatched managed path.
+Health checks compare only immutable managed release files. PlayTime's database, generated hook, and other runtime data do not make the install unhealthy. The installed state records each destination file's observed mode because a target filesystem can normalize the requested mode. Select **Issue** to open the health section directly. It shows the exact path, full expected and actual hash or mode, and Repair guidance.
+
+If an operation fails, the Store records its safe retry target under `/userdata/system/knulli-app-store/lifecycle/`. A failed fresh PlayTime install with no external files shows **Retry install**, never **Retry manage**. Failed update, Repair, Manage existing, Force reinstall, and Uninstall operations return to their own action after restart only when current state and compatibility still allow it. Each retry repeats all mandatory checks.
 
 - Grout configuration: `/userdata/roms/tools/Grout/config.json`, `save_slots.json`, `.cache/`, and `logs/`.
 - PlayTime statistics and configuration: `/userdata/system/configs/playtime/`.
@@ -97,6 +99,7 @@ After this checklist passes, add linked `real-device-test` evidence for the GUI 
 3. Change one statistic, run Repair, and confirm the statistic remains.
 4. Run Uninstall and confirm managed files are gone while `/userdata/system/configs/playtime/` remains.
 5. If PlayTime existed before this test, use **Manage existing** and confirm its statistics remain.
+6. Cause a download or checksum failure before writes. Restart the Store and confirm **Retry install** is shown while the destination is absent.
 
 ### Grout 5.2.0.0
 
@@ -108,6 +111,7 @@ After this checklist passes, add linked `real-device-test` evidence for the GUI 
 
 6. Test update from 5.1.0.0 and confirm all four preserved paths remain. Test a failed update and confirm rollback restores 5.1.0.0 exactly.
 7. Cause a disposable **Manage existing** failure. Confirm the recovery screen shows the exact reason, **Retry manage**, **Force reinstall**, diagnostics, and cancel. Complete both force confirmations and inspect the timestamped backup manifest.
+8. Select any **Issue** state and confirm Details opens the health section with the exact path, expected and actual value, and Repair guidance. After Repair, confirm no false mode issue remains on the device filesystem.
 
 Report install, launch, core function, update, rollback, Repair, Uninstall, adoption, and force-reinstall results separately for each package. A passing Smart Pro result does not verify another device.
 

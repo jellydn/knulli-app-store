@@ -102,6 +102,26 @@ func TestModelShowsOperationFailure(t *testing.T) {
 	}
 }
 
+func TestIssueSelectionOpensHealthBeforeActions(t *testing.T) {
+	backend := &fakeBackend{items: []appstore.Item{{
+		Package: manifest.Package{ID: "app.romm.grout", Name: "Grout"}, Healthy: false,
+		HealthReason: "mode changed: /userdata/roms/tools/Grout/grout (expected 0755, got 0777)",
+		Actions:      []appstore.Action{appstore.Repair, appstore.Uninstall},
+	}}}
+	model := New(backend)
+	if err := model.Load(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	model.Select(context.Background())
+	if model.Focus != Health {
+		t.Fatalf("Issue opened focus %v, want health", model.Focus)
+	}
+	model.Select(context.Background())
+	if model.Focus != Actions {
+		t.Fatalf("health confirmation opened focus %v, want actions", model.Focus)
+	}
+}
+
 func TestForceReinstallRequiresTwoConfirmationSteps(t *testing.T) {
 	backend := &fakeBackend{items: []appstore.Item{{
 		Package: manifest.Package{ID: "org.example.alpha", Name: "Alpha"},

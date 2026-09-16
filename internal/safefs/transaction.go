@@ -145,6 +145,14 @@ func (t *Transaction) Copy(source, virtual string, mode os.FileMode) error {
 	return Copy(source, host, mode)
 }
 
+func (t *Transaction) Chmod(virtual string, mode os.FileMode) error {
+	host, err := t.prepare(virtual)
+	if err != nil {
+		return err
+	}
+	return os.Chmod(host, mode.Perm())
+}
+
 func (t *Transaction) Remove(virtual string) error {
 	host, err := t.prepare(virtual)
 	if err != nil {

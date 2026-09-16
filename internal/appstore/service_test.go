@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jellydn/knulli-app-store/internal/catalog"
+	"github.com/jellydn/knulli-app-store/internal/diagnostics"
 	"github.com/jellydn/knulli-app-store/internal/installer"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/platform"
@@ -185,6 +187,87 @@ func TestActionsReflectInstallStateAndHealth(t *testing.T) {
 	assertActions(t, actions(item), Update, Uninstall, Repair)
 	item.Compatible = false
 	assertActions(t, actions(item), Uninstall)
+}
+
+func TestRetryTargetsRemainBoundToOriginatingOperation(t *testing.T) {
+	pkg := installablePackage()
+	tests := []struct {
+		name  string
+		item  Item
+		retry Action
+		want  Action
+	}{
+		{name: "fresh install absent", item: Item{Package: pkg, Compatible: true}, retry: Install, want: Install},
+		{name: "manage external", item: Item{Package: pkg, Compatible: true, PreExisting: true}, retry: Adopt, want: Adopt},
+		{name: "manage cannot target absent", item: Item{Package: pkg, Compatible: true}, retry: Adopt},
+		{name: "update managed old version", item: Item{Package: pkg, Compatible: true, Installed: true, InstalledVersion: "0.9.0"}, retry: Update, want: Update},
+		{name: "repair managed", item: Item{Package: pkg, Compatible: true, Installed: true, InstalledVersion: pkg.Version}, retry: Repair, want: Repair},
+		{name: "force external", item: Item{Package: pkg, Compatible: true, PreExisting: true}, retry: ForceReinstall, want: ForceReinstall},
+		{name: "uninstall managed", item: Item{Package: pkg, Installed: true}, retry: Uninstall, want: Uninstall},
+		{name: "compatibility still blocks retry", item: Item{Package: pkg}, retry: Install},
+		{name: "stale fresh transaction retries install", item: Item{Package: pkg, Compatible: true, PreExisting: true, RecoveryReason: "Interrupted package transaction"}, retry: Install, want: Install},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := validRetryAction(test.item, test.retry); got != test.want {
+				t.Fatalf("retry target = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestPersistedRetryRevalidatesAbsentAndExternalInstallTypes(t *testing.T) {
+	root := t.TempDir()
+	log, err := diagnostics.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg := installablePackage()
+	manager := installer.Manager{Root: root, Platform: platform.Info{
+		Firmware: "knulli", Version: "2026.05", Arch: "aarch64", ABI: "linux-aarch64-glibc", Dependencies: []string{"sdl2"}, Device: "trimui-smart-pro", Resolution: "1280x720",
+	}, Diagnostics: log}
+	service := &Service{index: catalog.Index{Packages: []catalog.Entry{{ID: pkg.ID, Package: pkg}}}, manager: manager}
+	failedInstall := installer.LifecycleState{PackageID: pkg.ID, RequestedOperation: string(Install), DetectedInstallType: "absent", RetryTarget: string(Install), Failure: "download release: SHA-256 mismatch"}
+	if err := manager.RecordLifecycle(failedInstall); err != nil {
+		t.Fatal(err)
+	}
+	items, err := service.Items(context.Background())
+	if err != nil || len(items) != 1 || items[0].PreExisting || items[0].RetryAction != Install || len(items[0].Actions) == 0 || items[0].Actions[0] != Install {
+		t.Fatalf("failed fresh install did not retry install: %#v, %v", items, err)
+	}
+
+	destination := filepath.Join(root, "userdata/roms/ports/test")
+	if err := os.MkdirAll(destination, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(destination, "run.sh"), []byte("external"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	failedManage := installer.LifecycleState{PackageID: pkg.ID, RequestedOperation: string(Adopt), DetectedInstallType: "external", RetryTarget: string(Adopt), Failure: "unexpected adoption error"}
+	if err := manager.RecordLifecycle(failedManage); err != nil {
+		t.Fatal(err)
+	}
+	restarted := &Service{index: service.index, manager: manager}
+	items, err = restarted.Items(context.Background())
+	if err != nil || !items[0].PreExisting || items[0].RetryAction != Adopt || items[0].Actions[0] != Adopt {
+		t.Fatalf("failed management did not survive restart: %#v, %v", items, err)
+	}
+	if err := os.RemoveAll(destination); err != nil {
+		t.Fatal(err)
+	}
+	items, err = restarted.Items(context.Background())
+	if err != nil || items[0].RetryAction != "" || len(items[0].Actions) != 1 || items[0].Actions[0] != Install {
+		t.Fatalf("absent copy retained adoption retry: %#v, %v", items, err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "userdata/system/logs/knulli-app-store.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{`event=lifecycle_state`, `package="org.example.test"`, `requested_operation="install"`, `detected_install_type="absent"`, `selected_retry_target="install"`, `health_reason=""`} {
+		if !strings.Contains(string(data), field) {
+			t.Fatalf("structured lifecycle log lacks %s: %s", field, data)
+		}
+	}
 }
 
 func TestOnlyRecoverableAdoptionFailuresAllowForceReinstall(t *testing.T) {
