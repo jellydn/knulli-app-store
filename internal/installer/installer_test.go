@@ -636,6 +636,27 @@ func TestDestinationFileIsReportedInsteadOfFailingTheCatalogue(t *testing.T) {
 	}
 }
 
+func TestUnreadableDestinationIsReportedNotFatal(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can read files regardless of mode")
+	}
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "userdata/roms/tools/demo/cache"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(root, "userdata/roms/tools/demo/cache"), 0000); err != nil {
+		t.Fatal(err)
+	}
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	// One destination the manager cannot read must still report what it holds
+	// rather than failing status for every package in the catalogue.
+	existing, err := (Manager{Root: root}).WithPlatform(testPlatform()).PreExisting(pkg)
+	if err != nil || !existing {
+		t.Fatalf("unreadable destination = existing=%v err=%v", existing, err)
+	}
+}
+
 func TestFilesystemNormalizedModeIsNotAHealthIssue(t *testing.T) {
 	root := t.TempDir()
 	asset := zipBytesWithModes(t, map[string]zipFixture{

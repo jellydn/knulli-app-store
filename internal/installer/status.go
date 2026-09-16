@@ -101,20 +101,18 @@ func (m Manager) PreExisting(pkg manifest.Package) (bool, error) {
 	if !info.IsDir() {
 		return true, nil
 	}
+	// Every return below stops the walk, so the walk never reports its own error
+	// and one unreadable destination never fails status for the whole catalogue.
 	found := false
-	err = fs.WalkDir(os.DirFS(host), ".", func(_ string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
+	_ = fs.WalkDir(os.DirFS(host), ".", func(_ string, entry fs.DirEntry, walkErr error) error {
+		if walkErr == nil && entry.IsDir() {
 			return nil
 		}
+		// A file, or an entry that cannot be read, is something the user must
+		// inventory or move aside.
 		found = true
 		return fs.SkipAll
 	})
-	if err != nil {
-		return false, err
-	}
 	return found, nil
 }
 
