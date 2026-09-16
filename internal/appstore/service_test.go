@@ -320,6 +320,36 @@ func TestOnlyRecoverableAdoptionFailuresAllowForceReinstall(t *testing.T) {
 	}
 }
 
+func TestDirectoryOnlyDestinationDoesNotRetryManageExisting(t *testing.T) {
+	root := t.TempDir()
+	log, err := diagnostics.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg := installablePackage()
+	manager := installer.Manager{Root: root, Diagnostics: log}.WithPlatform(platform.Info{
+		Firmware: "knulli", Version: "2026.05", Arch: "aarch64", ABI: "linux-aarch64-glibc", Dependencies: []string{"sdl2"}, Device: "trimui-smart-pro", Resolution: "1280x720",
+	})
+	// A rolled-back write leaves the destination directory tree behind with no
+	// files, which adoption reports as "no external installation was found".
+	if err := os.MkdirAll(filepath.Join(root, "userdata/roms/ports/test/icons"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	failedManage := installer.LifecycleState{PackageID: pkg.ID, RequestedOperation: string(Adopt), DetectedInstallType: "external", RetryTarget: string(Adopt), Failure: "no external installation was found; use Install"}
+	if err := manager.RecordLifecycle(failedManage); err != nil {
+		t.Fatal(err)
+	}
+	service := &Service{index: catalog.Index{Packages: []catalog.Entry{{ID: pkg.ID, Package: pkg}}}, manager: manager}
+	items, err := service.Items(context.Background())
+	if err != nil || len(items) != 1 {
+		t.Fatalf("items = %#v, %v", items, err)
+	}
+	if items[0].PreExisting || items[0].RecoveryReason != "" || items[0].RetryAction != "" {
+		t.Fatalf("directory skeleton kept external recovery state: %#v", items[0])
+	}
+	assertActions(t, items[0].Actions, Install)
+}
+
 func TestExecuteInstallFailureAndUninstall(t *testing.T) {
 	root := t.TempDir()
 	asset := testZip(t, map[string]string{"run.sh": "#!/bin/sh\n"})

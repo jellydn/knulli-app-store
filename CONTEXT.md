@@ -28,7 +28,7 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Adopt** (shown to users as **Manage existing**) — Take ownership of files that already exist at the destination and match the reviewed release. Content that does not match is backed up, not overwritten silently.
 
-**External installation** — Files already present at the destination that this installer did not write. Never deleted; backed up before any overwrite.
+**External installation** — Files already present at the destination that this installer did not write. Never deleted; backed up before any overwrite. Detection counts files, not directories, so an empty skeleton left by a rolled-back write is not an external installation.
 
 **Update** — Move an owned installation to a different reviewed release.
 
@@ -48,7 +48,7 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Installed state** — The record of what an operation left behind: manifest, files, originals, menu ownership. Written after every file change has committed, never before.
 
-**Health** — The check that managed files still match what was installed, in content and in the mode the filesystem actually applied. Preserved and unmanaged files are exempt.
+**Health** — The check that managed files still match what was installed, in content and in the mode the filesystem actually applied. Every immutable managed file is hashed on each check. A wider mode applied by the destination filesystem is accepted; only a lost owner read, write, or execute permission fails. Preserved and unmanaged files are exempt.
 
 ## Writes
 

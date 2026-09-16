@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -588,6 +589,169 @@ func TestInstallRejectsAnExternalCopyAndNamesTheOnScreenAction(t *testing.T) {
 	want := "an external installation exists; use Manage existing"
 	if err == nil || err.Error() != want {
 		t.Fatalf("external copy error = %v, want %q", err, want)
+	}
+}
+
+func TestRolledBackDestinationSkeletonIsNotAnExternalInstallation(t *testing.T) {
+	root := t.TempDir()
+	// A failed write can leave the destination directory tree behind after
+	// every file is rolled back. That skeleton is not an external copy.
+	if err := os.MkdirAll(filepath.Join(root, "userdata/roms/tools/demo/icons"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	existing, err := manager.PreExisting(pkg)
+	if err != nil || existing {
+		t.Fatalf("directory skeleton was treated as an external copy: existing=%v err=%v", existing, err)
+	}
+	if _, err := manager.Apply(context.Background(), OpAdopt, pkg); err == nil || err.Error() != "no external installation was found; use Install" {
+		t.Fatalf("adoption of a directory skeleton = %v", err)
+	}
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "reviewed launcher")
+	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
+		t.Fatalf("install over a directory skeleton was not healthy: %#v, %v", status, err)
+	}
+}
+
+func TestDestinationFileIsReportedInsteadOfFailingTheCatalogue(t *testing.T) {
+	root := t.TempDir()
+	writeRootFile(t, root, "userdata/roms/tools/demo", "not a directory")
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	manager := Manager{Root: root}.WithPlatform(testPlatform())
+	// A non-directory destination is still something the user must move aside,
+	// and it must not break status for every package in the catalogue.
+	existing, err := manager.PreExisting(pkg)
+	if err != nil || !existing {
+		t.Fatalf("file at the destination was not reported: existing=%v err=%v", existing, err)
+	}
+	if _, err := manager.Apply(context.Background(), OpAdopt, pkg); err == nil || !strings.Contains(err.Error(), "destination is not a directory") {
+		t.Fatalf("adoption of a file at the destination = %v", err)
+	}
+}
+
+func TestUnreadableDestinationIsReportedNotFatal(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can read files regardless of mode")
+	}
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "userdata/roms/tools/demo/cache"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(root, "userdata/roms/tools/demo/cache"), 0000); err != nil {
+		t.Fatal(err)
+	}
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	// One destination the manager cannot read must still report what it holds
+	// rather than failing status for every package in the catalogue.
+	existing, err := (Manager{Root: root}).WithPlatform(testPlatform()).PreExisting(pkg)
+	if err != nil || !existing {
+		t.Fatalf("unreadable destination = existing=%v err=%v", existing, err)
+	}
+}
+
+func TestFilesystemNormalizedModeIsNotAHealthIssue(t *testing.T) {
+	root := t.TempDir()
+	asset := zipBytesWithModes(t, map[string]zipFixture{
+		"launch.sh": {body: "reviewed launcher", mode: 0644},
+		"data.txt":  {body: "data", mode: 0644},
+	})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	pkg.Install.Executables = []string{"launch.sh"}
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+		t.Fatal(err)
+	}
+	launcher := filepath.Join(root, "userdata/roms/tools/demo/launch.sh")
+	data := filepath.Join(root, "userdata/roms/tools/demo/data.txt")
+	// Knulli SD-card filesystems own the mode bits and report 0777 for files
+	// the installer requested as 0755 or 0644.
+	for path, mode := range map[string]os.FileMode{launcher: 0777, data: 0666} {
+		if err := os.Chmod(path, mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	status, err := manager.Status(pkg.ID)
+	if err != nil || !status.Healthy || len(status.Issues) != 0 {
+		t.Fatalf("a wider filesystem mode was reported as a change: %#v, %v", status, err)
+	}
+	if err := os.Chmod(launcher, 0644); err != nil {
+		t.Fatal(err)
+	}
+	status, err = manager.Status(pkg.ID)
+	if err != nil || status.Healthy || len(status.Issues) != 1 || status.Issues[0].Check != "mode changed" || status.Issues[0].Path != "/userdata/roms/tools/demo/launch.sh" {
+		t.Fatalf("a lost execute capability was not reported: %#v, %v", status, err)
+	}
+}
+
+func TestModeIssueCoversEveryCapabilityClass(t *testing.T) {
+	file := InstalledFile{Path: "/userdata/roms/tools/demo/launch.sh"}
+	tests := []struct {
+		name     string
+		recorded os.FileMode
+		actual   os.FileMode
+		issue    bool
+	}{
+		{name: "unchanged", recorded: 0755, actual: 0755},
+		{name: "wider mode from a normalizing filesystem", recorded: 0755, actual: 0777},
+		{name: "world permissions narrowed", recorded: 0777, actual: 0755},
+		{name: "mode without recorded permissions", recorded: 0, actual: 0600},
+		{name: "lost execute", recorded: 0755, actual: 0644, issue: true},
+		{name: "lost write", recorded: 0644, actual: 0444, issue: true},
+		{name: "lost read", recorded: 0644, actual: 0200, issue: true},
+		{name: "owner loses read and write while group keeps read", recorded: 0640, actual: 0040, issue: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			file.Mode = uint32(test.recorded)
+			issue := modeIssue(file, test.actual)
+			if (issue != nil) != test.issue {
+				t.Fatalf("modeIssue(%04o, %04o) = %v, want issue %v", test.recorded, test.actual, issue, test.issue)
+			}
+			if issue == nil {
+				return
+			}
+			if issue.Check != "mode changed" || issue.Expected != fmt.Sprintf("%04o", test.recorded) || issue.Actual != fmt.Sprintf("%04o", test.actual) {
+				t.Fatalf("mode issue did not report expected and actual modes: %#v", issue)
+			}
+		})
+	}
+}
+
+func TestHealthCheckHashesContentWhenSizeAndTimeMatch(t *testing.T) {
+	root := t.TempDir()
+	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+		t.Fatal(err)
+	}
+	launcher := filepath.Join(root, "userdata/roms/tools/demo/launch.sh")
+	info, err := os.Stat(launcher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(launcher, []byte(strings.Repeat("x", len("reviewed launcher"))), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(launcher, info.ModTime(), info.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+	status, err := manager.Status(pkg.ID)
+	if err != nil || status.Healthy || len(status.Issues) != 1 || status.Issues[0].Check != "content changed" {
+		t.Fatalf("same-size content change with restored time was not detected: %#v, %v", status, err)
 	}
 }
 

@@ -44,8 +44,10 @@ Grout 5.2.0.0 and PlayTime 1.0.0 have broad experimental Knulli eligibility
 only when architecture, glibc ABI, SDL libraries, device identity, and display
 bounds pass. Only PlayTime 1.0.0 has exact current Smart Pro evidence.
 An existing copy shows EXTERNAL and offers Manage existing; that inventories
-and backs up uncertain files without reinstalling the reviewed release. The
-other two packages are read-only.
+and backs up uncertain files without reinstalling the reviewed release. Only
+files count, so an empty directory left by a rolled-back write still offers
+Install. A card that reports a wider file mode than requested is not a health
+failure. The other two packages are read-only.
 
 The Store disables Grout's updater metadata URL and verifies the transformed
 binary. Use App Store Repair and reviewed updates only. Grout config stays

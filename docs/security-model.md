@@ -30,7 +30,7 @@ Upstream package code runs later when the user launches it. The installer does n
 - Atomically replace regular files and installed state.
 - Snapshot every changed file, persist a journal before destination mutation, and roll back a failed operation in reverse order. Recover an open journal on the next locked start.
 - Keep a persistent backup when installation overwrites a file the package did not own.
-- Show a detected external copy as the row state **EXTERNAL** with the action **Manage existing**, then inventory it before adoption. Exact release-hash matches can become manager-owned; changed and unknown files are marked unmanaged and backed up because ownership is not proven.
+- Show a detected external copy as the row state **EXTERNAL** with the action **Manage existing**, then inventory it before adoption. Detection and adoption both require at least one file at the destination, so an empty directory is never offered for adoption. Exact release-hash matches can become manager-owned; changed and unknown files are marked unmanaged and backed up because ownership is not proven.
 - Preserve declared configuration during repair, update, and uninstall.
 - Track installed paths, hashes, modes, and original-file backups.
 - Persist the requested operation, detected install type, and safe retry target below manager state. Revalidate the current package state before showing a retry; never convert an absent fresh install into adoption.
@@ -45,12 +45,12 @@ Upstream package code runs later when the user launches it. The installer does n
 - Root can change files below approved `/userdata` paths despite installer checks.
 - Path checks do not defend against a hostile local process that races a checked directory into a symlink.
 - A corrupt transaction journal blocks the next locked operation until the leftover directory is inspected.
-- Empty directories can remain after rollback or uninstall.
+- Empty directories can remain after rollback or uninstall. They are inert: external detection counts files, so a leftover skeleton does not block a fresh install or offer adoption.
 - Device detection reads the Knulli board identifier (`/boot/boot/knulli.board`), then `/etc/knulli-device`, then Batocera's board file. An unrecognized board shows `UNKNOWN DEVICE` and is blocked until the operator supplies explicit flags.
 - The GUI has one community-reported TrimUI Smart Pro test. The Grout result applies to 5.1.0.0, not the current 5.2.0.0 release. The report did not itemize lifecycle steps.
 - PlayTime and Grout are broad experimental packages only when Knulli, AArch64, glibc, required SDL libraries, a device identity, and reviewed display bounds match. Exact package-version device evidence controls the tested badge.
 - Grout's reviewed staging patch replaces its only updater metadata URL with a reserved `.invalid` URL and verifies the transformed binary hash. A mismatch stops installation before any transaction write.
-- Health checks use the observed destination mode after transactional copy or adoption mode normalization. They continue to compare the full SHA-256 of every manager-owned immutable file. Unmanaged external files show their full reviewed and actual hashes for Repair instead of being treated as reviewed bytes.
+- Health checks use the observed destination mode after transactional copy or adoption mode normalization, and require that mode to keep the owner read, write, and execute permissions the installer set. A wider mode from a normalizing filesystem is not a health failure; a lost owner permission is. They compare the full SHA-256 of every manager-owned immutable file on every check. Unmanaged external files show their full reviewed and actual hashes for Repair instead of being treated as reviewed bytes.
 - Force reinstall is offered only after a recoverable adoption ownership failure or a validated stale transaction journal. An active transaction blocks all recovery actions. Compatibility, free-space, signature, checksum, archive, path, and licensing failures stay blocked and show their exact reason; force mode cannot disable those checks.
 - Before force reinstall changes a destination, the manager inventories and hashes every regular file. It preserves declared data and retains a complete timestamped backup plus original-path, hash, mode, and size records under `/userdata/system/knulli-app-store/recovery-backups/<package-id>/<timestamp>/`. A failed operation removes its incomplete retained backup after journal rollback restores the pre-operation files.
 - Diagnostic export contains detected platform metadata, public catalogue package status, and redacted App Store logs. It does not scan or copy package configuration, credentials, ROMs, or user data.

@@ -2,6 +2,7 @@ package installer
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,6 +71,12 @@ func (m Manager) RecoveryStatus(pkg manifest.Package) (RecoveryStatus, error) {
 	return RecoveryStatus{}, nil
 }
 
+// PreExisting reports whether the destination holds files this installer did
+// not write. Adoption inventories regular files, so an empty directory left by
+// a rolled-back write is absent, not an external installation: offering Manage
+// existing for it can only fail. Anything else, including an entry the walk
+// cannot read, still needs the user to move it aside. The walk stops at the
+// first entry, because the catalogue asks every package on every load.
 func (m Manager) PreExisting(pkg manifest.Package) (bool, error) {
 	if !pkg.Installable() || pkg.Install == nil {
 		return false, nil
@@ -82,14 +89,20 @@ func (m Manager) PreExisting(pkg manifest.Package) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	entries, err := os.ReadDir(host)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return len(entries) > 0, nil
+	found := false
+	// Every path stops the walk, so the walk itself reports no error.
+	_ = filepath.WalkDir(host, func(_ string, entry fs.DirEntry, walkErr error) error {
+		if walkErr == nil && entry.IsDir() {
+			return nil
+		}
+		// A file, or an entry that cannot be read, is something to move aside.
+		// An absent destination reports nothing.
+		if !os.IsNotExist(walkErr) {
+			found = true
+		}
+		return fs.SkipAll
+	})
+	return found, nil
 }
 
 func (m Manager) Status(id string) (Status, error) {
@@ -136,12 +149,25 @@ func (m Manager) Status(id string) (Status, error) {
 		if digest != file.SHA256 {
 			status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "content changed", Expected: file.SHA256, Actual: digest})
 		}
-		if info.Mode().Perm() != os.FileMode(file.Mode).Perm() {
-			status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "mode changed", Expected: fmt.Sprintf("%04o", os.FileMode(file.Mode).Perm()), Actual: fmt.Sprintf("%04o", info.Mode().Perm())})
+		if issue := modeIssue(file, info.Mode()); issue != nil {
+			status.addIssue(m, state.Manifest.ID, *issue)
 		}
 	}
 	m.event("package_health_checked", "package", state.Manifest.ID, "healthy", fmt.Sprint(status.Healthy), "issues", fmt.Sprint(len(status.Issues)))
 	return status, nil
+}
+
+// modeIssue reports a permission regression. The destination filesystem owns
+// the mode bits and a Knulli SD card can report 0777 for a file the installer
+// requested as 0755 or 0644, so wider bits are not an issue. What matters is
+// that the owner keeps the read, write, and execute permission the recorded
+// mode granted, because Knulli runs the package as that owner.
+func modeIssue(file InstalledFile, actual os.FileMode) *HealthIssue {
+	expected := os.FileMode(file.Mode).Perm()
+	if expected&0700&^actual.Perm() == 0 {
+		return nil
+	}
+	return &HealthIssue{Path: file.Path, Check: "mode changed", Expected: fmt.Sprintf("%04o", expected), Actual: fmt.Sprintf("%04o", actual.Perm())}
 }
 
 func (status *Status) addIssue(manager Manager, packageID string, issue HealthIssue) {
