@@ -119,7 +119,17 @@ func WalkDetail(model *storeui.Model, controls *storeinput.Session) string {
 	if controls != nil {
 		mode = string(controls.Mode)
 	}
-	return strings.Join([]string{item, focus, action, busy, mode, sessionMessage, message, problem}, "\t")
+	fields := []string{item, focus, action, busy, mode, sessionMessage, message, problem}
+	for index := range fields {
+		fields[index] = walkField(fields[index])
+	}
+	return strings.Join(fields, "\t")
+}
+
+// walkField keeps one value inside one TSV field even when an operation error
+// contains a line break or tab.
+func walkField(value string) string {
+	return strings.NewReplacer("\t", " ", "\r", " ", "\n", " ").Replace(value)
 }
 
 func walkFocusName(focus storeui.Focus) string {

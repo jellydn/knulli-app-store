@@ -65,6 +65,7 @@ func TestDetectUsesNarrowLegacyFallback(t *testing.T) {
 func TestResolveAppliesOverridesWithEvidenceAndResolutionPrecedence(t *testing.T) {
 	root := t.TempDir()
 	writePlatformFile(t, root, "sys/class/graphics/fb0/virtual_size", "1280,720\n")
+	writePlatformFile(t, root, "lib/ld-linux-aarch64.so.1", "")
 	got := Resolve(root,
 		WithFirmware("knulli"),
 		WithVersion("scarab"),
@@ -72,7 +73,7 @@ func TestResolveAppliesOverridesWithEvidenceAndResolutionPrecedence(t *testing.T
 		WithDevice("magicx-zero-28"),
 		WithResolutionOverride("640x480"),
 	)
-	if got.Firmware != "knulli" || got.Version != "scarab" || got.Arch != "aarch64" || got.Device != "magicx-zero-28" || got.Resolution != "640x480" {
+	if got.Firmware != "knulli" || got.Version != "scarab" || got.Arch != "aarch64" || got.ABI != "linux-aarch64-glibc" || got.Device != "magicx-zero-28" || got.Resolution != "640x480" {
 		t.Fatalf("overrides were not applied: %#v", got)
 	}
 	if got.Evidence(FieldFirmware) != (Source{Raw: "knulli", Location: "command-line override"}) || got.Evidence(FieldVersion) != (Source{Raw: "scarab", Location: "command-line override"}) || got.Evidence(FieldResolution).Location != "command-line override" {
