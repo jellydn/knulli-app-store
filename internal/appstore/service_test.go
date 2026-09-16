@@ -1,10 +1,18 @@
 package appstore
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -24,9 +32,9 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 	if err := writeIndexForTest(index, indexPath); err != nil {
 		t.Fatal(err)
 	}
-	service, err := Open(indexPath, installer.Manager{Root: t.TempDir(), Platform: platform.Info{
+	service, err := Open(indexPath, installer.Manager{Root: t.TempDir()}.WithPlatform(platform.Info{
 		Firmware: "knulli", Version: "scarab", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc", "libresolv", "libpthread"}, Device: "trimui-smart-pro", Resolution: "1280x720",
-	}})
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,8 +63,7 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 			}
 			continue
 		}
-		readOnlyStatus := strings.Contains(item.Compatibility, "Candidate") || strings.Contains(item.Compatibility, "installation is blocked")
-		if item.Compatible || len(item.Actions) != 0 || !readOnlyStatus {
+		if item.Compatible || len(item.Actions) != 0 || item.Verdict.State != StateCandidate {
 			t.Fatalf("candidate became actionable: %#v", item)
 		}
 	}
@@ -69,13 +76,24 @@ func TestApprovedCandidateRemainsReadOnly(t *testing.T) {
 	pkg := installablePackage()
 	pkg.Review = manifest.Review{Status: "candidate", Approval: &manifest.Approval{Provenance: "community"}}
 	pkg.Release, pkg.Compatibility, pkg.Install = nil, nil, nil
-	compatible, message := compatibility(pkg, platform.Info{})
-	if compatible || message != "Community approved; installation is blocked by technical review" {
-		t.Fatalf("unexpected approved candidate state: %v, %q", compatible, message)
+	verdict := assess(pkg, platform.Info{}, installer.Status{}, false)
+	if verdict.State != StateCandidate || verdict.Message() != "Community approved; installation is blocked by technical review" {
+		t.Fatalf("unexpected approved candidate state: %#v", verdict)
 	}
-	if actions(Item{Package: pkg}) != nil {
+	if len(verdict.Actions) != 0 {
 		t.Fatal("approved candidate must remain read-only")
 	}
+}
+
+func TestInstalledCandidateRetainsReviewReason(t *testing.T) {
+	pkg := installablePackage()
+	pkg.Review = manifest.Review{Status: "candidate", Approval: &manifest.Approval{Provenance: "community"}}
+	pkg.Release, pkg.Compatibility, pkg.Install = nil, nil, nil
+	verdict := assess(pkg, platform.Info{}, installer.Status{Installed: true, Healthy: true, Version: pkg.Version}, false)
+	if verdict.Compatible(pkg) || verdict.Message() != "Community approved; installation is blocked by technical review" {
+		t.Fatalf("installed candidate lost review reason: %#v", verdict)
+	}
+	assertActions(t, verdict.Actions, Uninstall)
 }
 
 func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
@@ -102,7 +120,7 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 	if err := writeIndexForTest(index, indexPath); err != nil {
 		t.Fatal(err)
 	}
-	detected := platform.Detect(root)
+	detected := platform.Resolve(root)
 	detected.Arch = "aarch64"
 	detected.ABI = "linux-aarch64-glibc"
 	detected.GLIBCVersion = "2.40"
@@ -110,8 +128,8 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 	if detected.Resolution != "" {
 		t.Fatalf("corrupt framebuffer virtual size became compatible: %#v", detected)
 	}
-	detected = platform.WithResolutionCandidates(detected, append([]platform.ResolutionCandidate{{Source: "SDL renderer output", Width: 1280, Height: 720}}, detected.ResolutionCandidates...))
-	service, err := Open(indexPath, installer.Manager{Root: root, Platform: detected})
+	detected = detected.WithCandidates(append([]platform.ResolutionCandidate{{Source: "SDL renderer output", Width: 1280, Height: 720}}, detected.ResolutionCandidates()...))
+	service, err := Open(indexPath, installer.Manager{Root: root}.WithPlatform(detected))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +139,7 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 	}
 	for _, item := range items {
 		if item.Package.Experimental() {
-			if !item.Compatible || len(item.Actions) != 1 || !strings.Contains(item.Compatibility, "no minimum version is claimed") || !strings.Contains(item.Compatibility, "/etc/os-release:OS_NAME") || !strings.Contains(item.Compatibility, "source=SDL renderer output") {
+			if !item.Compatible || len(item.Actions) != 1 || item.Verdict.State != StateAvailable || !hasReason(item.Verdict, ReasonReview, "no minimum version is claimed") || !hasReason(item.Verdict, ReasonReview, "/etc/os-release:OS_NAME") || !hasReason(item.Verdict, ReasonReview, "source=SDL renderer output") {
 				t.Fatalf("latest Knulli experimental decision is wrong: %#v", item)
 			}
 		}
@@ -137,10 +155,11 @@ func TestMagicXAllowsOnlyPlayTimeExperimentalPackage(t *testing.T) {
 	if err := writeIndexForTest(index, indexPath); err != nil {
 		t.Fatal(err)
 	}
-	service, err := Open(indexPath, installer.Manager{Root: t.TempDir(), Platform: platform.Info{
-		Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc", "libresolv", "libpthread"}, Device: "magicx-zero-28", Resolution: "640x480",
-		FirmwareRaw: "knulli", FirmwareSource: "/etc/os-release:OS_NAME", VersionRaw: "scarab 2026/08/19 16:06", VersionSource: "/usr/share/knulli/knulli.version", ResolutionSource: "SDL renderer output",
-	}})
+	detected := platform.Resolve(t.TempDir(), platform.WithFirmware("knulli"), platform.WithVersion("scarab 2026/08/19 16:06"), platform.WithArch("aarch64"), platform.WithDevice("magicx-zero-28"), platform.WithResolutionOverride("640x480"))
+	detected.ABI = "linux-aarch64-glibc"
+	detected.GLIBCVersion = "2.40"
+	detected.Dependencies = []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc", "libresolv", "libpthread"}
+	service, err := Open(indexPath, installer.Manager{Root: t.TempDir()}.WithPlatform(detected))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,38 +174,51 @@ func TestMagicXAllowsOnlyPlayTimeExperimentalPackage(t *testing.T) {
 				t.Fatalf("PlayTime was not offered as an unverified MagicX experiment: %#v", item)
 			}
 		case "app.romm.grout":
-			if !item.Compatible || item.DeviceTested || len(item.Actions) != 1 || item.Actions[0] != Install {
+			if !item.Compatible || item.DeviceTested || len(item.Actions) != 1 || item.Actions[0] != Install || item.Verdict.State != StateAvailable {
 				t.Fatalf("Grout was not offered as an unverified MagicX experiment: %#v", item)
 			}
 		}
 	}
 }
 
-func TestActionsReflectInstallStateAndHealth(t *testing.T) {
-	item := Item{Package: installablePackage(), Compatible: true}
-	assertActions(t, actions(item), Install)
-	item.PreExisting = true
-	assertActions(t, actions(item), Adopt)
-	item.RecoveryReason = "checksum mismatch"
+func TestVerdictActionsReflectInstallStateAndHealth(t *testing.T) {
+	pkg := installablePackage()
+	current := platform.Info{Firmware: "knulli", Version: "2026.05", Arch: "aarch64", ABI: "linux-aarch64-glibc", Dependencies: []string{"sdl2"}, Device: "trimui-smart-pro", Resolution: "1280x720"}
+	assertActions(t, assess(pkg, current, installer.Status{}, false).Actions, Install)
+	assertActions(t, assess(pkg, current, installer.Status{}, true).Actions, Adopt)
+	status := installer.Status{Installed: true, Version: pkg.Version, Healthy: true}
+	assertActions(t, assess(pkg, current, status, false).Actions, Uninstall, Repair)
+	status.Healthy = false
+	assertActions(t, assess(pkg, current, status, false).Actions, Uninstall, Repair)
+	status.Version = "0.9.0"
+	assertActions(t, assess(pkg, current, status, false).Actions, Update, Uninstall, Repair)
+	status.Version = pkg.Version
+	incompatible := platform.Info{Firmware: "other", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720"}
+	verdict := assess(pkg, incompatible, status, false)
+	assertActions(t, verdict.Actions, Uninstall)
+	if verdict.Compatible(pkg) {
+		t.Fatal("installed package became compatible after the platform rejected it")
+	}
+}
+
+func TestRecoveryStateRefinesVerdictActions(t *testing.T) {
+	pkg := installablePackage()
+	current := platform.Info{Firmware: "knulli", Version: "2026.05", Arch: "aarch64", ABI: "linux-aarch64-glibc", Dependencies: []string{"sdl2"}, Device: "trimui-smart-pro", Resolution: "1280x720"}
+	item := Item{Package: pkg, Compatible: true, PreExisting: true, Verdict: assess(pkg, current, installer.Status{}, true)}
 	assertActions(t, actions(item), Adopt)
 	item.RecoveryAllowed = true
 	assertActions(t, actions(item), Adopt, ForceReinstall)
 	item.RecoveryActive = true
 	assertActions(t, actions(item))
-	item.RecoveryReason = ""
-	item.RecoveryAllowed = false
-	item.RecoveryActive = false
-	item.PreExisting = false
-	item.Installed = true
-	item.InstalledVersion = item.Package.Version
-	item.Healthy = true
-	assertActions(t, actions(item), Uninstall, Repair)
-	item.Healthy = false
-	assertActions(t, actions(item), Uninstall, Repair)
-	item.InstalledVersion = "0.9.0"
-	assertActions(t, actions(item), Update, Uninstall, Repair)
-	item.Compatible = false
-	assertActions(t, actions(item), Uninstall)
+}
+
+func hasReason(verdict Verdict, kind ReasonKind, fragment string) bool {
+	for _, reason := range verdict.Reasons {
+		if reason.Kind == kind && strings.Contains(reason.Detail, fragment) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestRetryTargetsRemainBoundToOriginatingOperation(t *testing.T) {
@@ -223,9 +255,9 @@ func TestPersistedRetryRevalidatesAbsentAndExternalInstallTypes(t *testing.T) {
 		t.Fatal(err)
 	}
 	pkg := installablePackage()
-	manager := installer.Manager{Root: root, Platform: platform.Info{
+	manager := installer.Manager{Root: root, Diagnostics: log}.WithPlatform(platform.Info{
 		Firmware: "knulli", Version: "2026.05", Arch: "aarch64", ABI: "linux-aarch64-glibc", Dependencies: []string{"sdl2"}, Device: "trimui-smart-pro", Resolution: "1280x720",
-	}, Diagnostics: log}
+	})
 	service := &Service{index: catalog.Index{Packages: []catalog.Entry{{ID: pkg.ID, Package: pkg}}}, manager: manager}
 	failedInstall := installer.LifecycleState{PackageID: pkg.ID, RequestedOperation: string(Install), DetectedInstallType: "absent", RetryTarget: string(Install), Failure: "download release: SHA-256 mismatch"}
 	if err := manager.RecordLifecycle(failedInstall); err != nil {
@@ -286,6 +318,93 @@ func TestOnlyRecoverableAdoptionFailuresAllowForceReinstall(t *testing.T) {
 			t.Fatalf("recoverableAdoptionFailure(%q) = %v, want %v", test.err, got, test.allowed)
 		}
 	}
+}
+
+func TestExecuteInstallFailureAndUninstall(t *testing.T) {
+	root := t.TempDir()
+	asset := testZip(t, map[string]string{"run.sh": "#!/bin/sh\n"})
+	digest := sha256.Sum256(asset)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Length", strconv.Itoa(len(asset)))
+		_, _ = writer.Write(asset)
+	}))
+	defer server.Close()
+	client := server.Client()
+	client.Transport = testRewriteTransport{base: client.Transport, host: strings.TrimPrefix(server.URL, "https://")}
+	log, err := diagnostics.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg := installablePackage()
+	pkg.Release.SHA256 = hex.EncodeToString(digest[:])
+	pkg.Release.Size = int64(len(asset))
+	pkg.Release.InstalledSize = int64(len("#!/bin/sh\n"))
+	manager := installer.Manager{Root: root, Client: client, Diagnostics: log}.WithPlatform(platform.Info{
+		Firmware: "knulli", Version: "2026.05", Arch: "aarch64", ABI: "linux-aarch64-glibc", Dependencies: []string{"sdl2"}, Device: "trimui-smart-pro", Resolution: "1280x720",
+	})
+	service := &Service{index: catalog.Index{Packages: []catalog.Entry{{ID: pkg.ID, Package: pkg}}}, manager: manager}
+	var progress []string
+	if err := service.Execute(context.Background(), pkg.ID, Install, func(message string) { progress = append(progress, message) }); err != nil {
+		t.Fatalf("install through Execute: %v", err)
+	}
+	if len(progress) != 2 || !strings.Contains(progress[1], "completed") {
+		t.Fatalf("install progress did not consume returned outcome: %v", progress)
+	}
+	incompatibleManager := manager.WithPlatform(platform.Info{Firmware: "other", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720"})
+	incompatibleService := &Service{index: service.index, manager: incompatibleManager}
+	items, err := incompatibleService.Items(context.Background())
+	if err != nil || len(items) != 1 || items[0].Compatible || !items[0].Verdict.HasReason(ReasonPlatform) {
+		t.Fatalf("installed platform failure lost its typed verdict: %#v, %v", items, err)
+	}
+	assertActions(t, items[0].Actions, Uninstall)
+
+	broken := pkg
+	broken.Release = &manifest.Release{}
+	*broken.Release = *pkg.Release
+	broken.Version = "2.0.0"
+	broken.Release.SHA256 = strings.Repeat("0", 64)
+	service.index.Packages[0].Package = broken
+	if err := service.Execute(context.Background(), pkg.ID, Update, func(string) {}); err == nil || !strings.Contains(err.Error(), "SHA-256 mismatch") {
+		t.Fatalf("update failure through Execute = %v", err)
+	}
+	service.index.Packages[0].Package = pkg
+	if err := service.Execute(context.Background(), pkg.ID, Uninstall, func(string) {}); err != nil {
+		t.Fatalf("uninstall through Execute: %v", err)
+	}
+}
+
+type testRewriteTransport struct {
+	base http.RoundTripper
+	host string
+}
+
+func (transport testRewriteTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	clone := request.Clone(request.Context())
+	clone.URL.Scheme = "https"
+	clone.URL.Host = transport.host
+	clone.Host = transport.host
+	return transport.base.RoundTrip(clone)
+}
+
+func testZip(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buffer bytes.Buffer
+	writer := zip.NewWriter(&buffer)
+	for name, body := range files {
+		header := &zip.FileHeader{Name: name, Method: zip.Store}
+		header.SetMode(0755)
+		entry, err := writer.CreateHeader(header)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.WriteString(entry, body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buffer.Bytes()
 }
 
 func TestCompletionMessageReportsRefreshOrRestartPrecisely(t *testing.T) {

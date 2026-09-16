@@ -15,7 +15,9 @@ type OperationOutcome struct {
 	RestartRequired         bool
 }
 
-func (m Manager) reportOutcome(ctx context.Context, gameListChanged bool) {
+// outcome performs the optional game-list refresh after a commit and returns
+// what the caller should report.
+func (m Manager) outcome(ctx context.Context, gameListChanged bool) OperationOutcome {
 	outcome := OperationOutcome{GameListChanged: gameListChanged}
 	if gameListChanged {
 		if err := m.refreshGameList(ctx); err != nil {
@@ -26,9 +28,7 @@ func (m Manager) reportOutcome(ctx context.Context, gameListChanged bool) {
 			m.event("gamelist_refresh_accepted")
 		}
 	}
-	if m.Outcome != nil {
-		m.Outcome(outcome)
-	}
+	return outcome
 }
 
 func (m Manager) refreshGameList(ctx context.Context) error {

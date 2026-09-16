@@ -24,6 +24,7 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		Package:   manifest.Package{ID: "org.example.demo", Name: "Demo Utility", Type: "utility", Summary: "A safe package used to verify action and error layouts.", Review: manifest.Review{Status: "installable"}},
 		Installed: true, InstalledVersion: "1.0.0", Healthy: false, Compatible: true,
 		HealthReason: "content changed: /userdata/roms/tools/Grout/grout (expected 39b5ba053913620aea2db051c2fad2fa0bf05b59c2cc88bcb01734dd048882e7, got 31da1b650f285f47c27e1c94567c50e2b25a59893bde831aa175d722de269adb)", Compatibility: "Compatible with detected platform", Actions: []appstore.Action{appstore.Repair, appstore.Uninstall},
+		Verdict: appstore.Verdict{State: appstore.StateIssue, Reasons: []appstore.Reason{{Kind: appstore.ReasonHealth, Detail: "content changed"}}},
 	}
 	verified := appstore.Item{
 		Package: manifest.Package{
@@ -31,18 +32,19 @@ func TestRenderRepresentativeStates(t *testing.T) {
 			Version: "5.1.0.0", Review: manifest.Review{Status: "verified", Approval: &manifest.Approval{Provenance: "community"}},
 			Install: &manifest.Install{Warning: "Do not use Grout updater. Update only through Knulli App Store."},
 		},
-		Installed: true, InstalledVersion: "5.1.0.0", Healthy: true, DeviceTested: true, Compatible: true, Compatibility: "Compatible with detected platform", Actions: []appstore.Action{appstore.Uninstall, appstore.Repair},
+		Installed: true, InstalledVersion: "5.1.0.0", Healthy: true, DeviceTested: true, Compatible: true, Compatibility: "Compatible with detected platform", Actions: []appstore.Action{appstore.Uninstall, appstore.Repair}, Verdict: appstore.Verdict{State: appstore.StateInstalled},
 	}
 	experimental := appstore.Item{
 		Package: manifest.Package{
 			ID: "io.github.unitreign.playtime", Name: "PlayTime", Version: "1.0.0", Type: "utility", Summary: "Tracks game play time on Knulli.",
 			Review: manifest.Review{Status: "experimental", Approval: &manifest.Approval{Provenance: "community"}}, Install: &manifest.Install{Warning: "Unverified experimental test. Existing files are backed up."},
 		},
-		DeviceTested: true, Compatible: true, Compatibility: "Experimental compatibility on this device; no minimum version is claimed", Actions: []appstore.Action{appstore.Install},
+		DeviceTested: true, Compatible: true, Compatibility: "Experimental compatibility on this device; no minimum version is claimed", Actions: []appstore.Action{appstore.Install}, Verdict: appstore.Verdict{State: appstore.StateAvailable, Reasons: []appstore.Reason{{Kind: appstore.ReasonReview, Detail: "Experimental compatibility on this device; no minimum version is claimed"}}},
 	}
 	external := experimental
 	external.PreExisting = true
 	external.Actions = []appstore.Action{appstore.Adopt}
+	external.Verdict.State = appstore.StateExternal
 	recovery := external
 	recovery.RecoveryReason = "adoption backup already exists for /userdata/roms/tools/PlayTime/playtime"
 	recovery.RecoverySummary = "Replaces reviewed app files; preserves declared data; backs up the complete existing destination for manual restore."
@@ -51,9 +53,11 @@ func TestRenderRepresentativeStates(t *testing.T) {
 	incompatible.Compatible = false
 	incompatible.Actions = nil
 	incompatible.Compatibility = `compatibility failed field=firmware: detected device="trimui-smart-pro" architecture="aarch64" resolution="1280x720" firmware_raw="buildroot" firmware="" firmware_source="/etc/os-release:ID"; package requires firmware="knulli"`
+	incompatible.Verdict = appstore.Verdict{State: appstore.StateIncompatible, Reasons: []appstore.Reason{{Kind: appstore.ReasonPlatform, Detail: incompatible.Compatibility}}}
 	candidate := appstore.Item{
 		Package:       manifest.Package{ID: "io.github.example.candidate", Name: "Candidate Tool", Type: "utility", Summary: "Metadata is still under review.", Review: manifest.Review{Status: "candidate"}},
 		Compatibility: "Candidate: compatibility is not approved",
+		Verdict:       appstore.Verdict{State: appstore.StateCandidate, Reasons: []appstore.Reason{{Kind: appstore.ReasonReview, Detail: "Candidate: compatibility is not approved"}}},
 	}
 	states := map[string]*storeui.Model{
 		"catalogue":           {Items: []appstore.Item{verified, experimental, candidate}},
@@ -136,13 +140,13 @@ func TestCompactLabelsAndRequiredNotices(t *testing.T) {
 	if trustLabel(appstore.Item{Package: verified}) != "VERIFIED" || trustLabel(appstore.Item{Package: experimental}) != "EXPERIMENTAL" || trustLabel(appstore.Item{Package: experimental, DeviceTested: true}) != "DEVICE TESTED" {
 		t.Fatal("trust labels do not separate verified and experimental packages")
 	}
-	if got := installState(appstore.Item{Package: verified, Installed: true, Healthy: true}); got != "INSTALLED" {
+	if got := installState(appstore.Item{Package: verified, Verdict: appstore.Verdict{State: appstore.StateInstalled}}); got != "INSTALLED" {
 		t.Fatalf("healthy install label = %q", got)
 	}
-	if got := installState(appstore.Item{Package: verified, Installed: true, Healthy: false}); got != "ISSUE" {
+	if got := installState(appstore.Item{Package: verified, Verdict: appstore.Verdict{State: appstore.StateIssue}}); got != "ISSUE" {
 		t.Fatalf("unhealthy install label = %q", got)
 	}
-	if got := installState(appstore.Item{Package: experimental, PreExisting: true}); got != "EXTERNAL" || actionLabel(appstore.Adopt) != "Manage existing" {
+	if got := installState(appstore.Item{Package: experimental, Verdict: appstore.Verdict{State: appstore.StateExternal}}); got != "EXTERNAL" || actionLabel(appstore.Adopt) != "Manage existing" {
 		t.Fatalf("external install labels are not concise: state=%q action=%q", got, actionLabel(appstore.Adopt))
 	}
 	for _, pkg := range []manifest.Package{verified, experimental} {
@@ -272,7 +276,7 @@ func TestResolutionCandidateLoggingIncludesRejectionAndSelection(t *testing.T) {
 		{Source: "SDL current display mode", Width: 1280, Height: 0x3333},
 		{Source: "SDL renderer output", Width: 1280, Height: 720},
 	}
-	selected := platform.WithResolutionCandidates(platform.Info{Device: "trimui-smart-pro"}, candidates)
+	selected := platform.Info{Device: "trimui-smart-pro"}.WithCandidates(candidates)
 	logResolutionCandidates(logger, platform.AssessResolutions(candidates), selected)
 	data, err := os.ReadFile(filepath.Join(root, "userdata/system/logs/knulli-app-store.log"))
 	if err != nil {

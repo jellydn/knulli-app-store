@@ -46,21 +46,18 @@ func run() error {
 		return fmt.Errorf("open diagnostics log: %w", err)
 	}
 	diagnosticLog.Event("startup", "component", "gui")
-	current := platform.Detect(*root)
-	override(&current.Firmware, *firmware)
-	override(&current.Version, *version)
-	override(&current.Arch, *arch)
-	override(&current.Device, *device)
-	if *resolution != "" {
-		candidates := append([]platform.ResolutionCandidate{platform.ResolutionCandidateFromString("command-line override", *resolution)}, current.ResolutionCandidates...)
-		current = platform.WithResolutionCandidates(current, candidates)
-	}
-	setOverrideEvidence(&current, *firmware, *version)
+	current := platform.Resolve(*root,
+		platform.WithFirmware(*firmware),
+		platform.WithVersion(*version),
+		platform.WithArch(*arch),
+		platform.WithDevice(*device),
+		platform.WithResolutionOverride(*resolution),
+	)
 	if current.Arch == "" {
 		current.Arch = runtime.GOARCH
 	}
 	diagnosticLog.Event("platform_filesystem_detected", "details", platform.Summary(current))
-	manager := installer.Manager{Root: *root, Platform: current, Diagnostics: diagnosticLog}
+	manager := installer.Manager{Root: *root, Diagnostics: diagnosticLog}.WithPlatform(current)
 	service, err := appstore.Open(*catalogue, manager)
 	if err != nil {
 		diagnosticLog.Event("startup_error", "error", err.Error())
@@ -71,21 +68,4 @@ func run() error {
 		diagnosticLog.Event("final_error", "error", err.Error())
 	}
 	return err
-}
-
-func setOverrideEvidence(info *platform.Info, firmware, version string) {
-	if firmware != "" {
-		info.FirmwareRaw = firmware
-		info.FirmwareSource = "command-line override"
-	}
-	if version != "" {
-		info.VersionRaw = version
-		info.VersionSource = "command-line override"
-	}
-}
-
-func override(target *string, value string) {
-	if value != "" {
-		*target = value
-	}
 }

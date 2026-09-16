@@ -60,9 +60,9 @@ func TestManageExistingRepairUpdateAndUninstallEndToEnd(t *testing.T) {
 	}))
 	defer server.Close()
 
-	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server), Diagnostics: diagnosticLog}
+	manager := Manager{Root: root, Client: rewriteClient(t, server), Diagnostics: diagnosticLog}.WithPlatform(testPlatform())
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", v1, "1.0.0")
-	if err := manager.Adopt(context.Background(), pkg); err != nil {
+	if _, err := manager.Apply(context.Background(), OpAdopt, pkg); err != nil {
 		t.Fatal(err)
 	}
 	status, err := manager.Status(pkg.ID)
@@ -70,7 +70,7 @@ func TestManageExistingRepairUpdateAndUninstallEndToEnd(t *testing.T) {
 		t.Fatalf("changed external files should need repair after management: %#v, %v", status, err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "original launcher")
-	if err := manager.Repair(context.Background(), pkg); err != nil {
+	if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
 		t.Fatal(err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "version one")
@@ -84,13 +84,13 @@ func TestManageExistingRepairUpdateAndUninstallEndToEnd(t *testing.T) {
 	if err != nil || status.Healthy {
 		t.Fatalf("damaged file was not detected: %#v, %v", status, err)
 	}
-	if err := manager.Repair(context.Background(), pkg); err != nil {
+	if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
 		t.Fatal(err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "version one")
 
 	updated := testPackage("https://github.com/example/demo/releases/download/v2/demo.zip", v2, "2.0.0")
-	if err := manager.Update(context.Background(), updated); err != nil {
+	if _, err := manager.Apply(context.Background(), OpUpdate, updated); err != nil {
 		t.Fatal(err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "version two")
@@ -98,7 +98,7 @@ func TestManageExistingRepairUpdateAndUninstallEndToEnd(t *testing.T) {
 	assertRootFile(t, root, "userdata/roms/tools/demo/added.txt", "new file")
 	assertMissing(t, root, "userdata/roms/tools/demo/obsolete.txt")
 
-	if err := manager.Uninstall(pkg.ID); err != nil {
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
 		t.Fatal(err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "original launcher")
@@ -126,8 +126,8 @@ func TestFailedGamelistUpdateRollsBackFiles(t *testing.T) {
 	server := serveAsset(t, asset)
 	defer server.Close()
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
-	if err := manager.Adopt(context.Background(), pkg); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpAdopt, pkg); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
 		t.Fatalf("expected gamelist failure, got %v", err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "original")
@@ -151,17 +151,20 @@ func TestUninstallRemovesOwnedMenuEntryAndRefreshesGameList(t *testing.T) {
 	defer refreshServer.Close()
 	var outcomes []OperationOutcome
 	manager := Manager{
-		Root: root, Platform: testPlatform(), Client: rewriteClient(t, assetServer),
+		Root: root, Client: rewriteClient(t, assetServer),
 		RefreshClient: refreshServer.Client(), RefreshURL: refreshServer.URL + "/reloadgames",
-		Outcome: func(outcome OperationOutcome) { outcomes = append(outcomes, outcome) },
-	}
+	}.WithPlatform(testPlatform())
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	if err := manager.Install(context.Background(), pkg); err != nil {
+	outcome, err := manager.Apply(context.Background(), OpInstall, pkg)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.UninstallContext(context.Background(), pkg.ID); err != nil {
+	outcomes = append(outcomes, outcome)
+	outcome, err = manager.Uninstall(context.Background(), pkg.ID)
+	if err != nil {
 		t.Fatal(err)
 	}
+	outcomes = append(outcomes, outcome)
 	if refreshCalls != 2 || len(outcomes) != 2 || !outcomes[0].GameListRefreshAccepted || !outcomes[1].GameListRefreshAccepted {
 		t.Fatalf("game-list refresh outcomes are wrong: calls=%d outcomes=%#v", refreshCalls, outcomes)
 	}
@@ -175,11 +178,13 @@ func TestSharedPreExistingMenuEntryIsNotOwnedOrRemoved(t *testing.T) {
 	server := serveAsset(t, asset)
 	defer server.Close()
 	var outcomes []OperationOutcome
-	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server), Outcome: func(outcome OperationOutcome) { outcomes = append(outcomes, outcome) }}
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	if err := manager.Install(context.Background(), pkg); err != nil {
+	outcome, err := manager.Apply(context.Background(), OpInstall, pkg)
+	if err != nil {
 		t.Fatal(err)
 	}
+	outcomes = append(outcomes, outcome)
 	baseGuard, err := safefs.NewGuard(root, []string{managerPath})
 	if err != nil {
 		t.Fatal(err)
@@ -188,9 +193,11 @@ func TestSharedPreExistingMenuEntryIsNotOwnedOrRemoved(t *testing.T) {
 	if err != nil || state.MenuOwned {
 		t.Fatalf("manual menu entry became manager-owned: %#v, %v", state, err)
 	}
-	if err := manager.Uninstall(pkg.ID); err != nil {
+	outcome, err = manager.Uninstall(context.Background(), pkg.ID)
+	if err != nil {
 		t.Fatal(err)
 	}
+	outcomes = append(outcomes, outcome)
 	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<name>Manual Demo</name>")
 	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<custom>keep</custom>")
 	if len(outcomes) != 2 || outcomes[0].GameListChanged || outcomes[1].GameListChanged {
@@ -203,13 +210,13 @@ func TestUninstallGamelistFailureRollsBackManagedFilesAndState(t *testing.T) {
 	asset := zipBytes(t, map[string]string{"launch.sh": "managed"})
 	server := serveAsset(t, asset)
 	defer server.Close()
-	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	if err := manager.Install(context.Background(), pkg); err != nil {
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
 		t.Fatal(err)
 	}
 	writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList><broken></gameList>")
-	if err := manager.Uninstall(pkg.ID); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
 		t.Fatalf("expected uninstall gamelist failure, got %v", err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "managed")
@@ -227,14 +234,13 @@ func TestRefreshFailureRequiresRestartWithoutFailingOperation(t *testing.T) {
 		http.Error(writer, "unavailable", http.StatusServiceUnavailable)
 	}))
 	defer refreshServer.Close()
-	var outcome OperationOutcome
 	manager := Manager{
-		Root: root, Platform: testPlatform(), Client: rewriteClient(t, assetServer),
+		Root: root, Client: rewriteClient(t, assetServer),
 		RefreshClient: refreshServer.Client(), RefreshURL: refreshServer.URL,
-		Outcome: func(value OperationOutcome) { outcome = value },
-	}
+	}.WithPlatform(testPlatform())
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	if err := manager.Install(context.Background(), pkg); err != nil {
+	outcome, err := manager.Apply(context.Background(), OpInstall, pkg)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if !outcome.GameListChanged || !outcome.RestartRequired || outcome.GameListRefreshAccepted {
@@ -252,8 +258,8 @@ func TestChecksumFailureWritesNoPackageFiles(t *testing.T) {
 	defer server.Close()
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
 	pkg.Release.SHA256 = strings.Repeat("0", 64)
-	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
-	if err := manager.Install(context.Background(), pkg); err == nil || !strings.Contains(err.Error(), "SHA-256 mismatch") {
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err == nil || !strings.Contains(err.Error(), "SHA-256 mismatch") {
 		t.Fatalf("expected checksum failure, got %v", err)
 	}
 	assertMissing(t, root, "userdata/roms/tools/demo/launch.sh")
@@ -269,8 +275,8 @@ func TestDeclarativeExecutablesAreRestoredAndRepaired(t *testing.T) {
 	defer server.Close()
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
 	pkg.Install.Executables = []string{"launch.sh", "tool"}
-	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
-	if err := manager.Install(context.Background(), pkg); err != nil {
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"launch.sh", "tool"} {
@@ -286,7 +292,7 @@ func TestDeclarativeExecutablesAreRestoredAndRepaired(t *testing.T) {
 	if status, err := manager.Status(pkg.ID); err != nil || status.Healthy {
 		t.Fatalf("changed executable mode was not detected: %#v, %v", status, err)
 	}
-	if err := manager.Repair(context.Background(), pkg); err != nil {
+	if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
 		t.Fatal(err)
 	}
 	if info, err := os.Stat(tool); err != nil || info.Mode().Perm() != 0755 {
@@ -314,9 +320,9 @@ func TestPlayTimeFirstLaunchHealthRepairAndUninstallOnExperimentalDevices(t *tes
 				t.Fatal(err)
 			}
 			pkg := playTimeTestPackage(t, asset)
-			manager := Manager{Root: root, Platform: current, Client: rewriteClient(t, server), Diagnostics: logger}
+			manager := Manager{Root: root, Client: rewriteClient(t, server), Diagnostics: logger}.WithPlatform(current)
 
-			if err := manager.Install(context.Background(), pkg); err != nil {
+			if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
 				t.Fatal(err)
 			}
 			baseGuard, err := safefs.NewGuard(root, []string{managerPath})
@@ -354,13 +360,13 @@ func TestPlayTimeFirstLaunchHealthRepairAndUninstallOnExperimentalDevices(t *tes
 			if err != nil || status.Healthy || len(status.Issues) < 2 || status.Issues[0].Check != "content changed" || status.Issues[1].Check != "mode changed" {
 				t.Fatalf("immutable corruption lacks useful health reasons: %#v, %v", status, err)
 			}
-			if err := manager.Repair(context.Background(), pkg); err != nil {
+			if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
 				t.Fatal(err)
 			}
 			if status, err = manager.Status(pkg.ID); err != nil || !status.Healthy {
 				t.Fatalf("repair did not restore health: %#v, %v", status, err)
 			}
-			if err := manager.Uninstall(pkg.ID); err != nil {
+			if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
 				t.Fatal(err)
 			}
 			assertRootFile(t, root, "userdata/system/configs/playtime/playtime.db", "play statistics")
@@ -390,24 +396,24 @@ func TestPlayTimeMagicXAdoptionAndUninstallPreserveExistingData(t *testing.T) {
 	server := serveAsset(t, asset)
 	defer server.Close()
 	pkg := playTimeTestPackage(t, asset)
-	manager := Manager{Root: root, Platform: platform.Info{Firmware: "knulli", Version: "scarab", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc"}, Device: "magicx-zero-28", Resolution: "640x480"}, Client: rewriteClient(t, server)}
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(platform.Info{Firmware: "knulli", Version: "scarab", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc"}, Device: "magicx-zero-28", Resolution: "640x480"})
 	if existing, err := manager.PreExisting(pkg); err != nil || !existing {
 		t.Fatalf("MagicX PlayTime copy was not offered for adoption: existing=%v err=%v", existing, err)
 	}
-	if err := manager.Adopt(context.Background(), pkg); err != nil {
+	if _, err := manager.Apply(context.Background(), OpAdopt, pkg); err != nil {
 		t.Fatal(err)
 	}
 	if status, err := manager.Status(pkg.ID); err != nil || status.Healthy {
 		t.Fatalf("incomplete external PlayTime copy did not request repair: %#v, %v", status, err)
 	}
 	assertMissing(t, root, "userdata/roms/tools/PlayTime/playtime")
-	if err := manager.Repair(context.Background(), pkg); err != nil {
+	if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
 		t.Fatal(err)
 	}
 	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
 		t.Fatalf("repaired PlayTime was not healthy: %#v, %v", status, err)
 	}
-	if err := manager.Uninstall(pkg.ID); err != nil {
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
 		t.Fatal(err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/PlayTime/local-note.txt", "existing note")
@@ -429,9 +435,9 @@ func TestGroutPreviousVersionUpdateRepairRollbackAndUninstallPreserveState(t *te
 		writer.Write(data)
 	}))
 	defer server.Close()
-	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
 	old := groutTestPackage(v51, "https://github.com/example/demo/releases/download/v5.1/grout.zip", "5.1.0.0")
-	if err := manager.Install(context.Background(), old); err != nil {
+	if _, err := manager.Apply(context.Background(), OpInstall, old); err != nil {
 		t.Fatal(err)
 	}
 	for name, body := range map[string]string{"config.json": "credentials", "save_slots.json": "slots", ".cache/grout.db": "cache", "logs/grout.log": "log"} {
@@ -439,7 +445,7 @@ func TestGroutPreviousVersionUpdateRepairRollbackAndUninstallPreserveState(t *te
 	}
 	current := groutTestPackage(v52, "https://github.com/example/demo/releases/download/v5.2/grout.zip", "5.2.0.0")
 	writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList><broken></gameList>")
-	if err := manager.Update(context.Background(), current); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
+	if _, err := manager.Apply(context.Background(), OpUpdate, current); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
 		t.Fatalf("expected update rollback trigger, got %v", err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/Grout/grout", "binary 5.1")
@@ -447,16 +453,16 @@ func TestGroutPreviousVersionUpdateRepairRollbackAndUninstallPreserveState(t *te
 		assertRootFile(t, root, "userdata/roms/tools/Grout/"+name, body)
 	}
 	writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList></gameList>")
-	if err := manager.Update(context.Background(), current); err != nil {
+	if _, err := manager.Apply(context.Background(), OpUpdate, current); err != nil {
 		t.Fatal(err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/Grout/grout", "binary 5.2")
 	writeRootFile(t, root, "userdata/roms/tools/Grout/grout", "damaged")
-	if err := manager.Repair(context.Background(), current); err != nil {
+	if _, err := manager.Apply(context.Background(), OpRepair, current); err != nil {
 		t.Fatal(err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/Grout/grout", "binary 5.2")
-	if err := manager.Uninstall(current.ID); err != nil {
+	if _, err := manager.Uninstall(context.Background(), current.ID); err != nil {
 		t.Fatal(err)
 	}
 	for name, body := range map[string]string{"config.json": "credentials", "save_slots.json": "slots", ".cache/grout.db": "cache", "logs/grout.log": "log"} {
@@ -509,15 +515,15 @@ func TestAdoptBacksUpExistingFilesAndUninstallRestoresThem(t *testing.T) {
 	defer server.Close()
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
 	pkg.Install.Preserve = append(pkg.Install.Preserve, "local-config.ini", "logs")
-	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
 	preExisting, err := manager.PreExisting(pkg)
 	if err != nil || !preExisting {
 		t.Fatalf("existing package was not detected: %v, %v", preExisting, err)
 	}
-	if err := manager.Adopt(context.Background(), pkg); err != nil {
+	if _, err := manager.Apply(context.Background(), OpAdopt, pkg); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.Adopt(context.Background(), pkg); err == nil || !strings.Contains(err.Error(), "already installed") {
+	if _, err := manager.Apply(context.Background(), OpAdopt, pkg); err == nil || !strings.Contains(err.Error(), "already installed") {
 		t.Fatalf("repeated install was not rejected: %v", err)
 	}
 	baseGuard, err := safefs.NewGuard(root, []string{managerPath})
@@ -536,7 +542,7 @@ func TestAdoptBacksUpExistingFilesAndUninstallRestoresThem(t *testing.T) {
 		}
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "old launcher")
-	if err := manager.Repair(context.Background(), pkg); err != nil {
+	if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
 		t.Fatal(err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "reviewed launcher")
@@ -545,7 +551,7 @@ func TestAdoptBacksUpExistingFilesAndUninstallRestoresThem(t *testing.T) {
 	writeRootFile(t, root, "userdata/roms/tools/demo/local-config.ini", "updated local credentials")
 	writeRootFile(t, root, "userdata/roms/tools/demo/unknown/cache.db", "changed cache")
 	writeRootFile(t, root, "userdata/roms/tools/demo/logs/session.log", "new log")
-	if err := manager.Uninstall(pkg.ID); err != nil {
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
 		t.Fatal(err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "old launcher")
@@ -568,7 +574,7 @@ func TestAdoptionRejectsNonRegularExistingPaths(t *testing.T) {
 	}
 	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed"})
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	if err := (Manager{Root: root, Platform: testPlatform()}).Install(context.Background(), pkg); err == nil || !strings.Contains(err.Error(), "non-regular") {
+	if _, err := (Manager{Root: root}).WithPlatform(testPlatform()).Apply(context.Background(), OpInstall, pkg); err == nil || !strings.Contains(err.Error(), "non-regular") {
 		t.Fatalf("expected unsafe adoption rejection, got %v", err)
 	}
 }
@@ -578,7 +584,7 @@ func TestInstallRejectsAnExternalCopyAndNamesTheOnScreenAction(t *testing.T) {
 	writeRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "external copy")
 	asset := zipBytes(t, map[string]string{"launch.sh": "reviewed launcher"})
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	err := (Manager{Root: root, Platform: testPlatform()}).Install(context.Background(), pkg)
+	_, err := (Manager{Root: root}).WithPlatform(testPlatform()).Apply(context.Background(), OpInstall, pkg)
 	want := "an external installation exists; use Manage existing"
 	if err == nil || err.Error() != want {
 		t.Fatalf("external copy error = %v, want %q", err, want)
@@ -601,8 +607,8 @@ func TestForceReinstallBacksUpEverythingPreservesDataAndCanRepeat(t *testing.T) 
 		writer.WriteHeader(http.StatusNoContent)
 	}))
 	defer refreshServer.Close()
-	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server), Now: func() time.Time { return now }, RefreshClient: refreshServer.Client(), RefreshURL: refreshServer.URL}
-	if err := manager.ForceReinstall(context.Background(), pkg); err != nil {
+	manager := Manager{Root: root, Client: rewriteClient(t, server), Now: func() time.Time { return now }, RefreshClient: refreshServer.Client(), RefreshURL: refreshServer.URL}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpForceReinstall, pkg); err != nil {
 		t.Fatal(err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "reviewed launcher")
@@ -634,7 +640,7 @@ func TestForceReinstallBacksUpEverythingPreservesDataAndCanRepeat(t *testing.T) 
 		t.Fatalf("force reinstall did not create clean state: %#v, %v", status, err)
 	}
 	now = now.Add(time.Second)
-	if err := manager.ForceReinstall(context.Background(), pkg); err != nil {
+	if _, err := manager.Apply(context.Background(), OpForceReinstall, pkg); err != nil {
 		t.Fatal(err)
 	}
 	backups, err := filepath.Glob(filepath.Join(root, "userdata/system/knulli-app-store/recovery-backups/org.example.demo/*/manifest.json"))
@@ -654,7 +660,7 @@ func TestForceReinstallMandatoryChecksCannotBeBypassed(t *testing.T) {
 		want   string
 	}{
 		{name: "checksum", change: func(pkg *manifest.Package, _ *Manager, _ string) { pkg.Release.SHA256 = strings.Repeat("0", 64) }, want: "SHA-256 mismatch"},
-		{name: "compatibility", change: func(_ *manifest.Package, manager *Manager, _ string) { manager.Platform.Arch = "x86_64" }, want: "field=architecture"},
+		{name: "compatibility", change: func(_ *manifest.Package, manager *Manager, _ string) { manager.platform.Arch = "x86_64" }, want: "field=architecture"},
 		{name: "insufficient space", change: func(_ *manifest.Package, manager *Manager, _ string) {
 			manager.AvailableBytes = func(string) (uint64, error) { return 1, nil }
 		}, want: "not enough free space"},
@@ -669,9 +675,9 @@ func TestForceReinstallMandatoryChecksCannotBeBypassed(t *testing.T) {
 			server := serveAsset(t, asset)
 			defer server.Close()
 			pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-			manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
+			manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
 			test.change(&pkg, &manager, root)
-			err := manager.ForceReinstall(context.Background(), pkg)
+			_, err := manager.Apply(context.Background(), OpForceReinstall, pkg)
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("force reinstall bypassed %s: %v", test.name, err)
 			}
@@ -729,8 +735,8 @@ func TestGroutAdoptionUsesTransformedHashAndEffectiveDestinationMode(t *testing.
 	}}
 	writeRootFile(t, root, "userdata/roms/tools/Grout/grout", string(after))
 	writeRootFile(t, root, "userdata/roms/tools/Grout/Grout.sh", "launcher")
-	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
-	if err := manager.Adopt(context.Background(), pkg); err != nil {
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpAdopt, pkg); err != nil {
 		t.Fatal(err)
 	}
 	status, err := manager.Status(pkg.ID)
@@ -760,7 +766,7 @@ func TestGroutAdoptionUsesTransformedHashAndEffectiveDestinationMode(t *testing.
 	if err != nil || status.Healthy || len(status.Issues) == 0 || status.Issues[0].Expected != pkg.Install.BinaryPatches[0].SHA256 || status.Issues[0].Actual != hex.EncodeToString(changedDigest[:]) {
 		t.Fatalf("Grout health did not report full transformed hashes: %#v, %v", status, err)
 	}
-	if err := manager.Repair(context.Background(), pkg); err != nil {
+	if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
 		t.Fatal(err)
 	}
 	if status, err = manager.Status(pkg.ID); err != nil || !status.Healthy {
@@ -824,8 +830,8 @@ func TestForceReinstallRejectsArchiveTraversalAndLinks(t *testing.T) {
 			server := serveAsset(t, asset)
 			defer server.Close()
 			pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-			manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
-			if err := manager.ForceReinstall(context.Background(), pkg); err == nil {
+			manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+			if _, err := manager.Apply(context.Background(), OpForceReinstall, pkg); err == nil {
 				t.Fatal("unsafe archive passed force-reinstall validation")
 			}
 			assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "original")
@@ -860,8 +866,8 @@ func TestForceReinstallRollbackAndPowerLossRecoveryRestoreExactState(t *testing.
 	server := serveAsset(t, asset)
 	defer server.Close()
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server), Now: func() time.Time { return time.Date(2026, 9, 15, 23, 2, 0, 0, time.UTC) }}
-	if err := manager.ForceReinstall(context.Background(), pkg); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
+	manager := Manager{Root: root, Client: rewriteClient(t, server), Now: func() time.Time { return time.Date(2026, 9, 15, 23, 2, 0, 0, time.UTC) }}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpForceReinstall, pkg); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
 		t.Fatalf("expected recovered transaction followed by transactional failure, got %v", err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "before crash")
@@ -904,8 +910,8 @@ func TestLockedOperationRecoversCrashedTransaction(t *testing.T) {
 	server := serveAsset(t, asset)
 	defer server.Close()
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
-	manager := Manager{Root: root, Platform: testPlatform(), Client: rewriteClient(t, server)}
-	if err := manager.Install(context.Background(), pkg); err != nil {
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
 		t.Fatal(err)
 	}
 	assertRootFile(t, root, "userdata/system/knulli-app-store/existing", "before")
@@ -959,8 +965,28 @@ func TestCandidateCannotBeInstalled(t *testing.T) {
 	pkg.Release = nil
 	pkg.Compatibility = nil
 	pkg.Install = nil
-	if err := (Manager{}).Install(context.Background(), pkg); err == nil || !strings.Contains(err.Error(), "candidate") {
+	if _, err := (Manager{}).Apply(context.Background(), OpInstall, pkg); err == nil || !strings.Contains(err.Error(), "candidate") {
 		t.Fatalf("expected candidate rejection, got %v", err)
+	}
+}
+
+func TestApplyRejectsUnsupportedOperation(t *testing.T) {
+	pkg := testPackage("https://example.com/releases/download/v1/demo.zip", []byte("x"), "1.0.0")
+	_, err := (Manager{}).WithPlatform(testPlatform()).Apply(context.Background(), Op("uninstall"), pkg)
+	if err == nil || !strings.Contains(err.Error(), "unsupported lifecycle operation") {
+		t.Fatalf("expected unsupported operation rejection, got %v", err)
+	}
+}
+
+func TestWithPlatformCopiesSlices(t *testing.T) {
+	info := testPlatform().WithCandidates([]platform.ResolutionCandidate{{Source: "framebuffer", Width: 640, Height: 480}})
+	manager := (Manager{}).WithPlatform(info)
+	info.Dependencies[0] = "mutated"
+	candidates := info.ResolutionCandidates()
+	candidates[0].Source = "mutated"
+	bound := manager.Platform()
+	if bound.Dependencies[0] == "mutated" || bound.ResolutionCandidates()[0].Source == "mutated" {
+		t.Fatalf("bound platform aliases caller slices: %#v", bound)
 	}
 }
 

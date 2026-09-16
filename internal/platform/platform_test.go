@@ -3,6 +3,7 @@ package platform
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -26,8 +27,8 @@ func TestDetectReadsKnulliDeviceAndFramebuffer(t *testing.T) {
 	write("boot/boot/knulli.board", "trimui-smart-pro\n")
 	write("etc/knulli-device", "legacy-device\n")
 	write("sys/class/graphics/fb0/virtual_size", "1280,720\n")
-	got := Detect(root)
-	if got.Firmware != "knulli" || got.FirmwareRaw != "knulli" || got.FirmwareSource != "/etc/os-release:OS_NAME" || got.Version != "scarab" || got.VersionRaw != "scarab 2026/05/10 14:23" || got.VersionSource != "/usr/share/knulli/knulli.version" || got.Device != "trimui-smart-pro" || got.Resolution != "1280x720" {
+	got := Resolve(root)
+	if got.Firmware != "knulli" || got.Evidence(FieldFirmware).Raw != "knulli" || got.Evidence(FieldFirmware).Location != "/etc/os-release:OS_NAME" || got.Version != "scarab" || got.Evidence(FieldVersion).Raw != "scarab 2026/05/10 14:23" || got.Evidence(FieldVersion).Location != "/usr/share/knulli/knulli.version" || got.Device != "trimui-smart-pro" || got.Resolution != "1280x720" {
 		t.Fatalf("unexpected detection: %#v", got)
 	}
 }
@@ -36,8 +37,8 @@ func TestDetectUsesDeterministicCurrentThenLegacyPriority(t *testing.T) {
 	root := t.TempDir()
 	writePlatformFile(t, root, "etc/os-release", "  OS_NAME = ' KNULLI '  \nOS_VERSION=\nOS_DATE=20260510\n")
 	writePlatformFile(t, root, "etc/knulli-release", "ID=knulli\nVERSION_ID=legacy\n")
-	got := Detect(root)
-	if got.Firmware != "knulli" || got.FirmwareSource != "/etc/os-release:OS_NAME" || got.Version != "20260510" || got.VersionSource != "/etc/os-release:OS_DATE" {
+	got := Resolve(root)
+	if got.Firmware != "knulli" || got.Evidence(FieldFirmware).Location != "/etc/os-release:OS_NAME" || got.Version != "20260510" || got.Evidence(FieldVersion).Location != "/etc/os-release:OS_DATE" {
 		t.Fatalf("unexpected priority result: %#v", got)
 	}
 }
@@ -45,8 +46,8 @@ func TestDetectUsesDeterministicCurrentThenLegacyPriority(t *testing.T) {
 func TestDetectDoesNotTreatBuildrootOrMalformedVersionAsKnulli(t *testing.T) {
 	root := t.TempDir()
 	writePlatformFile(t, root, "etc/os-release", "ID=buildroot\nVERSION_ID=2025.02\nOS_NAME=other\nOS_VERSION=   \n")
-	got := Detect(root)
-	if got.Firmware != "" || got.FirmwareRaw != "other" || got.FirmwareSource != "/etc/os-release:OS_NAME" || got.Version != "" {
+	got := Resolve(root)
+	if got.Firmware != "" || got.Evidence(FieldFirmware).Raw != "other" || got.Evidence(FieldFirmware).Location != "/etc/os-release:OS_NAME" || got.Version != "" {
 		t.Fatalf("unknown firmware became compatible: %#v", got)
 	}
 }
@@ -55,9 +56,45 @@ func TestDetectUsesNarrowLegacyFallback(t *testing.T) {
 	root := t.TempDir()
 	writePlatformFile(t, root, "etc/os-release", "ID=buildroot\n")
 	writePlatformFile(t, root, "etc/knulli-release", "ID=KNULLI\nVERSION_ID=2025.2-dev-a1b2c3\n")
-	got := Detect(root)
-	if got.Firmware != "knulli" || got.FirmwareSource != "/etc/knulli-release:ID" || got.Version != "2025.2-dev-a1b2c3" {
+	got := Resolve(root)
+	if got.Firmware != "knulli" || got.Evidence(FieldFirmware).Location != "/etc/knulli-release:ID" || got.Version != "2025.2-dev-a1b2c3" {
 		t.Fatalf("legacy fallback failed: %#v", got)
+	}
+}
+
+func TestResolveAppliesOverridesWithEvidenceAndResolutionPrecedence(t *testing.T) {
+	root := t.TempDir()
+	writePlatformFile(t, root, "sys/class/graphics/fb0/virtual_size", "1280,720\n")
+	got := Resolve(root,
+		WithFirmware("knulli"),
+		WithVersion("scarab"),
+		WithArch("aarch64"),
+		WithDevice("magicx-zero-28"),
+		WithResolutionOverride("640x480"),
+	)
+	if got.Firmware != "knulli" || got.Version != "scarab" || got.Arch != "aarch64" || got.Device != "magicx-zero-28" || got.Resolution != "640x480" {
+		t.Fatalf("overrides were not applied: %#v", got)
+	}
+	if got.Evidence(FieldFirmware) != (Source{Raw: "knulli", Location: "command-line override"}) || got.Evidence(FieldVersion) != (Source{Raw: "scarab", Location: "command-line override"}) || got.Evidence(FieldResolution).Location != "command-line override" {
+		t.Fatalf("override evidence is inconsistent: %#v", got)
+	}
+	candidates := got.ResolutionCandidates()
+	if len(candidates) < 2 || candidates[0].Source != "command-line override" || candidates[1].Source != "/sys/class/graphics/fb0/virtual_size" {
+		t.Fatalf("resolution precedence is wrong: %#v", candidates)
+	}
+	got = Resolve(root, WithResolutionOverride("invalid"))
+	if got.Resolution != "1280x720" || got.Evidence(FieldResolution).Location != "/sys/class/graphics/fb0/virtual_size" {
+		t.Fatalf("invalid override did not fall back: %#v", got)
+	}
+}
+
+func TestResolveUsesGOARCHWhenArchIsNotOverridden(t *testing.T) {
+	want := runtime.GOARCH
+	if want == "arm64" {
+		want = "aarch64"
+	}
+	if got := Resolve(t.TempDir()); got.Arch != want {
+		t.Fatalf("arch = %q, want GOARCH fallback %q", got.Arch, want)
 	}
 }
 
@@ -103,7 +140,7 @@ func TestDisplayHeaderShowsFallbackStates(t *testing.T) {
 }
 
 func TestDisplayHeaderRejectsCorruptRuntimeSize(t *testing.T) {
-	info := Info{Device: "trimui-smart-pro", Resolution: "1280x720", ResolutionSource: "/sys/class/graphics/fb0/mode"}
+	info := Info{Device: "trimui-smart-pro", Resolution: "1280x720", evidence: evidence{ResolutionSource: "/sys/class/graphics/fb0/mode"}}
 	if got := DisplayHeader(info, 1280, 0x3333); got != "TrimUI Smart Pro / 1280x720 fallback" {
 		t.Fatalf("header used corrupt runtime size: %q", got)
 	}
@@ -115,8 +152,8 @@ func TestResolutionSelectionRejectsCorruptDisplayMode(t *testing.T) {
 		{Source: "SDL current display mode", Width: 1280, Height: 0x3333},
 		{Source: "/sys/class/graphics/fb0/virtual_size", Width: 1280, Height: 0x3333},
 	}
-	got := WithResolutionCandidates(Info{}, candidates)
-	if got.Resolution != "1280x720" || got.ResolutionSource != "SDL renderer output" {
+	got := Info{}.WithCandidates(candidates)
+	if got.Resolution != "1280x720" || got.Evidence(FieldResolution).Location != "SDL renderer output" {
 		t.Fatalf("selected corrupt resolution: %#v", got)
 	}
 	assessments := AssessResolutions(candidates)
@@ -131,8 +168,8 @@ func TestResolutionSelectionUsesValidatedFramebufferModeFallback(t *testing.T) {
 	root := t.TempDir()
 	writePlatformFile(t, root, "sys/class/graphics/fb0/mode", "U:1280x720p-60\n")
 	writePlatformFile(t, root, "sys/class/graphics/fb0/virtual_size", "1280,13107\n")
-	got := Detect(root)
-	if got.Resolution != "1280x720" || got.ResolutionSource != "/sys/class/graphics/fb0/mode" {
+	got := Resolve(root)
+	if got.Resolution != "1280x720" || got.Evidence(FieldResolution).Location != "/sys/class/graphics/fb0/mode" {
 		t.Fatalf("did not select framebuffer mode fallback: %#v", got)
 	}
 }
@@ -143,8 +180,8 @@ func TestResolutionSelectionBlocksUnknownWhenEveryCandidateIsInvalid(t *testing.
 		{Source: "corrupt", Width: 1280, Height: 0x3333},
 		{Source: "query", Error: "display query failed"},
 	}
-	got := WithResolutionCandidates(Info{Resolution: "1280x720"}, candidates)
-	if got.Resolution != "" || got.ResolutionSource != "" {
+	got := Info{Resolution: "1280x720"}.WithCandidates(candidates)
+	if got.Resolution != "" || got.Evidence(FieldResolution).Location != "" {
 		t.Fatalf("invalid candidates became compatible: %#v", got)
 	}
 }
@@ -178,7 +215,7 @@ func TestCheckRejectsUnknownCodenameOrderingForMinimumVersion(t *testing.T) {
 	pkg := manifest.Package{Compatibility: &manifest.Compatibility{
 		Firmware: "knulli", MinimumVersion: "2025.10", Architectures: []string{"aarch64"}, Devices: []string{"trimui-smart-pro"}, Resolutions: []string{"1280x720"},
 	}}
-	current := Info{Firmware: "knulli", FirmwareRaw: "knulli", FirmwareSource: "/etc/os-release:OS_NAME", Version: "scarab", VersionRaw: "scarab 2026/05/10 14:23", VersionSource: "/usr/share/knulli/knulli.version", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720"}
+	current := Info{Firmware: "knulli", Version: "scarab", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720", evidence: evidence{FirmwareRaw: "knulli", FirmwareSource: "/etc/os-release:OS_NAME", VersionRaw: "scarab 2026/05/10 14:23", VersionSource: "/usr/share/knulli/knulli.version"}}
 	err := Check(pkg, current)
 	for _, wanted := range []string{"field=firmware_version", `version_raw="scarab 2026/05/10 14:23"`, `version="scarab"`, `version_source="/usr/share/knulli/knulli.version"`, "ordering is unknown"} {
 		if err == nil || !strings.Contains(err.Error(), wanted) {
@@ -236,7 +273,7 @@ func TestBroadExperimentalCompatibilityRequiresEveryRuntimeConstraint(t *testing
 
 func TestCheckFailureIncludesDetectedEvidenceAndConstraint(t *testing.T) {
 	pkg := manifest.Package{Compatibility: &manifest.Compatibility{Firmware: "knulli", Architectures: []string{"aarch64"}, Devices: []string{"trimui-smart-pro"}, Resolutions: []string{"1280x720"}}}
-	current := Info{FirmwareRaw: "buildroot", FirmwareSource: "/etc/os-release:ID", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720"}
+	current := Info{Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720", evidence: evidence{FirmwareRaw: "buildroot", FirmwareSource: "/etc/os-release:ID"}}
 	err := Check(pkg, current)
 	for _, wanted := range []string{"field=firmware", `device="trimui-smart-pro"`, `architecture="aarch64"`, `resolution="1280x720"`, `firmware_raw="buildroot"`, `firmware=""`, `firmware_source="/etc/os-release:ID"`, `requires firmware="knulli"`} {
 		if err == nil || !strings.Contains(err.Error(), wanted) {
@@ -247,7 +284,7 @@ func TestCheckFailureIncludesDetectedEvidenceAndConstraint(t *testing.T) {
 
 func TestResolutionFailureIncludesSelectedSource(t *testing.T) {
 	pkg := manifest.Package{Compatibility: &manifest.Compatibility{Firmware: "knulli", Architectures: []string{"aarch64"}, Devices: []string{"trimui-smart-pro"}, Resolutions: []string{"1280x720"}}}
-	current := Info{Firmware: "knulli", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1024x600", ResolutionSource: "/sys/class/graphics/fb0/mode"}
+	current := Info{Firmware: "knulli", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1024x600", evidence: evidence{ResolutionSource: "/sys/class/graphics/fb0/mode"}}
 	err := Check(pkg, current)
 	if err == nil || !strings.Contains(err.Error(), `resolution_source="/sys/class/graphics/fb0/mode"`) {
 		t.Fatalf("resolution source missing from diagnostic: %v", err)

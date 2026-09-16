@@ -129,9 +129,9 @@ func run(arguments []string) error {
 			return fmt.Errorf("open diagnostics log: %w", err)
 		}
 		diagnosticLog.Event("startup", "component", "cli", "command", "uninstall")
-		outcome := installer.OperationOutcome{}
-		manager := installer.Manager{Root: *root, Diagnostics: diagnosticLog, Outcome: func(value installer.OperationOutcome) { outcome = value }}
-		if err := manager.UninstallContext(context.Background(), flags.Arg(0)); err != nil {
+		manager := installer.Manager{Root: *root, Diagnostics: diagnosticLog}
+		outcome, err := manager.Uninstall(context.Background(), flags.Arg(0))
+		if err != nil {
 			return err
 		}
 		fmt.Printf("uninstalled %s\n", flags.Arg(0))
@@ -178,16 +178,13 @@ func runApply(operation string, arguments []string) error {
 		return fmt.Errorf("open diagnostics log: %w", err)
 	}
 	diagnosticLog.Event("startup", "component", "cli", "command", operation)
-	current := platform.Detect(*root)
-	override(&current.Firmware, *firmware)
-	override(&current.Version, *version)
-	override(&current.Arch, *arch)
-	override(&current.Device, *device)
-	if *resolution != "" {
-		candidates := append([]platform.ResolutionCandidate{platform.ResolutionCandidateFromString("command-line override", *resolution)}, current.ResolutionCandidates...)
-		current = platform.WithResolutionCandidates(current, candidates)
-	}
-	setOverrideEvidence(&current, *firmware, *version)
+	current := platform.Resolve(*root,
+		platform.WithFirmware(*firmware),
+		platform.WithVersion(*version),
+		platform.WithArch(*arch),
+		platform.WithDevice(*device),
+		platform.WithResolutionOverride(*resolution),
+	)
 	if current.Arch == "" {
 		current.Arch = runtime.GOARCH
 	}
@@ -202,18 +199,13 @@ func runApply(operation string, arguments []string) error {
 		diagnosticLog.Event("platform_detection_incomplete", "error", err.Error())
 		return err
 	}
-	outcome := installer.OperationOutcome{}
-	manager := installer.Manager{Root: *root, Platform: current, Diagnostics: diagnosticLog, Outcome: func(value installer.OperationOutcome) { outcome = value }}
-	switch operation {
-	case "install":
-		err = manager.Install(context.Background(), pkg)
-	case "adopt":
-		err = manager.Adopt(context.Background(), pkg)
-	case "update":
-		err = manager.Update(context.Background(), pkg)
-	case "repair":
-		err = manager.Repair(context.Background(), pkg)
+	ops := map[string]installer.Op{"install": installer.OpInstall, "adopt": installer.OpAdopt, "update": installer.OpUpdate, "repair": installer.OpRepair}
+	op, known := ops[operation]
+	if !known {
+		return fmt.Errorf("unknown operation %q", operation)
 	}
+	manager := installer.Manager{Root: *root, Diagnostics: diagnosticLog}.WithPlatform(current)
+	outcome, err := manager.Apply(context.Background(), op, pkg)
 	if err != nil {
 		return err
 	}
@@ -227,22 +219,5 @@ func printGameListOutcome(outcome installer.OperationOutcome) {
 		fmt.Println("game list refresh accepted")
 	} else if outcome.RestartRequired {
 		fmt.Println("restart required to update game list")
-	}
-}
-
-func override(target *string, value string) {
-	if value != "" {
-		*target = value
-	}
-}
-
-func setOverrideEvidence(info *platform.Info, firmware, version string) {
-	if firmware != "" {
-		info.FirmwareRaw = firmware
-		info.FirmwareSource = "command-line override"
-	}
-	if version != "" {
-		info.VersionRaw = version
-		info.VersionSource = "command-line override"
 	}
 }

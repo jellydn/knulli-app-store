@@ -18,6 +18,7 @@ import (
 
 	storearchive "github.com/jellydn/knulli-app-store/internal/archive"
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
+	"github.com/jellydn/knulli-app-store/internal/gamelist"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/platform"
 	"github.com/jellydn/knulli-app-store/internal/safefs"
@@ -25,14 +26,14 @@ import (
 
 type Manager struct {
 	Root           string
-	Platform       platform.Info
 	Client         *http.Client
 	RefreshClient  *http.Client
 	RefreshURL     string
 	Diagnostics    *diagnostics.Log
-	Outcome        func(OperationOutcome)
 	Now            func() time.Time
 	AvailableBytes func(string) (uint64, error)
+
+	platform platform.Info
 }
 
 type AdoptionConflictError struct {
@@ -43,82 +44,163 @@ func (err *AdoptionConflictError) Error() string {
 	return fmt.Sprintf("adoption backup already exists for %s; move the existing package aside before retrying", err.Path)
 }
 
-func (m Manager) Install(ctx context.Context, pkg manifest.Package) error {
-	return m.apply(ctx, pkg, "install")
+// Op names one lifecycle operation applied to a package.
+type Op string
+
+const (
+	OpInstall        Op = "install"
+	OpAdopt          Op = "adopt"
+	OpUpdate         Op = "update"
+	OpRepair         Op = "repair"
+	OpForceReinstall Op = "force-reinstall"
+)
+
+// WithPlatform returns a copy of the manager bound to the given detected platform.
+func (m Manager) WithPlatform(info platform.Info) Manager {
+	m.platform = info.Clone()
+	return m
 }
 
-func (m Manager) Adopt(ctx context.Context, pkg manifest.Package) error {
-	return m.apply(ctx, pkg, "adopt")
+// Platform returns the platform this manager validates packages against.
+func (m Manager) Platform() platform.Info {
+	return m.platform
 }
 
-func (m Manager) Update(ctx context.Context, pkg manifest.Package) error {
-	return m.apply(ctx, pkg, "update")
+// Apply runs one package lifecycle operation: download, verify, and commit the
+// reviewed release, rolling back every change on failure. The outcome is
+// returned after a commit; a failed operation returns a zero outcome with the
+// error.
+func (m Manager) Apply(ctx context.Context, op Op, pkg manifest.Package) (OperationOutcome, error) {
+	switch op {
+	case OpInstall, OpAdopt, OpUpdate, OpRepair, OpForceReinstall:
+	default:
+		return OperationOutcome{}, fmt.Errorf("unsupported lifecycle operation %q", op)
+	}
+	var outcome OperationOutcome
+	err := m.apply(ctx, string(op), pkg, &outcome)
+	return outcome, err
 }
 
-func (m Manager) Repair(ctx context.Context, pkg manifest.Package) error {
-	return m.apply(ctx, pkg, "repair")
-}
-
-// ForceReinstall is a recovery operation. It uses the same validation and
-// transaction path as every other install operation, and adds a retained
-// backup of the complete pre-operation destination before replacing files.
-func (m Manager) ForceReinstall(ctx context.Context, pkg manifest.Package) error {
-	return m.apply(ctx, pkg, "force-reinstall")
-}
-
-func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation string) (result error) {
+func (m Manager) apply(ctx context.Context, operation string, pkg manifest.Package, outcome *OperationOutcome) (result error) {
 	m.event("operation_start", "package", pkg.ID, "action", operation)
 	defer func() {
 		if result != nil {
 			m.event("operation_error", "package", pkg.ID, "action", operation, "error", result.Error())
 		}
 	}()
+	// Stage 1 — preconditions: validate the request against package policy.
+	if err := m.checkPreconditions(operation, pkg); err != nil {
+		return err
+	}
+	// Stage 2 — acquire: open the manager, reconcile state, stage the release.
+	staged, err := m.stage(ctx, operation, pkg)
+	if err != nil {
+		return err
+	}
+	defer staged.release()
+	// Stage 3 — commit: apply the staged release inside one transaction.
+	return m.commit(ctx, operation, pkg, staged, outcome)
+}
+
+// checkPreconditions validates the requested operation against pure package
+// policy before any filesystem work begins.
+func (m Manager) checkPreconditions(operation string, pkg manifest.Package) error {
 	if err := pkg.Validate(); err != nil {
 		return err
 	}
 	if !pkg.Installable() {
 		return fmt.Errorf("package %s is a candidate and cannot be installed", pkg.ID)
 	}
-	if err := platform.Check(pkg, m.Platform); err != nil {
+	if err := platform.Check(pkg, m.platform); err != nil {
 		m.event("compatibility_rejected", "package", pkg.ID, "decision", err.Error())
 		return err
 	}
-	m.event("compatibility_allowed", "package", pkg.ID, "status", pkg.Review.Status, "platform", platform.Summary(m.Platform))
-	if err := validateDownloadURL(pkg.Release.URL); err != nil {
-		return err
-	}
-	baseGuard, err := safefs.NewGuard(m.root(), []string{managerPath})
-	if err != nil {
-		return err
-	}
-	managerHost, err := baseGuard.Resolve(managerPath)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Join(managerHost, "installed"), 0700); err != nil {
-		return err
-	}
-	lock, err := acquireLock(filepath.Join(managerHost, "lock"))
-	if err != nil {
-		return err
-	}
-	defer releaseLock(lock)
-	if err := safefs.Recover(m.root(), managerHost); err != nil {
-		return err
-	}
+	m.event("compatibility_allowed", "package", pkg.ID, "status", pkg.Review.Status, "platform", platform.Summary(m.platform))
+	return validateDownloadURL(pkg.Release.URL)
+}
 
-	old, err := loadState(baseGuard, pkg.ID)
+// managerSession is an acquired manager environment: the base guard, the
+// resolved manager host path, and the held exclusive lock.
+type managerSession struct {
+	guard       *safefs.Guard
+	managerHost string
+	lock        *os.File
+}
+
+func (s *managerSession) release() {
+	releaseLock(s.lock)
+}
+
+// acquireManager opens the manager directory under its base guard, takes the
+// exclusive lock, and recovers any interrupted transactions.
+func (m Manager) acquireManager() (*managerSession, error) {
+	guard, err := safefs.NewGuard(m.root(), []string{managerPath})
 	if err != nil {
-		return err
+		return nil, err
+	}
+	host, err := guard.Resolve(managerPath)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(filepath.Join(host, "installed"), 0700); err != nil {
+		return nil, err
+	}
+	lock, err := acquireLock(filepath.Join(host, "lock"))
+	if err != nil {
+		return nil, err
+	}
+	if err := safefs.Recover(m.root(), host); err != nil {
+		releaseLock(lock)
+		return nil, err
+	}
+	return &managerSession{guard: guard, managerHost: host, lock: lock}, nil
+}
+
+// stagedRelease is an acquired manager session with a verified release staged
+// in a temporary work directory.
+type stagedRelease struct {
+	session  *managerSession
+	guard    *safefs.Guard
+	old      *Installed
+	existing []existingFile
+	files    []storearchive.File
+	work     string
+}
+
+// release discards the staging directory and releases the manager lock.
+func (s *stagedRelease) release() {
+	os.RemoveAll(s.work)
+	s.session.release()
+}
+
+// stage acquires the manager, reconciles the requested operation with the
+// installed state, and downloads, verifies, and extracts the release. Any
+// failure cleans up the staging directory and the session.
+func (m Manager) stage(ctx context.Context, operation string, pkg manifest.Package) (*stagedRelease, error) {
+	session, err := m.acquireManager()
+	if err != nil {
+		return nil, err
+	}
+	staged := &stagedRelease{session: session}
+	failed := true
+	defer func() {
+		if failed {
+			staged.release()
+		}
+	}()
+
+	old, err := loadState(session.guard, pkg.ID)
+	if err != nil {
+		return nil, err
 	}
 	if (operation == "install" || operation == "adopt") && old != nil {
-		return fmt.Errorf("package %s is already installed", pkg.ID)
+		return nil, fmt.Errorf("package %s is already installed", pkg.ID)
 	}
 	if operation != "install" && operation != "adopt" && operation != "force-reinstall" && old == nil {
-		return fmt.Errorf("package %s is not installed", pkg.ID)
+		return nil, fmt.Errorf("package %s is not installed", pkg.ID)
 	}
 	if operation == "repair" && (old.Manifest.Version != pkg.Version || old.Manifest.Release.SHA256 != pkg.Release.SHA256) {
-		return fmt.Errorf("repair requires the installed release; use update for a different version")
+		return nil, fmt.Errorf("repair requires the installed release; use update for a different version")
 	}
 	allowed := append([]string{}, pkg.Install.AllowedWritePaths...)
 	if old != nil && old.Manifest.Install != nil {
@@ -127,29 +209,29 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	allowed = append(allowed, managerPath)
 	guard, err := safefs.NewGuard(m.root(), allowed)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	destinationHost, err := guard.Resolve(pkg.Install.Destination)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var existing []existingFile
 	var existingBytes uint64
 	if old == nil || operation == "force-reinstall" {
 		existing, existingBytes, err = inventoryExisting(destinationHost, pkg.Install.Destination)
 		if err != nil {
-			return fmt.Errorf("inventory pre-existing installation: %w", err)
+			return nil, fmt.Errorf("inventory pre-existing installation: %w", err)
 		}
 		m.event("adoption_inventory", "package", pkg.ID, "files", fmt.Sprint(len(existing)), "bytes", fmt.Sprint(existingBytes))
 	}
 	if operation == "install" && len(existing) > 0 {
-		return fmt.Errorf("an external installation exists; use Manage existing")
+		return nil, fmt.Errorf("an external installation exists; use Manage existing")
 	}
 	if operation == "adopt" && len(existing) == 0 {
-		return fmt.Errorf("no external installation was found; use Install")
+		return nil, fmt.Errorf("no external installation was found; use Install")
 	}
 	if operation == "force-reinstall" && len(existing) == 0 && old == nil {
-		return fmt.Errorf("no stale, partial, or external installation was found; use Install")
+		return nil, fmt.Errorf("no stale, partial, or external installation was found; use Install")
 	}
 	availableBytes := safefs.AvailableBytes
 	if m.AvailableBytes != nil {
@@ -157,17 +239,17 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	}
 	available, err := availableBytes(destinationHost)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	required := uint64(pkg.Release.Size) + uint64(pkg.Release.InstalledSize)*3 + existingBytes*2
 	if available < required {
-		return fmt.Errorf("not enough free space: need %d bytes, have %d", required, available)
+		return nil, fmt.Errorf("not enough free space: need %d bytes, have %d", required, available)
 	}
-	work, err := os.MkdirTemp(managerHost, "work-*")
+	work, err := os.MkdirTemp(session.managerHost, "work-*")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer os.RemoveAll(work)
+	staged.work = work
 	archivePath := filepath.Join(work, "release")
 	client := m.Client
 	if client == nil {
@@ -175,95 +257,76 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	}
 	m.event("download_start", "package", pkg.ID, "url", pkg.Release.URL, "expected_bytes", fmt.Sprint(pkg.Release.Size))
 	if err := download(ctx, client, *pkg.Release, archivePath); err != nil {
-		return fmt.Errorf("download release: %w", err)
+		return nil, fmt.Errorf("download release: %w", err)
 	}
 	m.event("download_verified", "package", pkg.ID, "bytes", fmt.Sprint(pkg.Release.Size), "sha256", pkg.Release.SHA256)
 	files, err := storearchive.Extract(archivePath, pkg.Release.Format, filepath.Join(work, "staging"), pkg.Install.StripComponents, pkg.Release.InstalledSize)
 	if err != nil {
-		return fmt.Errorf("extract release: %w", err)
+		return nil, fmt.Errorf("extract release: %w", err)
 	}
 	if len(files) == 0 {
-		return fmt.Errorf("release archive contains no installable files")
+		return nil, fmt.Errorf("release archive contains no installable files")
 	}
 	m.event("extraction_complete", "package", pkg.ID, "format", pkg.Release.Format, "files", fmt.Sprint(len(files)))
 	if err := applyExecutableModes(files, pkg.Install.Executables); err != nil {
-		return err
+		return nil, err
 	}
 	if err := applyBinaryPatches(files, pkg.Install.BinaryPatches); err != nil {
-		return err
+		return nil, err
 	}
 	if !containsArchiveFile(files, pkg.Install.Launcher) {
-		return fmt.Errorf("release archive does not contain launcher %s", pkg.Install.Launcher)
+		return nil, fmt.Errorf("release archive does not contain launcher %s", pkg.Install.Launcher)
 	}
+	staged.guard = guard
+	staged.old = old
+	staged.existing = existing
+	staged.files = files
+	failed = false
+	return staged, nil
+}
 
-	tx, err := safefs.Begin(guard, managerHost)
+// commit applies the staged release inside one transaction: files, menu
+// ownership, and the installed-state record are written together and rolled
+// back as one on failure.
+func (m Manager) commit(ctx context.Context, operation string, pkg manifest.Package, staged *stagedRelease, outcome *OperationOutcome) (result error) {
+	guard := staged.guard
+	old := staged.old
+	tx, err := safefs.Begin(guard, staged.session.managerHost)
 	if err != nil {
 		return err
 	}
 	m.event("transaction_begin", "package", pkg.ID, "action", operation)
 	recoveryBackupPath := ""
-	defer func() {
-		if result != nil {
-			m.event("rollback_start", "package", pkg.ID, "action", operation)
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				result = fmt.Errorf("%w; rollback also failed: %v", result, rollbackErr)
-				m.event("rollback_error", "package", pkg.ID, "error", rollbackErr.Error())
-			} else {
-				m.event("rollback_complete", "package", pkg.ID)
-			}
-			if recoveryBackupPath != "" {
-				if host, resolveErr := guard.Resolve(recoveryBackupPath); resolveErr == nil {
-					_ = os.RemoveAll(host)
-				}
-			}
-		}
-	}()
+	defer m.rollback(pkg.ID, operation, tx, guard, &recoveryBackupPath, &result)
 	var state Installed
 	if operation == "adopt" {
-		state, err = m.adoptFiles(tx, guard, pkg, files, existing)
+		state, err = m.adoptFiles(tx, guard, pkg, staged.files, staged.existing)
 	} else {
 		if operation == "force-reinstall" {
 			recoveryBackupPath = m.recoveryBackupDirectory(pkg)
-			backupErr := m.backupRecoveryDestination(tx, pkg, existing, recoveryBackupPath)
+			backupErr := m.backupRecoveryDestination(tx, pkg, staged.existing, recoveryBackupPath)
 			if backupErr != nil {
 				return backupErr
 			}
-			m.event("recovery_backup_complete", "package", pkg.ID, "path", recoveryBackupPath, "files", fmt.Sprint(len(existing)))
+			m.event("recovery_backup_complete", "package", pkg.ID, "path", recoveryBackupPath, "files", fmt.Sprint(len(staged.existing)))
 		}
-		state, err = m.installFiles(tx, guard, pkg, old, files, operation == "force-reinstall")
+		state, err = m.installFiles(tx, guard, pkg, old, staged.files, operation == "force-reinstall")
 	}
 	if err != nil {
 		return err
 	}
 	m.event("backup_complete", "package", pkg.ID, "originals", fmt.Sprint(len(state.Originals)))
-	gameListChanged := false
-	if old != nil && old.MenuOwned && old.Manifest.Install.Menu != nil && !sameMenu(old.Manifest.Install.Menu, pkg.Install.Menu) {
-		changed, menuErr := removeMenu(tx, guard, *old.Manifest.Install.Menu)
-		if menuErr != nil {
-			return menuErr
-		}
-		gameListChanged = gameListChanged || changed
+	var previous *manifest.Menu
+	if old != nil && old.MenuOwned && old.Manifest.Install.Menu != nil {
+		owned := *old.Manifest.Install.Menu
+		previous = &owned
 	}
-	if pkg.Install.Menu != nil {
-		if old != nil && old.MenuOwned && old.Manifest.Install.Menu != nil && sameMenu(old.Manifest.Install.Menu, pkg.Install.Menu) {
-			changed, menuErr := replaceMenu(tx, guard, *old.Manifest.Install.Menu, *pkg.Install.Menu)
-			if menuErr != nil {
-				return menuErr
-			}
-			state.MenuOwned = changed
-			gameListChanged = gameListChanged || changed
-		} else {
-			owned, menuErr := addMenu(tx, guard, *pkg.Install.Menu)
-			if menuErr != nil {
-				return menuErr
-			}
-			state.MenuOwned = owned
-			gameListChanged = gameListChanged || owned
-		}
+	menuChanged, menuOwned, err := gamelist.Apply(tx, guard, gamelist.Derive(previous != nil, previous, pkg.Install.Menu))
+	if err != nil {
+		return err
 	}
-	if old != nil && old.MenuOwned && pkg.Install.Menu == nil {
-		state.MenuOwned = false
-	}
+	state.MenuOwned = menuOwned
+	gameListChanged := menuChanged
 	stateData, err := encodeState(state)
 	if err != nil {
 		return err
@@ -274,7 +337,7 @@ func (m Manager) apply(ctx context.Context, pkg manifest.Package, operation stri
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	m.reportOutcome(ctx, gameListChanged)
+	*outcome = m.outcome(ctx, gameListChanged)
 	m.event("operation_complete", "package", pkg.ID, "action", operation)
 	return nil
 }
@@ -486,37 +549,28 @@ func backupExisting(tx *safefs.Transaction, guard *safefs.Guard, id string, file
 	return nil
 }
 
-func (m Manager) Uninstall(id string) error {
-	return m.UninstallContext(context.Background(), id)
+// Uninstall removes a managed package, restoring originals and releasing menu
+// ownership. The outcome is returned after the commit; a failed uninstall
+// returns a zero outcome with the error.
+func (m Manager) Uninstall(ctx context.Context, id string) (OperationOutcome, error) {
+	var outcome OperationOutcome
+	err := m.uninstall(ctx, id, &outcome)
+	return outcome, err
 }
 
-func (m Manager) UninstallContext(ctx context.Context, id string) (result error) {
+func (m Manager) uninstall(ctx context.Context, id string, outcome *OperationOutcome) (result error) {
 	m.event("operation_start", "package", id, "action", "uninstall")
 	defer func() {
 		if result != nil {
 			m.event("operation_error", "package", id, "action", "uninstall", "error", result.Error())
 		}
 	}()
-	baseGuard, err := safefs.NewGuard(m.root(), []string{managerPath})
+	session, err := m.acquireManager()
 	if err != nil {
 		return err
 	}
-	managerHost, err := baseGuard.Resolve(managerPath)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Join(managerHost, "installed"), 0700); err != nil {
-		return err
-	}
-	lock, err := acquireLock(filepath.Join(managerHost, "lock"))
-	if err != nil {
-		return err
-	}
-	defer releaseLock(lock)
-	if err := safefs.Recover(m.root(), managerHost); err != nil {
-		return err
-	}
-	state, err := loadState(baseGuard, id)
+	defer session.release()
+	state, err := loadState(session.guard, id)
 	if err != nil {
 		return err
 	}
@@ -529,22 +583,12 @@ func (m Manager) UninstallContext(ctx context.Context, id string) (result error)
 	if err != nil {
 		return err
 	}
-	tx, err := safefs.Begin(guard, managerHost)
+	tx, err := safefs.Begin(guard, session.managerHost)
 	if err != nil {
 		return err
 	}
 	m.event("transaction_begin", "package", id, "action", "uninstall")
-	defer func() {
-		if result != nil {
-			m.event("rollback_start", "package", id, "action", "uninstall")
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				result = fmt.Errorf("%w; rollback also failed: %v", result, rollbackErr)
-				m.event("rollback_error", "package", id, "error", rollbackErr.Error())
-			} else {
-				m.event("rollback_complete", "package", id)
-			}
-		}
-	}()
+	defer m.rollback(id, "uninstall", tx, nil, nil, &result)
 	for _, file := range state.Files {
 		if file.Preserved || file.Unmanaged {
 			continue
@@ -567,9 +611,10 @@ func (m Manager) UninstallContext(ctx context.Context, id string) (result error)
 	}
 	gameListChanged := false
 	if state.MenuOwned && state.Manifest.Install.Menu != nil {
-		changed, menuErr := removeMenu(tx, guard, *state.Manifest.Install.Menu)
-		if menuErr != nil {
-			return menuErr
+		menu := *state.Manifest.Install.Menu
+		changed, _, err := gamelist.Apply(tx, guard, gamelist.Derive(true, &menu, nil))
+		if err != nil {
+			return err
 		}
 		gameListChanged = changed
 	}
@@ -584,9 +629,29 @@ func (m Manager) UninstallContext(ctx context.Context, id string) (result error)
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	m.reportOutcome(ctx, gameListChanged)
+	*outcome = m.outcome(ctx, gameListChanged)
 	m.event("operation_complete", "package", id, "action", "uninstall")
 	return nil
+}
+
+// rollback rolls the transaction back when the operation failed, folding any
+// rollback failure into the operation error.
+func (m Manager) rollback(id, action string, tx *safefs.Transaction, guard *safefs.Guard, cleanupPath *string, result *error) {
+	if *result == nil {
+		return
+	}
+	m.event("rollback_start", "package", id, "action", action)
+	if rollbackErr := tx.Rollback(); rollbackErr != nil {
+		*result = fmt.Errorf("%w; rollback also failed: %v", *result, rollbackErr)
+		m.event("rollback_error", "package", id, "error", rollbackErr.Error())
+	} else {
+		m.event("rollback_complete", "package", id)
+	}
+	if guard != nil && cleanupPath != nil && *cleanupPath != "" {
+		if host, err := guard.Resolve(*cleanupPath); err == nil {
+			_ = os.RemoveAll(host)
+		}
+	}
 }
 
 func (m Manager) event(name string, fields ...string) {
@@ -704,45 +769,6 @@ func isPreserved(relative string, preserved []string) bool {
 	return false
 }
 
-func addMenu(tx *safefs.Transaction, guard *safefs.Guard, menu manifest.Menu) (bool, error) {
-	return changeMenu(tx, guard, menu.Gamelist, func(data []byte) ([]byte, bool, error) {
-		return addMenuEntry(data, menu)
-	})
-}
-
-func replaceMenu(tx *safefs.Transaction, guard *safefs.Guard, oldMenu, newMenu manifest.Menu) (bool, error) {
-	return changeMenu(tx, guard, newMenu.Gamelist, func(data []byte) ([]byte, bool, error) {
-		return replaceOwnedMenuEntry(data, oldMenu, newMenu)
-	})
-}
-
-func removeMenu(tx *safefs.Transaction, guard *safefs.Guard, menu manifest.Menu) (bool, error) {
-	return changeMenu(tx, guard, menu.Gamelist, func(data []byte) ([]byte, bool, error) {
-		return removeOwnedMenuEntry(data, menu)
-	})
-}
-
-func changeMenu(tx *safefs.Transaction, guard *safefs.Guard, gamelist string, change func([]byte) ([]byte, bool, error)) (bool, error) {
-	host, err := guard.Resolve(gamelist)
-	if err != nil {
-		return false, err
-	}
-	data, err := os.ReadFile(host)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return false, err
-		}
-	}
-	updated, changed, err := change(data)
-	if err != nil {
-		return false, err
-	}
-	if !changed {
-		return false, nil
-	}
-	return true, tx.Write(gamelist, updated, 0644)
-}
-
 func originalPath(id, target string) string {
 	digest := sha256.Sum256([]byte(target))
 	return managerPath + "/originals/" + id + "/" + hex.EncodeToString(digest[:])
@@ -763,13 +789,6 @@ func stringSet(values []string) map[string]bool {
 		set[value] = true
 	}
 	return set
-}
-
-func sameMenu(left, right *manifest.Menu) bool {
-	if left == nil || right == nil {
-		return left == right
-	}
-	return left.Gamelist == right.Gamelist && left.Path == right.Path
 }
 
 func (m Manager) root() string {
