@@ -28,6 +28,7 @@ import (
 	"image"
 	"image/png"
 	"os"
+	"path/filepath"
 	"runtime"
 	"time"
 	"unsafe"
@@ -54,7 +55,20 @@ type Options struct {
 	// Input selects the source. The zero value is the device default: an SDL
 	// GameController, or a blocked screen when none is attached.
 	Input InputMode
+	// Keys is a scripted key sequence for a walkthrough run. An empty sequence
+	// is an interactive run.
+	Keys []Key
+	// ShotDir collects one frame per walkthrough step, plus the walk.tsv record
+	// that names the screen each key reached.
+	ShotDir string
+	// WalkTimeout bounds a walkthrough run, so a stuck flow fails instead of
+	// hanging. Zero means no bound.
+	WalkTimeout time.Duration
 }
+
+// walkSettleFrames is how many idle frames a walkthrough renders after its last
+// key before it ends, so the final screen is settled when it is captured.
+const walkSettleFrames = 3
 
 func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	runtime.LockOSThread()
@@ -129,6 +143,16 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 			C.SDL_GameControllerClose(controller.handle)
 		}
 	}()
+	walk := NewWalkRunner(options.Keys, walkSettleFrames)
+	walkLog, err := openWalkLog(walk, options.ShotDir)
+	if err != nil {
+		return err
+	}
+	defer closeWalkLog(walkLog)
+	var deadline time.Time
+	if walk != nil && options.WalkTimeout > 0 {
+		deadline = time.Now().Add(options.WalkTimeout)
+	}
 	ticker := time.NewTicker(time.Second / 30)
 	defer ticker.Stop()
 	for {
@@ -152,11 +176,71 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 		if options.Screenshot != "" {
 			return saveOutputScreenshot(options.Screenshot, frame, outputWidth, outputHeight)
 		}
+		if walk != nil {
+			shot, capture := walk.Capture(WalkState(model, controls), model.Busy)
+			if capture && walkLog != nil {
+				if err := saveOutputScreenshot(filepath.Join(options.ShotDir, shot.File), frame, outputWidth, outputHeight); err != nil {
+					return err
+				}
+				if _, err := walkLog.WriteString(WalkRecord(shot, WalkDetail(model, controls))); err != nil {
+					return err
+				}
+			}
+			if key, ok := walk.Step(model.Busy); ok {
+				// The key goes through the same handler as a real keystroke, so a
+				// walkthrough reaches the same screens a user would.
+				if Handle(ctx, model, controls, options.Diagnostics, Event{Kind: EventKey, Key: key}).Exit {
+					walkFinished(options, walk)
+					return nil
+				}
+			}
+			if walk.Done(model.Busy) {
+				walkFinished(options, walk)
+				return nil
+			}
+			if !deadline.IsZero() && time.Now().After(deadline) {
+				return fmt.Errorf("walkthrough timed out after %s: sent %d of %d keys, captured %d frames", options.WalkTimeout, walk.Sent(), len(options.Keys), walk.Steps())
+			}
+		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
 		}
+	}
+}
+
+// openWalkLog creates the walkthrough evidence record. A run without a scripted
+// sequence, or without an evidence directory, writes no record.
+func openWalkLog(walk *WalkRunner, directory string) (*os.File, error) {
+	if walk == nil || directory == "" {
+		return nil, nil
+	}
+	if err := os.MkdirAll(directory, 0755); err != nil {
+		return nil, err
+	}
+	log, err := os.Create(filepath.Join(directory, "walk.tsv"))
+	if err != nil {
+		return nil, err
+	}
+	if _, err := log.WriteString(WalkHeader); err != nil {
+		closeWalkLog(log)
+		return nil, err
+	}
+	return log, nil
+}
+
+func closeWalkLog(log *os.File) {
+	if log != nil {
+		log.Close()
+	}
+}
+
+// walkFinished records what the walkthrough actually did, so the evidence is
+// self-describing.
+func walkFinished(options Options, walk *WalkRunner) {
+	if walk != nil {
+		options.Diagnostics.Event("walkthrough_complete", "keys", fmt.Sprint(walk.Sent()), "frames", fmt.Sprint(walk.Steps()))
 	}
 }
 
