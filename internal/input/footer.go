@@ -23,7 +23,7 @@ const (
 	VerbSelect      = "Confirm"
 	VerbBack        = "Back"
 	VerbSettings    = "Settings"
-	VerbExit        = "Exit"
+	VerbExit        = "Quit"
 	VerbAnyButton   = "PRESS ANY BUTTON"
 	VerbShownButton = "PRESS EACH SHOWN BUTTON"
 )
@@ -75,14 +75,41 @@ func ActionLabel(action Action) string {
 // Footer renders one footer line as "VERB (BUTTON)" pairs. It is the single
 // place a physical button label is written, which keeps every screen
 // consistent and free of duplicated hints.
-func Footer(mapping Mapping, hints []Hint) string {
+//
+// The quit hint is the one action no button carries on its own, so the caller
+// passes the chord it is actually listening for ("SELECT + Y", "TAB + Y"). An
+// empty chord leaves that hint out rather than printing a button that does
+// nothing.
+func Footer(mapping Mapping, hints []Hint, chord string) string {
 	parts := make([]string, 0, len(hints))
 	for _, hint := range hints {
-		if hint.Action == "" {
+		switch {
+		case hint.Action == "":
 			parts = append(parts, hint.Verb)
-			continue
+		case hint.Action == Exit:
+			if chord != "" {
+				parts = append(parts, hint.Verb+" ("+chord+")")
+			}
+		default:
+			parts = append(parts, hint.Verb+" ("+ButtonLabel(mapping[hint.Action])+")")
 		}
-		parts = append(parts, hint.Verb+" ("+ButtonLabel(mapping[hint.Action])+")")
 	}
 	return strings.Join(parts, "  ")
+}
+
+// QuitChord names the held anchor that turns the next trigger press into the
+// quit, in the order the user presses it. The anchor is the input source's own
+// Select key — the pad's SELECT button or the keyboard's Tab — and the trigger
+// is whatever button the active mapping gives the Settings action, so a
+// customized pad keeps reading its own labels.
+func QuitChord(mapping Mapping, source string) string {
+	anchor := "SELECT"
+	if source == KeyboardSourceName {
+		anchor = "TAB"
+	}
+	trigger, ok := mapping[Diagnostics]
+	if !ok {
+		return ""
+	}
+	return anchor + " + " + ButtonLabel(trigger)
 }

@@ -5,6 +5,7 @@ package sdlui
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"image"
 	"os"
 	"path/filepath"
@@ -372,7 +373,7 @@ func TestRenderControllerPreviewAndBlockedState(t *testing.T) {
 
 func TestControllerSetupProgress(t *testing.T) {
 	controls := storeinput.NewSession(t.TempDir(), "magicx-zero-28")
-	if got := controllerSetupProgress(controls); got != "PROGRESS  0 OF 8 ACTIONS" {
+	if got := controllerSetupProgress(controls); got != fmt.Sprintf("PROGRESS  0 OF %d ACTIONS", len(storeinput.Actions)) {
 		t.Fatalf("unexpected blocked progress: %q", got)
 	}
 	controls.Connect(storeinput.Identity{GUID: "one", Name: "Pad"}, true)
@@ -380,7 +381,7 @@ func TestControllerSetupProgress(t *testing.T) {
 	controls.Calibration = storeinput.NewPreview(storeinput.AutoMapping())
 	controls.Calibration.Test(storeinput.AutoMapping()[storeinput.Up])
 	controls.Calibration.Test(storeinput.AutoMapping()[storeinput.Confirm])
-	if got := controllerSetupProgress(controls); got != "PROGRESS  2 OF 8 ACTIONS" {
+	if got := controllerSetupProgress(controls); got != fmt.Sprintf("PROGRESS  2 OF %d ACTIONS", len(storeinput.Actions)) {
 		t.Fatalf("unexpected preview progress: %q", got)
 	}
 }

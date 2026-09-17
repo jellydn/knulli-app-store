@@ -95,25 +95,28 @@ A flow is a key sequence:
   -walk-timeout 60s
 ```
 
-- `-keys` accepts `up`, `down`, `left`, `right`, `enter`, `esc`, `y`, `q`, in
+- `-keys` accepts `up`, `down`, `left`, `right`, `enter`, `esc`, `y`, `tab`, in
   the order to press them. Each key goes through the same handler as a real
-  keystroke, so a walkthrough reaches the same screens a user does.
+  keystroke, so a walkthrough reaches the same screens a user does. `tab` holds
+  the quit chord's anchor, so a flow that quits ends with `tab,y`, the desktop
+  spelling of holding Select and pressing Y.
 - `-shot-dir` keeps the opening frame, each post-key frame, any
   operation-completion frames, and a `walk.tsv` record. It needs `-keys`:
   without a sequence there is no walkthrough to capture. A key waits for any
   operation it started, so an install finishes before the next key.
 - `-walk-timeout` fails a stuck flow instead of hanging a runner.
-- The run ends when the sequence is spent. An exit key must be the final key;
-  an early exit fails and records its final frame.
+- The run ends when the sequence is spent. A quit must be the final key; an
+  early quit fails and records its final frame.
 
 | Flow | Covers |
 | --- | --- |
 | `first-run-use-detected` | Setup, saving the detected mapping |
-| `first-run-test-detected` | Setup, preview, testing all eight actions, save |
+| `first-run-test-detected` | Setup, preview, testing all seven actions, save |
 | `first-run-customize` | Calibration, assignment review, preview, save |
 | `first-run-safe-exit` | Leaving setup without a mapping |
 | `catalogue-walk` | Catalogue, details, action list, confirmation, back out |
 | `catalogue-read-only` | A candidate package that offers no action |
+| `quit-chord` | Escape at the catalogue does not leave; a held Tab plus Y does |
 | `settings-export-diagnostics` | Settings and a diagnostics export |
 | `blocked-export-diagnostics` | The blocked screen with no controller at all |
 | `install-package` | Download, verify, apply, and the progress screen (`--install`) |
@@ -152,10 +155,12 @@ artifact is useful evidence when a device run is not available.
 | Confirm | Enter |
 | Back | Escape |
 | Diagnostics | Y |
-| Exit | Q |
+| Quit | Tab (or F5) held, then Y |
 
-These are a binding set like any other, so the footer and the mapping summary
-name them: `Confirm (ENTER)  Back (ESC)  Settings (Y)`. Keyboard codes
+The seven actions above Quit are a binding set like any other, so the footer and
+the mapping summary name them: `Confirm (ENTER)  Settings (Y)  Quit (TAB + Y)`.
+Quitting is deliberately not one of them: it is the Select chord, the one thing
+no single key carries. Keyboard codes
 sit above every SDL GameController button, so a key is never mistaken for a pad
 button.
 

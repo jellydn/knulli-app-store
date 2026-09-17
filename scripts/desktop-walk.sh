@@ -152,12 +152,12 @@ walk first-run-use-detected keyboard \
   "setup,catalogue"
 
 walk first-run-test-detected keyboard \
-  "down,enter,up,down,left,right,enter,esc,y,q" \
+  "down,enter,up,down,left,right,enter,esc,y,tab,y" \
   "setup,preview,catalogue" \
   "Controller mapping tested and saved"
 
 walk first-run-customize keyboard \
-  "down,down,enter,up,enter,down,enter,left,enter,right,enter,enter,enter,esc,enter,y,enter,q,enter,up,down,left,right,enter,esc,y,q" \
+  "down,down,enter,up,enter,down,enter,left,enter,right,enter,enter,enter,esc,enter,y,enter,up,down,left,right,enter,esc,y,tab,y" \
   "setup,calibration,assignment-review,preview,catalogue" \
   "Controller mapping tested and saved"
 
@@ -167,7 +167,7 @@ walk first-run-safe-exit keyboard \
 
 # Catalogue, package details, the action list, and the confirmation dialog.
 walk catalogue-walk keyboard \
-  "enter,down,up,enter,enter,esc,esc,q" \
+  "enter,down,up,enter,enter,esc,esc,tab,y" \
   "setup,catalogue,actions,confirm"
 
 # A read-only package offers no action and says so. Only compatible packages
@@ -177,15 +177,22 @@ walk catalogue-read-only keyboard \
   "setup,catalogue" \
   "No safe action is available"
 
+# Leaving is the Select chord and nothing else: Escape at the catalogue does
+# not leave it, and a held Tab plus Y does.
+walk quit-chord keyboard \
+  "enter,esc,tab,y" \
+  "setup,catalogue"
+
 # Settings: export diagnostics writes a bundle below the scratch root.
 walk settings-export-diagnostics keyboard \
   "enter,y,down,enter,esc" \
   "setup,catalogue,settings" \
   "Diagnostics saved to"
 
-# No controller at all: the blocked screen still exports and still leaves.
+# No controller at all: the blocked screen still exports and still leaves
+# through the quit chord.
 walk blocked-export-diagnostics auto \
-  "enter,esc" \
+  "enter,tab,y" \
   "blocked" \
   "Diagnostics saved to"
 

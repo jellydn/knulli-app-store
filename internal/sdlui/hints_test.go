@@ -28,7 +28,9 @@ func normalControls(t *testing.T) *storeinput.Session {
 func TestCatalogueFooterUsesOneCanonicalHint(t *testing.T) {
 	controls := normalControls(t)
 	model := catalogueModel()
-	if got := footerText(model, controls); got != "Confirm (A)  Back (B)  Settings (Y)" {
+	// The catalogue is the top of the app: nothing sits behind it, so Back is
+	// absent and the way out is the Select chord.
+	if got := footerText(model, controls); got != "Confirm (A)  Settings (Y)  Quit (SELECT + Y)" {
 		t.Fatalf("catalogue footer = %q", got)
 	}
 	model.Focus = storeui.Confirm
@@ -42,7 +44,7 @@ func TestCatalogueFooterUsesOneCanonicalHint(t *testing.T) {
 }
 
 func TestEmptyCatalogueFooterDropsUnavailableActions(t *testing.T) {
-	if got := footerText(&storeui.Model{}, normalControls(t)); got != "Back (B)  Settings (Y)" {
+	if got := footerText(&storeui.Model{}, normalControls(t)); got != "Settings (Y)  Quit (SELECT + Y)" {
 		t.Fatalf("empty catalogue footer = %q", got)
 	}
 }
@@ -60,7 +62,7 @@ func TestFooterLabelsFollowTheActiveMapping(t *testing.T) {
 	controls.Mapping = storeinput.AutoMapping()
 	controls.Mapping[storeinput.Confirm] = 2
 	controls.Mapping[storeinput.Back] = 0
-	if got := footerText(catalogueModel(), controls); got != "Confirm (X)  Back (A)  Settings (Y)" {
+	if got := footerText(catalogueModel(), controls); got != "Confirm (X)  Settings (Y)  Quit (SELECT + Y)" {
 		t.Fatalf("footer ignored the custom mapping: %q", got)
 	}
 }
@@ -71,7 +73,7 @@ func TestFirstRunSetupFooterOffersTheDetectedBinding(t *testing.T) {
 	if controls.Mode != storeinput.Setup || !controls.FirstRun {
 		t.Fatalf("connect did not open first-run setup: mode=%q", controls.Mode)
 	}
-	if got := footerText(catalogueModel(), controls); got != "Confirm (A)  Exit (START)" {
+	if got := footerText(catalogueModel(), controls); got != "Confirm (A)  Quit (SELECT + Y)" {
 		t.Fatalf("first-run footer = %q", got)
 	}
 }

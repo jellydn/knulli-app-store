@@ -10,7 +10,7 @@ const (
 	KeyEnter      = 100
 	KeyEscape     = 101
 	KeyY          = 102
-	KeyQ          = 103
+	KeyTab        = 103
 	KeyArrowUp    = 104
 	KeyArrowDown  = 105
 	KeyArrowLeft  = 106
@@ -28,7 +28,7 @@ var keyboardLabels = map[int]string{
 	KeyEnter:      "ENTER",
 	KeyEscape:     "ESC",
 	KeyY:          "Y",
-	KeyQ:          "Q",
+	KeyTab:        "TAB",
 	KeyArrowUp:    "UP",
 	KeyArrowDown:  "DOWN",
 	KeyArrowLeft:  "LEFT",
@@ -36,10 +36,12 @@ var keyboardLabels = map[int]string{
 }
 
 // KeyboardMapping is the binding set a desktop run detects for a keyboard.
+// KeyTab is the chord anchor rather than a bound action: holding it turns the
+// next Y into the quit chord, exactly as holding Select does on a pad.
 func KeyboardMapping() Mapping {
 	return Mapping{
 		Up: KeyArrowUp, Down: KeyArrowDown, Left: KeyArrowLeft, Right: KeyArrowRight,
-		Confirm: KeyEnter, Back: KeyEscape, Diagnostics: KeyY, Exit: KeyQ,
+		Confirm: KeyEnter, Back: KeyEscape, Diagnostics: KeyY,
 	}
 }
 

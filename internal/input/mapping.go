@@ -19,14 +19,18 @@ const (
 	Exit        Action = "exit"
 )
 
-var Actions = []Action{Up, Down, Left, Right, Confirm, Back, Diagnostics, Exit}
+// Actions is every action a user binds during controller setup. Exit is
+// deliberately absent: quitting is the Select+Y chord the input layer reads
+// from held state, so no single button can end a session by accident and no
+// mapping can claim to be the way out.
+var Actions = []Action{Up, Down, Left, Right, Confirm, Back, Diagnostics}
 
 type Mapping map[Action]int
 
 func AutoMapping() Mapping {
 	return Mapping{
 		Up: 11, Down: 12, Left: 13, Right: 14,
-		Confirm: 0, Back: 1, Diagnostics: 3, Exit: 6,
+		Confirm: 0, Back: 1, Diagnostics: 3,
 	}
 }
 
@@ -61,6 +65,20 @@ func (mapping Mapping) Clone() Mapping {
 	result := make(Mapping, len(mapping))
 	for action, button := range mapping {
 		result[action] = button
+	}
+	return result
+}
+
+// KeepKnown drops every entry that is not a bindable action. A mapping saved
+// before quitting became a chord still carries its own exit button; loading it
+// through this filter migrates the record instead of rejecting it, so an
+// upgraded app does not force every user back through controller setup.
+func (mapping Mapping) KeepKnown() Mapping {
+	result := make(Mapping, len(Actions))
+	for _, action := range Actions {
+		if button, ok := mapping[action]; ok {
+			result[action] = button
+		}
 	}
 	return result
 }

@@ -23,7 +23,7 @@ var keySpecs = map[string]Key{
 	"enter": KeyConfirm,
 	"esc":   KeyBack,
 	"y":     KeyDiagnostics,
-	"q":     KeyExit,
+	"tab":   KeyChordAnchor,
 }
 
 // KeyName is the -keys spelling of a key, and the spelling used in an evidence
@@ -59,7 +59,7 @@ func ParseKeys(specification string) ([]Key, error) {
 
 // KeyNames lists every accepted key spelling, in a stable order.
 func KeyNames() []string {
-	return []string{"up", "down", "left", "right", "enter", "esc", "y", "q"}
+	return []string{"up", "down", "left", "right", "enter", "esc", "y", "tab"}
 }
 
 // WalkState names the screen a rendered frame shows. The input session owns the

@@ -52,6 +52,10 @@ type Session struct {
 	PendingSource   string
 	Message         string
 	ValidationError string
+	// ChordHeld is the quit chord's anchor: the input source's own Select key
+	// (the pad's SELECT button, the keyboard's Tab) is down. It is held state,
+	// not a binding, so no mapping can claim to be the way out.
+	ChordHeld bool
 }
 
 // sourceGameController and sourceKnulli name the SDL sources a session detects.
@@ -102,6 +106,7 @@ func (session *Session) connect(identity Identity, source string) {
 	}
 	session.Identity = identity
 	session.Connected = true
+	session.ChordHeld = false
 	session.Mapping = session.detected().Clone()
 	session.Source = source
 	session.AutoSource = source
@@ -133,6 +138,7 @@ func (session *Session) Disconnect() {
 	session.Mode = Blocked
 	session.Calibration = nil
 	session.FirstRun = true
+	session.ChordHeld = false
 	session.Message = "No SDL GameController is available"
 }
 
@@ -144,7 +150,27 @@ func (session *Session) OpenSetup() {
 	session.openSetup(false)
 }
 
+// SetChordAnchor records whether the input source's Select key is down. A
+// release hands the trigger button back its own action, so a stuck anchor can
+// never turn an ordinary press into a quit.
+func (session *Session) SetChordAnchor(held bool) {
+	session.ChordHeld = held
+}
+
+// QuitChord is the chord the current screen listens for. The footer shows it
+// instead of a button label, because quitting is the one action no button
+// carries on its own.
+func (session *Session) QuitChord() string {
+	return QuitChord(session.ScreenMapping(), session.Source)
+}
+
 func (session *Session) HandleButton(button int) (Action, Effect) {
+	// The quit chord outranks every screen, calibration included: a held anchor
+	// plus the trigger is a way out of anywhere.
+	if session.ChordHeld && button == session.activeMapping()[Diagnostics] {
+		session.ChordHeld = false
+		return Exit, NoEffect
+	}
 	if !session.Connected || session.Mode == Blocked {
 		return session.handleBlocked(button)
 	}
@@ -175,20 +201,18 @@ func (session *Session) HandleButton(button int) (Action, Effect) {
 }
 
 func (session *Session) handleBlocked(button int) (Action, Effect) {
-	// Keyboard still reaches this path when no GameController exists.
-	// Confirm exports diagnostics. Back and Exit leave. Catalogue navigation stays closed.
+	// Keyboard still reaches this path when no GameController exists. Confirm
+	// exports diagnostics and the quit chord (checked before this screen) is
+	// the way out; nothing here can end the session on its own. Catalogue
+	// navigation stays closed.
 	action, ok := session.activeMapping().Action(button)
 	if !ok {
 		return "", NoEffect
 	}
-	switch action {
-	case Confirm:
+	if action == Confirm {
 		return "", ExportDiagnostics
-	case Back, Exit:
-		return Exit, NoEffect
-	default:
-		return "", NoEffect
 	}
+	return "", NoEffect
 }
 
 func (session *Session) handleSetup(button int) (Action, Effect) {
@@ -202,9 +226,11 @@ func (session *Session) handleSetup(button int) (Action, Effect) {
 		session.SetupIndex = wrap(session.SetupIndex-1, len(SetupItems))
 	case Down, Right:
 		session.SetupIndex = wrap(session.SetupIndex+1, len(SetupItems))
-	case Back, Exit:
+	case Back:
 		if session.FirstRun {
-			return Exit, NoEffect
+			// A first run has nothing to go back to. Leaving is the quit chord
+			// or the SAFE EXIT item, both deliberate choices.
+			return "", NoEffect
 		}
 		session.Mode = Settings
 	case Confirm:
@@ -247,7 +273,7 @@ func (session *Session) handleReview(button int) (Action, Effect) {
 		session.ReviewIndex = wrap(session.ReviewIndex-1, len(ReviewItems))
 	case Down, Right:
 		session.ReviewIndex = wrap(session.ReviewIndex+1, len(ReviewItems))
-	case Back, Exit:
+	case Back:
 		session.cancelCalibration()
 	case Confirm:
 		switch session.ReviewIndex {
@@ -292,7 +318,7 @@ func (session *Session) handleSettings(button int) (Action, Effect) {
 		session.SettingsIndex = wrap(session.SettingsIndex-1, len(SettingsItems))
 	case Down, Right:
 		session.SettingsIndex = wrap(session.SettingsIndex+1, len(SettingsItems))
-	case Back, Exit:
+	case Back:
 		session.Mode = Normal
 	case Confirm:
 		switch session.SettingsIndex {

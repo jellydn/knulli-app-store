@@ -114,7 +114,9 @@ func (m *Model) Back() bool {
 	case Health:
 		m.Focus = Browse
 	default:
-		return true
+		// Leaving the app belongs to the quit chord, never to a single Back
+		// press. With nothing left to step back to, Back does nothing.
+		return false
 	}
 	m.Message = ""
 	m.Error = ""

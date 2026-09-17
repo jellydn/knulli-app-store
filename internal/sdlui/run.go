@@ -158,12 +158,16 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	ticker := time.NewTicker(time.Second / 30)
 	defer ticker.Stop()
 	exitRequested := false
+	var repeat NavRepeat
 	for {
 		var event C.SDL_Event
 		for C.SDL_PollEvent(&event) != 0 {
 			if handleEvent(ctx, model, &event, &controller, controls, options.Diagnostics, options.Input) {
 				return nil
 			}
+		}
+		if !options.Input.IsKeyboard() {
+			repeatHeldDirection(ctx, model, controls, controller, options.Diagnostics, &repeat)
 		}
 		model.Poll()
 		frame := draw(model, platformHeader, controls)
@@ -295,8 +299,15 @@ func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, 
 	case C.SDL_QUIT:
 		return Handle(ctx, model, controls, logger, Event{Kind: EventQuit}).Exit
 	case C.SDL_KEYDOWN:
-		if C.event_key_repeat(event) != 0 {
-			return false
+		// The quit chord's anchor is held state, not an action: Tab (or F5, the
+		// key a desktop hand reaches for) turns the next Y into the quit, the
+		// way holding Select does on a pad. It is handled before the translation
+		// below, which drops a repeated anchor.
+		if C.event_key_repeat(event) == 0 {
+			switch C.event_key(event) {
+			case C.SDLK_TAB, C.SDLK_F5:
+				return Handle(ctx, model, controls, logger, Event{Kind: EventChordAnchor, Held: true}).Exit
+			}
 		}
 		var key Key
 		switch C.event_key(event) {
@@ -314,18 +325,36 @@ func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, 
 			key = KeyBack
 		case C.SDLK_y:
 			key = KeyDiagnostics
-		case C.SDLK_q:
-			key = KeyExit
 		}
 		if key == KeyNone {
 			return false
 		}
-		return Handle(ctx, model, controls, logger, Event{Kind: EventKey, Key: key}).Exit
+		// A key repeat reaches Handle marked as one, which lets only navigation
+		// answer it: a held Enter must not confirm twice.
+		return Handle(ctx, model, controls, logger, Event{Kind: EventKey, Key: key, Repeat: C.event_key_repeat(event) != 0}).Exit
+	case C.SDL_KEYUP:
+		switch C.event_key(event) {
+		case C.SDLK_TAB, C.SDLK_F5:
+			return Handle(ctx, model, controls, logger, Event{Kind: EventChordAnchor, Held: false}).Exit
+		}
+		return false
 	case C.SDL_CONTROLLERBUTTONDOWN:
 		if *controller == nil || C.event_controller_which(event) != (*controller).instanceID {
 			return false
 		}
-		return Handle(ctx, model, controls, logger, Event{Kind: EventButton, Button: int(C.event_controller_button(event))}).Exit
+		button := int(C.event_controller_button(event))
+		if button == chordAnchorButton {
+			return Handle(ctx, model, controls, logger, Event{Kind: EventChordAnchor, Held: true}).Exit
+		}
+		return Handle(ctx, model, controls, logger, Event{Kind: EventButton, Button: button}).Exit
+	case C.SDL_CONTROLLERBUTTONUP:
+		if *controller == nil || C.event_controller_which(event) != (*controller).instanceID {
+			return false
+		}
+		if int(C.event_controller_button(event)) == chordAnchorButton {
+			return Handle(ctx, model, controls, logger, Event{Kind: EventChordAnchor, Held: false}).Exit
+		}
+		return false
 	case C.SDL_CONTROLLERDEVICEREMOVED:
 		if *controller != nil && C.event_device_which(event) == (*controller).instanceID {
 			logger.Event("controller_disconnected", "name", (*controller).identity.Name, "guid", (*controller).identity.GUID)
@@ -370,6 +399,46 @@ func connectController(ctx context.Context, model *storeui.Model, controls *stor
 		return
 	}
 	Handle(ctx, model, controls, logger, Event{Kind: EventControllerConnected, Identity: controller.identity, KnulliMapping: os.Getenv("SDL_GAMECONTROLLERCONFIG") != ""})
+}
+
+// chordAnchorButton is SDL's SELECT/BACK button, the pad's own Select key. It
+// is deliberately outside the semantic mapping: quitting is the app's escape
+// hatch, not an action a user can bind, and holding it alone does nothing.
+const chordAnchorButton = 4
+
+// heldDirection reports the direction a pad is holding right now, if any. The
+// adapter polls this instead of tracking button releases, which is what lets a
+// dropped release event leave nothing stuck.
+func heldDirection(controller *controllerState, mapping storeinput.Mapping) storeinput.Action {
+	for _, action := range []storeinput.Action{storeinput.Up, storeinput.Down, storeinput.Left, storeinput.Right} {
+		button, ok := mapping[action]
+		if !ok {
+			continue
+		}
+		if C.controller_button(controller.handle, C.int(button)) != 0 {
+			return action
+		}
+	}
+	return ""
+}
+
+// repeatHeldDirection feeds the pad's held direction to the repeat schedule and
+// re-dispatches the direction through the same handler a press uses, so a
+// repeat reaches the screen the press did.
+func repeatHeldDirection(ctx context.Context, model *storeui.Model, controls *storeinput.Session, controller *controllerState, logger *diagnostics.Log, repeat *NavRepeat) {
+	var direction storeinput.Action
+	if controller != nil {
+		direction = heldDirection(controller, controls.ScreenMapping())
+	}
+	action, due := repeat.Held(direction, time.Now())
+	if !due {
+		return
+	}
+	button, ok := controls.ScreenMapping()[action]
+	if !ok {
+		return
+	}
+	Handle(ctx, model, controls, logger, Event{Kind: EventButton, Button: button})
 }
 
 func startupOverride(controller *controllerState, mapping storeinput.Mapping) bool {
