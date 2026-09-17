@@ -493,6 +493,69 @@ func TestSwappedConfirmBackMappingControlsCatalogueAndConfirmation(t *testing.T)
 	}
 }
 
+// countMutedInHeading counts the muted pixels in the heading line to the right
+// of the word CATALOGUE, which is where the list reports its range.
+func countMutedInHeading(frame *image.RGBA) int {
+	muted := 0
+	for column := 100; column < listRight; column++ {
+		for baseline := 62 - glyphHeight; baseline <= 62; baseline++ {
+			if frame.RGBAAt(column, baseline) == palette.muted {
+				muted++
+			}
+		}
+	}
+	return muted
+}
+
+// A catalogue longer than the window shows one window of rows, marks the
+// selected row with a solid accent ring around an accent wash, and reports where
+// the window sits in the list.
+func TestLongCatalogueShowsOneWindowOfRows(t *testing.T) {
+	model := &storeui.Model{}
+	for index := 0; index < listRows+3; index++ {
+		model.Items = append(model.Items, catalogueItem())
+	}
+	model.Selected = len(model.Items) - 1
+	controls := storeinput.NewSession(t.TempDir(), "trimui-smart-pro")
+	controls.Connected = true
+	controls.Mode = storeinput.Normal
+	frame := draw(model, platformHeader("trimui-smart-pro"), controls)
+	start, end := model.Window(listRows)
+	row := listRowRectangle(model.Selected - start)
+	for column := row.Min.X; column < row.Max.X; column++ {
+		if frame.RGBAAt(column, row.Min.Y) != palette.accent || frame.RGBAAt(column, row.Max.Y-1) != palette.accent {
+			t.Fatal("the selected row has no accent ring")
+		}
+	}
+	wash := frame.RGBAAt(row.Max.X-4, row.Min.Y+2)
+	if wash != blend(palette.accent, palette.panel, selectionWash) {
+		t.Fatalf("the selected row is not washed with the accent: %v", wash)
+	}
+	if wash == palette.selected {
+		t.Fatal("the selected row still reads as a filled button")
+	}
+	// Nothing is painted below the window, so the list never claims rows it does
+	// not show. The panel background is what is left there.
+	for y := listBottom; y < panelBottom; y++ {
+		if frame.RGBAAt(listLeft, y) != palette.panel {
+			t.Fatalf("the list painted row content at y=%d, outside its window", y)
+		}
+	}
+	if muted := countMutedInHeading(frame); muted == 0 {
+		t.Fatalf("the overflowing list did not report its range %d-%d of %d", start+1, end, len(model.Items))
+	}
+}
+
+// A list that fits is fully shown, so a range would only repeat the count and
+// the heading stays bare.
+func TestShortCatalogueReportsNoRange(t *testing.T) {
+	model := &storeui.Model{Items: []appstore.Item{catalogueItem()}}
+	frame := draw(model, platformHeader("trimui-smart-pro"), nil)
+	if muted := countMutedInHeading(frame); muted != 0 {
+		t.Fatalf("a catalogue that fits reported a range (%d pixels)", muted)
+	}
+}
+
 func platformHeader(device string) string {
 	if device == "magicx-zero-28" {
 		return "MagicX Zero 28 / 640x480"

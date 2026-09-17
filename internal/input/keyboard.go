@@ -15,6 +15,8 @@ const (
 	KeyArrowDown  = 105
 	KeyArrowLeft  = 106
 	KeyArrowRight = 107
+	KeyPageUp     = 108
+	KeyPageDown   = 109
 )
 
 // KeyboardSourceName is the source the GUI reports for a keyboard mapping.
@@ -33,6 +35,8 @@ var keyboardLabels = map[int]string{
 	KeyArrowDown:  "DOWN",
 	KeyArrowLeft:  "LEFT",
 	KeyArrowRight: "RIGHT",
+	KeyPageUp:     "PGUP",
+	KeyPageDown:   "PGDN",
 }
 
 // KeyboardMapping is the binding set a desktop run detects for a keyboard.
@@ -41,6 +45,7 @@ var keyboardLabels = map[int]string{
 func KeyboardMapping() Mapping {
 	return Mapping{
 		Up: KeyArrowUp, Down: KeyArrowDown, Left: KeyArrowLeft, Right: KeyArrowRight,
+		PageUp: KeyPageUp, PageDown: KeyPageDown,
 		Confirm: KeyEnter, Back: KeyEscape, Diagnostics: KeyY,
 	}
 }

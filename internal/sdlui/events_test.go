@@ -168,6 +168,45 @@ func TestHandleKeyUsesNonDefaultActiveMapping(t *testing.T) {
 	}
 }
 
+// A list that outgrows its window is crossed a screenful at a time, and the
+// page stops at the end rather than flying back to the top.
+func TestHandlePagesTheCatalogueByKey(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	model.Items = make([]appstore.Item, listRows*2+1)
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown})
+	if model.Selected != listRows {
+		t.Fatalf("page down selected %d, want %d", model.Selected, listRows)
+	}
+	if start, end := model.Window(listRows); model.Selected < start || model.Selected >= end {
+		t.Fatalf("paging left the selection outside the window %d-%d", start, end)
+	}
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown})
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown})
+	if model.Selected != len(model.Items)-1 {
+		t.Fatalf("paging past the end selected %d, want the last row", model.Selected)
+	}
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageUp})
+	if want := len(model.Items) - 1 - listRows; model.Selected != want {
+		t.Fatalf("page up selected %d, want %d", model.Selected, want)
+	}
+	// A held page key is navigation like any other, so it keeps paging.
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown, Repeat: true})
+	if model.Selected != len(model.Items)-1 {
+		t.Fatalf("a repeated page key selected %d, want the last row", model.Selected)
+	}
+}
+
+// The one-shot keys stay one-shot: only navigation answers a repeat, so a held
+// Confirm cannot confirm twice however long the key is held down.
+func TestHandleKeepsOneShotKeysOneShot(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	model.Items = make([]appstore.Item, listRows+1)
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyConfirm, Repeat: true})
+	if model.Focus != storeui.Browse {
+		t.Fatalf("a repeated Confirm opened %v", model.Focus)
+	}
+}
+
 func TestHandleModeDependentButtons(t *testing.T) {
 	for _, test := range []struct {
 		name       string

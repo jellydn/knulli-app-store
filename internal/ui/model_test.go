@@ -168,6 +168,77 @@ func TestModelExportsDiagnosticsPath(t *testing.T) {
 	}
 }
 
+// The list window is a function of the selection and the row count, so a list
+// that fits shows every row and a longer one keeps the selection on screen.
+func TestWindowFollowsTheSelectionAndStopsAtTheEndOfTheList(t *testing.T) {
+	model := &Model{Items: make([]appstore.Item, 12)}
+	for _, test := range []struct{ selected, rows, start, end int }{
+		{selected: 0, rows: 5, start: 0, end: 5},
+		{selected: 3, rows: 5, start: 1, end: 6},
+		{selected: 5, rows: 5, start: 3, end: 8},
+		{selected: 11, rows: 5, start: 7, end: 12},
+		{selected: 11, rows: 20, start: 0, end: 12},
+	} {
+		model.Selected = test.selected
+		start, end := model.Window(test.rows)
+		if start != test.start || end != test.end {
+			t.Fatalf("selection %d with %d rows: window %d-%d, want %d-%d", test.selected, test.rows, start, end, test.start, test.end)
+		}
+		if test.selected < start || test.selected >= end {
+			t.Fatalf("selection %d is outside the window %d-%d", test.selected, start, end)
+		}
+	}
+	empty := &Model{}
+	if start, end := empty.Window(5); start != 0 || end != 0 {
+		t.Fatalf("empty catalogue window = %d-%d", start, end)
+	}
+	if start, end := model.Window(0); start != 0 || end != 0 {
+		t.Fatalf("window without rows = %d-%d", start, end)
+	}
+}
+
+// A page is a screenful, and it clamps instead of wrapping: holding the key at
+// the end of the list stays on the last row rather than flying back to the top.
+func TestPageMovesByAScreenfulAndClampsAtBothEnds(t *testing.T) {
+	model := &Model{Items: make([]appstore.Item, 12), Focus: Browse}
+	model.Page(1, 5)
+	if model.Selected != 5 {
+		t.Fatalf("one page down selected %d, want 5", model.Selected)
+	}
+	model.Page(1, 5)
+	model.Page(1, 5)
+	if model.Selected != 11 {
+		t.Fatalf("paging past the end selected %d, want the last row", model.Selected)
+	}
+	model.Page(-1, 5)
+	if model.Selected != 6 {
+		t.Fatalf("one page up selected %d, want 6", model.Selected)
+	}
+	model.Page(-1, 5)
+	model.Page(-1, 5)
+	if model.Selected != 0 {
+		t.Fatalf("paging past the start selected %d, want the first row", model.Selected)
+	}
+	// Paging belongs to the catalogue. There is no second screenful of action
+	// buttons, and a busy model is not accepting navigation at all.
+	model.Focus = Actions
+	model.Page(1, 5)
+	if model.Selected != 0 {
+		t.Fatalf("paging moved a non-catalogue screen to %d", model.Selected)
+	}
+	model.Focus = Browse
+	model.Busy = true
+	model.Page(1, 5)
+	if model.Selected != 0 {
+		t.Fatalf("paging moved a busy model to %d", model.Selected)
+	}
+	model.Busy = false
+	model.Page(1, 0)
+	if model.Selected != 0 {
+		t.Fatalf("paging by no rows moved the selection to %d", model.Selected)
+	}
+}
+
 func waitForModel(t *testing.T, model *Model) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)

@@ -23,7 +23,7 @@ before the catalogue. Choose Use Detected Mapping, Test Detected Mapping,
 Customize, or Safe Exit. Customize assigns one semantic action at a time. Each
 detected button has Select, Retry, Start Over, and Back choices. Conflicts
 stay on the current action. Tested and custom mappings require a complete
-eight-action preview before atomic save. No timeout skips setup.
+nine-action preview before atomic save. No timeout skips setup.
 
 Open Settings with the control the footer shows beside SETTINGS. Settings can
 rerun setup, export diagnostics, reset the active mapping, or close. Hold the

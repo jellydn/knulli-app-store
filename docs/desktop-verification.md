@@ -1,7 +1,7 @@
 # Desktop GUI verification
 
 The SDL GUI can be walked end to end on a development machine, with no handheld
-and no controller attached. The keyboard carries the eight semantic actions and a
+and no controller attached. The keyboard carries the nine semantic actions and a
 scratch fixture root supplies the Knulli files that platform detection reads, so
 a desktop run can simulate the selected device matrix. The target architecture
 and resolution are explicit desktop overrides; they are not measurements from a
@@ -95,8 +95,8 @@ A flow is a key sequence:
   -walk-timeout 60s
 ```
 
-- `-keys` accepts `up`, `down`, `left`, `right`, `enter`, `esc`, `y`, `tab`, in
-  the order to press them. Each key goes through the same handler as a real
+- `-keys` accepts `up`, `down`, `left`, `right`, `pgup`, `pgdown`, `enter`,
+  `esc`, `y`, `tab`, in the order to press them. Each key goes through the same handler as a real
   keystroke, so a walkthrough reaches the same screens a user does. `tab` holds
   the quit chord's anchor, so a flow that quits ends with `tab,y`, the desktop
   spelling of holding Select and pressing Y.
@@ -111,7 +111,7 @@ A flow is a key sequence:
 | Flow | Covers |
 | --- | --- |
 | `first-run-use-detected` | Setup, saving the detected mapping |
-| `first-run-test-detected` | Setup, preview, testing all seven actions, save |
+| `first-run-test-detected` | Setup, preview, testing all nine actions, save |
 | `first-run-customize` | Calibration, assignment review, preview, save |
 | `first-run-safe-exit` | Leaving setup without a mapping |
 | `catalogue-walk` | Catalogue, details, action list, confirmation, back out |
@@ -152,15 +152,19 @@ artifact is useful evidence when a device run is not available.
 | Action | Key |
 | --- | --- |
 | Up, Down, Left, Right | Arrow keys |
+| Page Up, Page Down | Page Up, Page Down |
 | Confirm | Enter |
 | Back | Escape |
 | Diagnostics | Y |
 | Quit | Tab (or F5) held, then Y |
 
-The seven actions above Quit are a binding set like any other, so the footer and
-the mapping summary name them: `Confirm (ENTER)  Settings (Y)  Quit (TAB + Y)`.
-Quitting is deliberately not one of them: it is the Select chord, the one thing
-no single key carries. Keyboard codes
+The nine actions above Quit are a binding set like any other, so the footer and
+the mapping summary name them. A catalogue that shows all of its rows reads
+`Confirm (ENTER)  Settings (Y)  Quit (TAB + Y)`; once the list outgrows the
+window, the range beside the heading names where the window sits and the footer
+gains the one hint that carries two buttons, `Page (PGUP/PGDN)`. Quitting is
+deliberately not one of the nine: it is the Select chord, the one thing no
+single key carries. Keyboard codes
 sit above every SDL GameController button, so a key is never mistaken for a pad
 button.
 

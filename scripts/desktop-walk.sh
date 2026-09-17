@@ -151,13 +151,18 @@ walk first-run-use-detected keyboard \
   "enter" \
   "setup,catalogue"
 
+# The preview tests every action the mapping carries, so it presses each bound
+# button once. The desktop bindings put paging on Page Up and Page Down.
 walk first-run-test-detected keyboard \
-  "down,enter,up,down,left,right,enter,esc,y,tab,y" \
+  "down,enter,up,down,left,right,pgup,pgdown,enter,esc,y,tab,y" \
   "setup,preview,catalogue" \
   "Controller mapping tested and saved"
 
+# Customize assigns one button per action in the canonical order — up, down,
+# left, right, page up, page down, confirm, back, settings — reviewing each
+# assignment before the next, then tests the mapping the same way.
 walk first-run-customize keyboard \
-  "down,down,enter,up,enter,down,enter,left,enter,right,enter,enter,enter,esc,enter,y,enter,up,down,left,right,enter,esc,y,tab,y" \
+  "down,down,enter,up,enter,down,enter,left,enter,right,enter,pgup,enter,pgdown,enter,enter,enter,esc,enter,y,enter,up,down,left,right,pgup,pgdown,enter,esc,y,tab,y" \
   "setup,calibration,assignment-review,preview,catalogue" \
   "Controller mapping tested and saved"
 

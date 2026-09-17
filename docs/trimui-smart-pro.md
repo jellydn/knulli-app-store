@@ -73,7 +73,7 @@ Grout has no supported updater-disable setting. The Store therefore changes the 
 
 ## Controls
 
-The first launch for each device/controller identity opens a dedicated setup screen before the catalogue. Choose **Use Detected Mapping**, **Test Detected Mapping**, **Customize**, or **Safe Exit**. Customize assigns one semantic action at a time, then reviews each detected button with Select, Retry, Start Over, and Back choices. All custom and tested mappings require a seven-action preview before atomic save. Later launches load the saved mapping directly. Settings can reopen setup, export diagnostics, or reset the active mapping. Hold the saved Back and Settings controls while launching for a deliberate setup override. Physical button positions are not assumed.
+The first launch for each device/controller identity opens a dedicated setup screen before the catalogue. Choose **Use Detected Mapping**, **Test Detected Mapping**, **Customize**, or **Safe Exit**. Customize assigns one semantic action at a time — Navigate for up, down, left, and right, Page for the two shoulders, then Select, Back, and Settings — and reviews each detected button with Select, Retry, Start Over, and Back choices. All custom and tested mappings require a nine-action preview before atomic save. Later launches load the saved mapping directly. Settings can reopen setup, export diagnostics, or reset the active mapping. Hold the saved Back and Settings controls while launching for a deliberate setup override. Physical button positions are not assumed.
 
 If SDL exposes no GameController, the setup screen stays blocked, automatically exports diagnostics when possible, and shows the log and export paths. It does not open the catalogue with unknown controls.
 

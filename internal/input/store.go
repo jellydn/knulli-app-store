@@ -192,8 +192,8 @@ func (store Store) read() (fileData, error) {
 		return data, corruptFileError{err: fmt.Errorf("unsupported controller mapping schema %q", data.Schema)}
 	}
 	keys := make(map[string]struct{}, len(data.Records))
-	for index := range data.Records {
-		record := data.Records[index]
+	usable := make([]Record, 0, len(data.Records))
+	for _, record := range data.Records {
 		key, err := record.Identity.Key()
 		if err != nil {
 			return data, corruptFileError{err: fmt.Errorf("invalid saved controller identity: %w", err)}
@@ -205,13 +205,24 @@ func (store Store) read() (fileData, error) {
 		// quitting used to carry. Dropping it here migrates the record instead of
 		// treating the whole file as corrupt, and the next write stores the
 		// migrated form.
-		migrated := record.Mapping.KeepKnown()
-		if err := migrated.Validate(); err != nil {
+		record.Mapping = record.Mapping.KeepKnown()
+		if missing := record.Mapping.Missing(); len(missing) > 0 {
+			// The action set has grown since this record was written, so it
+			// cannot drive the current screens and no button can be invented for
+			// the gap. It is stale, not damaged: the file is shared by every
+			// controller, so one stale record is dropped while every other
+			// identity keeps the mapping it saved. The dropped identity simply
+			// has no saved mapping, which sends that user back through the setup
+			// that binds the new actions.
+			continue
+		}
+		if err := record.Mapping.Validate(); err != nil {
 			return data, corruptFileError{err: fmt.Errorf("invalid saved mapping for %q: %w", key, err)}
 		}
-		data.Records[index].Mapping = migrated
 		keys[key] = struct{}{}
+		usable = append(usable, record)
 	}
+	data.Records = usable
 	return data, nil
 }
 
