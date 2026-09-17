@@ -48,9 +48,9 @@ The launcher appends diagnostics to `/userdata/system/logs/knulli-app-store.log`
 
 ## Experimental package operations
 
-Grout 5.2.0.0 and PlayTime 1.0.0 are broad experimental packages. This Smart Pro has exact PlayTime 1.0.0 evidence, but the Grout report is for 5.1.0.0. Select **Install** for a new copy. If the App Store detects files an earlier write did not own, the row shows **EXTERNAL** and the action becomes **Manage existing**. An empty destination directory left by a rolled-back write holds no files to manage, so it stays **Install**. Details explain that this inventories the copy and records safe ownership without reinstalling it. Exact release matches become manager-owned. Changed and unknown files stay unmanaged and are backed up under `/userdata/system/knulli-app-store/originals/<package-id>/` before a later Repair can replace them. State is stored under `/userdata/system/knulli-app-store/installed/`.
+Grout 5.2.0.0, PlayTime 1.0.0, and RetSend 0.9.1 are broad experimental packages. This Smart Pro has exact PlayTime 1.0.0 evidence, but the Grout report is for 5.1.0.0, and RetSend has no device report at all. Select **Install** for a new copy. If the App Store detects files an earlier write did not own, the row shows **EXTERNAL** and the action becomes **Manage existing**. An empty destination directory left by a rolled-back write holds no files to manage, so it stays **Install**. Details explain that this inventories the copy and records safe ownership without reinstalling it. Exact release matches become manager-owned. Changed and unknown files stay unmanaged and are backed up under `/userdata/system/knulli-app-store/originals/<package-id>/` before a later Repair can replace them. State is stored under `/userdata/system/knulli-app-store/installed/`.
 
-The manager restores execute mode only on reviewed paths. PlayTime needs `playtime` and `playtime.sh` to be executable so Knulli can start the launcher and its local binary. Grout needs `Grout.sh` and `grout` for the same reason. No downloaded script is executed during installation.
+The manager restores execute mode only on reviewed paths. PlayTime needs `playtime` and `playtime.sh` to be executable so Knulli can start the launcher and its local binary. Grout needs `Grout.sh` and `grout` for the same reason, and RetSend needs `RetSend.sh` and `retsend`. No downloaded script is executed during installation.
 
 Use **Repair** to re-download, verify, and restore managed files. Use **Uninstall** to remove manager-owned files while preserving declared data. Exact pre-existing release files are removed after adoption; changed package files are restored because their ownership is uncertain. If an operation fails, the transaction rolls back. A retained backup can be restored by copying it back to the path recorded in the installed-state JSON. Do not edit that state by hand while the app is running.
 
@@ -60,6 +60,7 @@ If an operation fails, the Store records its safe retry target under `/userdata/
 
 - Grout configuration: `/userdata/roms/tools/Grout/config.json`, `save_slots.json`, `.cache/`, and `logs/`.
 - PlayTime statistics and configuration: `/userdata/system/configs/playtime/`.
+- RetSend configuration, transfer history, and TLS identity: `/userdata/system/configs/retsend/`; received files: `/userdata/roms/retsend-inbox/`.
 - App Store log: `/userdata/system/logs/knulli-app-store.log`.
 
 The App Store writes concise UTC timestamped events for startup, platform and catalogue decisions, package actions, download verification, extraction, transactions, backup, rollback, and completion. The active log is capped at 512 KiB and one prior file is retained as `knulli-app-store.log.1`. URLs lose credentials, query strings, and fragments; common token and password fields are redacted.
@@ -89,7 +90,7 @@ Every screen can be checked on a development machine first, with no handheld and
 - Confirm the footer is the only control hint on screen: one line of `VERB (BUTTON)` pairs for the active mapping, with no repeated hint in the panel. Record the log if no controller appears.
 - Open Settings with its displayed physical label, export diagnostics, and inspect the bundle for platform and mapping decisions. Do not send it if manual inspection finds private data.
 - Confirm the header shows `TRIMUI SMART PRO / 1280X720`. Unknown boards must show `UNKNOWN DEVICE`, and failed runtime-size detection must identify its fallback.
-- Confirm Grout shows `EXPERIMENTAL`, PlayTime shows `DEVICE TESTED`, and the other two packages remain read-only.
+- Confirm Grout and RetSend show `EXPERIMENTAL`, PlayTime shows `DEVICE TESTED`, and RAOfflineProxy and PocketCurator remain read-only.
 - Confirm returning to EmulationStation works and a second launch also works.
 - Confirm Wi-Fi disabled and enabled produce the same catalogue because this artifact reads its bundled index.
 - Send the log, firmware version, observed controls, and a photo or screenshot with the result. Do not include credentials or private network data.

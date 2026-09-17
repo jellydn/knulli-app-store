@@ -46,19 +46,23 @@ Mappings are stored by device and controller identity under:
 
 CURRENT SAFETY STATE
 
-Grout 5.2.0.0 and PlayTime 1.0.0 have broad experimental Knulli eligibility
-only when architecture, glibc ABI, SDL libraries, device identity, and display
-bounds pass. Only PlayTime 1.0.0 has exact current Smart Pro evidence.
+Grout 5.2.0.0, PlayTime 1.0.0, and RetSend 0.9.1 have broad experimental
+Knulli eligibility only when architecture, glibc ABI, SDL libraries, device
+identity, and display bounds pass. Only PlayTime 1.0.0 has exact current Smart
+Pro evidence. RetSend has no device report and needs local Wi-Fi.
 An existing copy shows EXTERNAL and offers Manage existing; that inventories
 and backs up uncertain files without reinstalling the reviewed release. Only
 files count, so an empty directory left by a rolled-back write still offers
 Install. A card that reports a wider file mode than requested is not a health
-failure. The other two packages are read-only.
+failure. RAOfflineProxy and PocketCurator are read-only.
 
 The Store disables Grout's updater metadata URL and verifies the transformed
 binary. Use App Store Repair and reviewed updates only. Grout config stays
 under /userdata/roms/tools/Grout. PlayTime
-statistics stay under /userdata/system/configs/playtime. Manager state and
+statistics stay under /userdata/system/configs/playtime. RetSend keeps its
+configuration and TLS identity under /userdata/system/configs/retsend and
+receives files in /userdata/roms/retsend-inbox; both stay after uninstall.
+Manager state and
 adoption backups are under /userdata/system/knulli-app-store. After Manage
 existing fails, Force reinstall needs two confirmations and keeps a complete
 timestamped backup under recovery-backups/<package-id>/. The app asks

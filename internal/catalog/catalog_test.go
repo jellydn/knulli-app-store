@@ -17,14 +17,17 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first.Packages) != 4 || len(second.Packages) != 4 {
-		t.Fatalf("expected four packages, got %d and %d", len(first.Packages), len(second.Packages))
+	if len(first.Packages) != 5 || len(second.Packages) != 5 {
+		t.Fatalf("expected five packages, got %d and %d", len(first.Packages), len(second.Packages))
 	}
-	approved := map[string]bool{
-		"app.romm.grout":                         true,
-		"io.github.misantronic.raofflineproxy":   true,
-		"io.github.tomtombombadil.pocketcurator": true,
-		"io.github.unitreign.playtime":           true,
+	// RetSend is published by the App Store maintainer's own fork, so its
+	// recorded provenance is the maintainer rather than the community.
+	provenance := map[string]string{
+		"app.romm.grout":                         "community",
+		"io.github.jellydn.retsend":              "maintainer",
+		"io.github.misantronic.raofflineproxy":   "community",
+		"io.github.tomtombombadil.pocketcurator": "community",
+		"io.github.unitreign.playtime":           "community",
 	}
 	experimental := 0
 	verified := 0
@@ -40,12 +43,13 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 			t.Fatalf("non-experimental package unexpectedly installable: %s", first.Packages[index].ID)
 		}
 		approval := first.Packages[index].Package.Review.Approval
-		if approved[first.Packages[index].ID] != (approval != nil && approval.Provenance == "community") {
+		wanted, known := provenance[first.Packages[index].ID]
+		if !known || approval == nil || approval.Provenance != wanted {
 			t.Fatalf("unexpected approval state: %s", first.Packages[index].ID)
 		}
 	}
-	if experimental != 2 || verified != 0 {
-		t.Fatalf("expected two broad experimental packages and no current device-verified release, got %d and %d", experimental, verified)
+	if experimental != 3 || verified != 0 {
+		t.Fatalf("expected three broad experimental packages and no current device-verified release, got %d and %d", experimental, verified)
 	}
 }
 
