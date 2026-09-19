@@ -257,7 +257,7 @@ func recoverOne(root, directory string) error {
 		return err
 	}
 	if err := rollbackSnapshots(root, snapshots); err != nil {
-		return err
+		return fmt.Errorf("roll back transaction journal %s: %w", directory, err)
 	}
 	return os.RemoveAll(directory)
 }
@@ -269,10 +269,10 @@ func readJournal(directory string) (journalRecord, error) {
 	}
 	var record journalRecord
 	if err := json.Unmarshal(data, &record); err != nil {
-		return journalRecord{}, fmt.Errorf("decode transaction journal: %w", err)
+		return journalRecord{}, fmt.Errorf("decode transaction journal %s: %w", directory, err)
 	}
 	if record.Schema != journalSchemaV1 {
-		return journalRecord{}, fmt.Errorf("unsupported transaction journal schema %q", record.Schema)
+		return journalRecord{}, fmt.Errorf("unsupported transaction journal schema %q in %s", record.Schema, directory)
 	}
 	return record, nil
 }
@@ -281,12 +281,12 @@ func snapshotsFromRecord(root, directory string, record journalRecord) ([]snapsh
 	snapshots := make([]snapshot, 0, len(record.Snapshots))
 	for _, item := range record.Snapshots {
 		if err := withinRoot(root, item.Host); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w in %s", err, directory)
 		}
 		snap := snapshot{path: item.Host, virtual: item.Virtual, mode: os.FileMode(item.Mode), existed: item.Existed}
 		if item.Existed {
 			if item.Backup == "" || item.Backup != filepath.Base(item.Backup) {
-				return nil, fmt.Errorf("invalid journal backup name %q", item.Backup)
+				return nil, fmt.Errorf("invalid journal backup name %q in %s", item.Backup, directory)
 			}
 			snap.backup = filepath.Join(directory, item.Backup)
 		}

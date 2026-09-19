@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -199,6 +200,42 @@ func TestRecoverRemovesJournalWithoutMutations(t *testing.T) {
 	}
 	if _, err := os.Stat(directory); !os.IsNotExist(err) {
 		t.Fatalf("empty journal directory remained: %v", err)
+	}
+}
+
+// An unreadable journal has to be inspected by hand, so every failure names the
+// leftover directory instead of reporting only that a record could not be read.
+// Recover and PendingForPath are the two ways into a journal, and the GUI shows
+// the PendingForPath error as the reason a package needs attention.
+func TestRecoveryFailuresNameTheLeftoverJournalDirectory(t *testing.T) {
+	const destination = "/userdata/test/demo"
+	entries := []struct {
+		name string
+		open func(root, parent string) error
+	}{
+		{name: "Recover", open: func(root, parent string) error { return Recover(root, parent) }},
+		{name: "PendingForPath", open: func(root, parent string) error {
+			_, err := PendingForPath(root, parent, destination)
+			return err
+		}},
+	}
+	for _, entry := range entries {
+		root := t.TempDir()
+		parent := t.TempDir()
+		directory, err := os.MkdirTemp(parent, transactionPrefix+"*")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, journalName), []byte("{not json"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		err = entry.open(root, parent)
+		if err == nil {
+			t.Fatalf("%s accepted a corrupt journal", entry.name)
+		}
+		if !strings.Contains(err.Error(), directory) {
+			t.Fatalf("%s error does not name the leftover directory %s: %v", entry.name, directory, err)
+		}
 	}
 }
 
