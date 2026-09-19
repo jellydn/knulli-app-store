@@ -71,8 +71,13 @@ make walkthrough
 
 That walks the offline flows below with the keyboard and writes their opening,
 post-key, and operation-completion frames under `build/walkthrough/<flow>/`. It
-also renders every screen state under `build/walkthrough/screens/`. For a host
-with no window server, run:
+also renders every screen state under `build/walkthrough/screens/`, at both
+target resolutions. Those stills name the screen they show, so the catalogue
+view is `<device>-gui-catalogue.png` with its tab bar, `-gui-tabs-ready.png`
+for the bar on another view, `-gui-notice.png` for the notice bar over a
+completed operation, and one file per remaining state. The screenshots are
+generated evidence and are not checked in; the `gui-walkthrough` artifact
+carries them. For a host with no window server, run:
 
 ```sh
 SDL_VIDEODRIVER=dummy make walkthrough
@@ -115,6 +120,7 @@ A flow is a key sequence:
 | `first-run-customize` | Calibration, assignment review, preview, save |
 | `first-run-safe-exit` | Leaving setup without a mapping |
 | `catalogue-walk` | Catalogue, details, action list, confirmation, back out |
+| `catalogue-tabs` | The tab bar: right steps onto Ready, then the installed tab, and left steps back |
 | `catalogue-read-only` | A candidate package that offers no action |
 | `quit-chord` | Escape at the catalogue does not leave; a held Tab plus Y does |
 | `settings-export-diagnostics` | Settings and a diagnostics export |
@@ -133,8 +139,11 @@ whether it reached them all. Beside each flow, `walk.tsv` records one row per
 frame:
 
 ```text
-file	state	key	item	focus	action	busy	mode	session_message	message	error
+file	state	key	item	focus	action	busy	mode	tab	session_message	message	toast	error
 ```
+
+`tab` names the catalogue view the frame was showing, and `toast` carries the
+notice bar's line, which is where a completed operation reports itself.
 
 The script fails a flow that never reaches a screen it claims, or one whose run
 exits non-zero, so a broken flow fails the run rather than passing quietly.
@@ -151,7 +160,8 @@ artifact is useful evidence when a device run is not available.
 
 | Action | Key |
 | --- | --- |
-| Up, Down, Left, Right | Arrow keys |
+| Up, Down | Arrow keys, one row at a time |
+| Left, Right | Arrow keys, one tab at a time on the catalogue and one button at a time inside a panel |
 | Page Up, Page Down | Page Up, Page Down |
 | Confirm | Enter |
 | Back | Escape |
@@ -161,12 +171,30 @@ artifact is useful evidence when a device run is not available.
 The nine actions above Quit are a binding set like any other, so the footer and
 the mapping summary name them. A catalogue that shows all of its rows reads
 `Confirm (ENTER)  Settings (Y)  Quit (TAB + Y)`; once the list outgrows the
-window, the range beside the heading names where the window sits and the footer
+window, the range under the last row names where the window sits and the footer
 gains the one hint that carries two buttons, `Page (PGUP/PGDN)`. Quitting is
 deliberately not one of the nine: it is the Select chord, the one thing no
 single key carries. Keyboard codes
 sit above every SDL GameController button, so a key is never mistaken for a pad
 button.
+
+## Tabs and notices
+
+The catalogue carries a tab bar above its rows. `ALL` leads, because the app
+lands there and so the default view hides nothing; `READY` holds the packages
+with an install or an adoption waiting; `INSTALLED` holds the packages the app
+manages on the device, failing health checks included. The active tab carries
+the same accent wash and ring as a selected row. Sideways steps the bar and
+vertically steps the rows, so a direction key never means two things at once,
+and an empty tab still steps, which is the way out of it. Each tab remembers
+the row it was left on, so coming back to one lands where the reader stopped;
+a tab never opened opens on the package the user was already reading, and a
+remembered package that has since left the tab gives way to its first row.
+
+A finished operation reports itself in a notice bar over the panel foot instead
+of leaving a status banner behind: it is drawn below the action row and above
+the footer, and it clears itself after three seconds. A failure is not a notice:
+it keeps the status block until the user answers it.
 
 ## The fixture root
 
@@ -204,7 +232,8 @@ it beside the binary or from `-catalog`.
 
 Covers: every rendered screen state, the footer on each one, focus order,
 wording, layout bounds, setup, calibration, preview, settings, catalogue,
-details, health, confirmations, recovery, blocked, and error states. The
+tabs, notices, details, health, confirmations, recovery, blocked, and error
+states. The
 default scripted flows are offline; package lifecycle flows require
 `WALK_FLAGS=--install`.
 

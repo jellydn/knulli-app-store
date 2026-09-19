@@ -38,7 +38,10 @@ func (fake *fakeBackend) Execute(_ context.Context, _ string, action appstore.Ac
 	return fake.err
 }
 
-func TestModelKeepsRestartRequiredCompletion(t *testing.T) {
+// A completion nobody has to act on is a notice, not a status: it is shown in
+// the notice bar and clears itself, so a finished operation does not leave the
+// catalogue wearing a banner. A failure keeps the status block instead.
+func TestModelShowsRestartRequiredCompletionAsANotice(t *testing.T) {
 	backend := &fakeBackend{
 		items:      []appstore.Item{{Package: manifest.Package{ID: "org.example.alpha", Name: "Alpha"}, Actions: []appstore.Action{appstore.Uninstall}}},
 		completion: "Uninstall completed; restart required to update game list",
@@ -51,8 +54,14 @@ func TestModelKeepsRestartRequiredCompletion(t *testing.T) {
 	model.Select(context.Background())
 	model.Select(context.Background())
 	waitForModel(t, model)
-	if model.Error != "" || model.Message != backend.completion {
-		t.Fatalf("restart outcome was lost: message=%q error=%q", model.Message, model.Error)
+	if model.Error != "" {
+		t.Fatalf("a successful uninstall reported %q", model.Error)
+	}
+	if model.Message != "" {
+		t.Fatalf("a finished operation left a status banner: %q", model.Message)
+	}
+	if notices := model.Toasts.Live(time.Now()); len(notices) != 1 || notices[0] != backend.completion {
+		t.Fatalf("completion notice = %v, want %q", notices, backend.completion)
 	}
 }
 

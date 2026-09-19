@@ -213,10 +213,16 @@ func setupProgress(controls *storeinput.Session) (int, int) {
 
 func dispatchAction(ctx context.Context, model *storeui.Model, action storeinput.Action) bool {
 	switch action {
-	case storeinput.Up, storeinput.Left:
+	case storeinput.Up:
 		model.Move(-1)
-	case storeinput.Down, storeinput.Right:
+	case storeinput.Down:
 		model.Move(1)
+	case storeinput.Left:
+		// Sideways is the tab bar on the catalogue and the button row inside a
+		// panel; the model owns which, so the router stays a dispatcher.
+		model.Horizontal(-1)
+	case storeinput.Right:
+		model.Horizontal(1)
 	case storeinput.PageUp:
 		model.Page(-1, listRows)
 	case storeinput.PageDown:

@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
 )
@@ -18,15 +19,21 @@ const (
 )
 
 type Model struct {
-	backend  appstore.Backend
-	Items    []appstore.Item
-	Selected int
-	Action   int
-	Focus    Focus
-	Busy     bool
-	Message  string
-	Error    string
-	events   chan operationEvent
+	backend appstore.Backend
+	// Items is the list the catalogue shows: the packages the active tab
+	// matches. catalogue keeps everything the index listed, so switching tabs
+	// never reloads the index and never reorders what is already known.
+	Items     []appstore.Item
+	catalogue []appstore.Item
+	Tabs      Tabs
+	Toasts    Toasts
+	Selected  int
+	Action    int
+	Focus     Focus
+	Busy      bool
+	Message   string
+	Error     string
+	events    chan operationEvent
 }
 
 type operationEvent struct {
@@ -46,9 +53,35 @@ func (m *Model) Load(ctx context.Context) error {
 		m.Error = err.Error()
 		return err
 	}
-	m.Items = items
-	m.clamp()
+	m.setCatalogue(items)
 	return nil
+}
+
+// setCatalogue records everything the index lists and shows what the active tab
+// matches. The package the user was reading stays selected while it is still on
+// screen, so a tab switch or a refresh after an operation never moves the
+// selection out from under them.
+func (m *Model) setCatalogue(items []appstore.Item) {
+	keep := m.selectedID()
+	m.catalogue = items
+	m.filter(keep)
+}
+
+// Tab is the tab the catalogue is showing.
+func (m *Model) Tab() Tab {
+	return m.Tabs.Active()
+}
+
+// Total reports how many packages the index listed, before the active tab
+// narrowed them, so a screen can tell an empty catalogue from an empty tab.
+func (m *Model) Total() int {
+	return len(m.catalogue)
+}
+
+// LiveToasts is what the notice bar says right now. Reading expires a notice
+// whose moment has passed, so the bar empties itself between frames.
+func (m *Model) LiveToasts() []string {
+	return m.Toasts.Live(time.Now())
 }
 
 func (m *Model) Move(delta int) {
@@ -88,6 +121,72 @@ func (m *Model) Window(rows int) (int, int) {
 		start = total - rows
 	}
 	return start, start + rows
+}
+
+// Horizontal moves sideways on the current screen. On the catalogue, sideways
+// steps to the previous or next tab: the bar is the row under the header, and
+// left and right walk it while up and down walk the rows, so a direction key
+// never means two things at once. Inside a panel sideways still steps that
+// panel's own buttons, because there is no tab bar there to walk.
+func (m *Model) Horizontal(delta int) {
+	if m.Busy {
+		return
+	}
+	if m.Focus != Browse {
+		m.Move(delta)
+		return
+	}
+	// Leaving a tab stores where the reader stopped; entering one prefers that
+	// memory and falls back to the package they were already reading, so a tab
+	// opens where it was last left and a tab never seen opens on the same
+	// package instead of jumping to the top.
+	carried := m.selectedID()
+	m.Tabs.Remember(carried)
+	m.Tabs.Cycle(delta)
+	m.filter(m.Tabs.Remembered(), carried)
+	m.Error = ""
+}
+
+// filter shows the packages the active tab matches. The selection is the first
+// preferred package the tab still shows, and the tab's own first row when it
+// shows none of them. A model that has never loaded a catalogue has nothing to
+// narrow, so its rows are left alone: a tab can only hide packages the index
+// actually listed.
+func (m *Model) filter(preferred ...string) {
+	if m.catalogue == nil {
+		m.clamp()
+		return
+	}
+	visible := make([]appstore.Item, 0, len(m.catalogue))
+	for _, item := range m.catalogue {
+		if m.Tabs.Active().Match(item) {
+			visible = append(visible, item)
+		}
+	}
+	m.Items = visible
+	m.Action = 0
+	m.Selected = 0
+	for _, candidate := range preferred {
+		if index := indexOfPackage(visible, candidate); index >= 0 {
+			m.Selected = index
+			break
+		}
+	}
+	m.clamp()
+}
+
+// indexOfPackage is the row a package occupies in a list, or -1 when the list
+// does not show it. An empty id is never a row.
+func indexOfPackage(items []appstore.Item, id string) int {
+	if id == "" {
+		return -1
+	}
+	for index, item := range items {
+		if item.Package.ID == id {
+			return index
+		}
+	}
+	return -1
 }
 
 // Page moves the selection by a screenful and clamps at both ends: a page past
@@ -193,13 +292,19 @@ func (m *Model) Poll() bool {
 				m.Busy = false
 				m.Focus = Browse
 				if len(event.items) > 0 {
-					m.Items = event.items
-					m.clamp()
+					m.setCatalogue(event.items)
 				}
 				if event.err != nil {
+					// A failure is a state, not a notice: it keeps the status
+					// block until the user answers it.
 					m.Error = event.err.Error()
 				} else {
+					// A completion is a notice. It says what just happened and
+					// then clears itself, so a finished operation does not leave
+					// the catalogue wearing a banner nothing will remove.
 					m.Error = ""
+					m.Message = ""
+					m.Toasts.Push(event.message, time.Now())
 				}
 			}
 		default:
@@ -209,10 +314,26 @@ func (m *Model) Poll() bool {
 }
 
 func (m *Model) current() appstore.Item {
-	if len(m.Items) == 0 {
-		return appstore.Item{}
+	item, _ := m.selectedItem()
+	return item
+}
+
+// selectedItem is the package under the cursor, if the visible list has one.
+func (m *Model) selectedItem() (appstore.Item, bool) {
+	if m.Selected < 0 || m.Selected >= len(m.Items) {
+		return appstore.Item{}, false
 	}
-	return m.Items[m.Selected]
+	return m.Items[m.Selected], true
+}
+
+// selectedID is the package under the cursor, or empty when the list has no
+// row to read.
+func (m *Model) selectedID() string {
+	item, ok := m.selectedItem()
+	if !ok {
+		return ""
+	}
+	return item.Package.ID
 }
 
 func (m *Model) start(ctx context.Context) {

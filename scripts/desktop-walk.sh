@@ -175,8 +175,17 @@ walk catalogue-walk keyboard \
   "enter,down,up,enter,enter,esc,esc,tab,y" \
   "setup,catalogue,actions,confirm"
 
-# A read-only package offers no action and says so. The catalogue lists packages
-# by id, so two steps down from Grout reach RAOfflineProxy in this fixture.
+# The tab bar: the whole list leads, right walks onto Ready and then the
+# installed tab, and left walks back. Nothing is installed in a fresh fixture,
+# so the installed tab is empty and the same key steps out of it. The record's
+# tab column names the view each key reached.
+walk catalogue-tabs keyboard \
+  "enter,right,right,left" \
+  "setup,catalogue" \
+  "installed"
+
+# A read-only package offers no action and says so. Only compatible packages
+# are listed, and PocketCurator follows Grout and PlayTime in this fixture.
 walk catalogue-read-only keyboard \
   "enter,down,down,enter" \
   "setup,catalogue" \

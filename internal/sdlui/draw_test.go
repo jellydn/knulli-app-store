@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
@@ -60,8 +61,18 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		Compatibility: "Candidate: compatibility is not approved",
 		Verdict:       appstore.Verdict{State: appstore.StateCandidate, Reasons: []appstore.Reason{{Kind: appstore.ReasonReview, Detail: "Candidate: compatibility is not approved"}}},
 	}
+	// The tab bar and the notice bar are part of the catalogue's own screens, so
+	// they are rendered like every other state. The tabs-ready fixture holds the
+	// rows the Ready tab actually matches, so the screenshot shows the view and
+	// its filter agreeing.
+	tabsReady := &storeui.Model{Items: []appstore.Item{experimental, external}}
+	tabsReady.Tabs.Cycle(1)
+	notice := &storeui.Model{Items: []appstore.Item{experimental}}
+	notice.Toasts.Push("Install completed; game list refresh requested", time.Now())
 	states := map[string]*storeui.Model{
 		"catalogue":           {Items: []appstore.Item{verified, experimental, candidate}},
+		"tabs-ready":          tabsReady,
+		"notice":              notice,
 		"details":             {Items: []appstore.Item{experimental}, Focus: storeui.Actions},
 		"installed-healthy":   {Items: []appstore.Item{verified}},
 		"verified":            {Items: []appstore.Item{verified}, Focus: storeui.Actions},
@@ -493,12 +504,12 @@ func TestSwappedConfirmBackMappingControlsCatalogueAndConfirmation(t *testing.T)
 	}
 }
 
-// countMutedInHeading counts the muted pixels in the heading line to the right
-// of the word CATALOGUE, which is where the list reports its range.
-func countMutedInHeading(frame *image.RGBA) int {
+// countMutedRange counts the muted pixels of the range caption under the rows,
+// which is where a list that outgrows its window reports what it is showing.
+func countMutedRange(frame *image.RGBA) int {
 	muted := 0
-	for column := 100; column < listRight; column++ {
-		for baseline := 62 - glyphHeight; baseline <= 62; baseline++ {
+	for column := listLeft; column < listRight; column++ {
+		for baseline := listRangeBaseline - glyphHeight; baseline <= listRangeBaseline; baseline++ {
 			if frame.RGBAAt(column, baseline) == palette.muted {
 				muted++
 			}
@@ -509,7 +520,7 @@ func countMutedInHeading(frame *image.RGBA) int {
 
 // A catalogue longer than the window shows one window of rows, marks the
 // selected row with a solid accent ring around an accent wash, and reports where
-// the window sits in the list.
+// the window sits under the rows it describes.
 func TestLongCatalogueShowsOneWindowOfRows(t *testing.T) {
 	model := &storeui.Model{}
 	for index := 0; index < listRows+3; index++ {
@@ -534,25 +545,137 @@ func TestLongCatalogueShowsOneWindowOfRows(t *testing.T) {
 	if wash == palette.selected {
 		t.Fatal("the selected row still reads as a filled button")
 	}
-	// Nothing is painted below the window, so the list never claims rows it does
-	// not show. The panel background is what is left there.
+	// Nothing is painted between the last row and the range caption, so the list
+	// never claims rows it does not show: the panel background is what is left
+	// to the left of the caption.
+	caption := listRangeCaption(start, end, len(model.Items))
 	for y := listBottom; y < panelBottom; y++ {
-		if frame.RGBAAt(listLeft, y) != palette.panel {
-			t.Fatalf("the list painted row content at y=%d, outside its window", y)
+		for x := listLeft; x < listRangePosition(caption); x++ {
+			if frame.RGBAAt(x, y) != palette.panel {
+				t.Fatalf("the list painted row content at (%d,%d), outside its window", x, y)
+			}
 		}
 	}
-	if muted := countMutedInHeading(frame); muted == 0 {
+	if muted := countMutedRange(frame); muted == 0 {
 		t.Fatalf("the overflowing list did not report its range %d-%d of %d", start+1, end, len(model.Items))
 	}
 }
 
 // A list that fits is fully shown, so a range would only repeat the count and
-// the heading stays bare.
+// the list leaves its foot clear.
 func TestShortCatalogueReportsNoRange(t *testing.T) {
 	model := &storeui.Model{Items: []appstore.Item{catalogueItem()}}
 	frame := draw(model, platformHeader("trimui-smart-pro"), nil)
-	if muted := countMutedInHeading(frame); muted != 0 {
+	if muted := countMutedRange(frame); muted != 0 {
 		t.Fatalf("a catalogue that fits reported a range (%d pixels)", muted)
+	}
+}
+
+// The bar marks the view the list is showing with the same accent wash and ring
+// as a selected row, and leaves every other tab's name readable, so the other
+// views are discoverable from inside one of them.
+func TestTabStripMarksTheActiveTabAndKeepsTheRestReadable(t *testing.T) {
+	model := &storeui.Model{Items: []appstore.Item{catalogueItem()}}
+	model.Tabs.Cycle(1)
+	if model.Tab() != storeui.TabReady {
+		t.Fatalf("stepping right selected %q", model.Tab().Label())
+	}
+	frame := draw(model, platformHeader("trimui-smart-pro"), nil)
+	labels := tabLabels()
+	for index, pill := range tabPillRectangles(labels) {
+		active := storeui.TabOrder[index] == model.Tab()
+		ring := frame.RGBAAt(pill.Min.X, pill.Min.Y)
+		if active {
+			if ring != palette.accent {
+				t.Fatalf("the active tab %q has no accent ring: %v", labels[index], ring)
+			}
+			if wash := frame.RGBAAt(pill.Min.X+2, pill.Min.Y+2); wash != blend(palette.accent, palette.panel, selectionWash) {
+				t.Fatalf("the active tab %q is not washed with the accent: %v", labels[index], wash)
+			}
+			continue
+		}
+		if ring == palette.accent {
+			t.Fatalf("the inactive tab %q is marked as active", labels[index])
+		}
+		muted := false
+		for x := pill.Min.X; x < pill.Max.X && !muted; x++ {
+			for y := tabStripBaseline - glyphHeight; y <= tabStripBaseline; y++ {
+				if frame.RGBAAt(x, y) == palette.muted {
+					muted = true
+					break
+				}
+			}
+		}
+		if !muted {
+			t.Fatalf("the inactive tab %q has no readable label", labels[index])
+		}
+	}
+}
+
+// A notice is painted over the panel foot and nowhere else: the action row above
+// it and the footer below it keep what they had.
+func TestNoticeBarCarriesTheCompletionOverThePanelFoot(t *testing.T) {
+	model := &storeui.Model{Items: []appstore.Item{catalogueItem()}, Focus: storeui.Browse}
+	model.Toasts.Push("Install completed; game list refresh requested", time.Now())
+	frame := draw(model, platformHeader("trimui-smart-pro"), nil)
+	bar := toastRectangle()
+	if got := frame.RGBAAt(bar.Min.X, bar.Min.Y); got != palette.accent {
+		t.Fatalf("the notice bar has no accent edge: %v", got)
+	}
+	if got := frame.RGBAAt(bar.Min.X+2, bar.Min.Y+2); got != blend(palette.accent, palette.panel, toastWash) {
+		t.Fatalf("the notice bar is not washed with the accent: %v", got)
+	}
+	painted := 0
+	for y := actionRowBaseline; y < actionRowBaseline+22; y++ {
+		for x := panelInset; x < panelRight; x++ {
+			if frame.RGBAAt(x, y) == palette.selected {
+				painted++
+			}
+		}
+	}
+	if painted == 0 {
+		t.Fatal("the notice bar covered the action buttons")
+	}
+	painted = 0
+	for y := footerBaseline - glyphHeight; y <= footerBaseline; y++ {
+		for x := 0; x < canvasWidth; x++ {
+			if frame.RGBAAt(x, y) == palette.muted {
+				painted++
+			}
+		}
+	}
+	if painted == 0 {
+		t.Fatal("the notice bar cost the footer its hint")
+	}
+	// A notice that has expired leaves no bar behind at all.
+	expired := &storeui.Model{Items: []appstore.Item{catalogueItem()}, Focus: storeui.Browse}
+	expired.Toasts.Push("Install completed; game list refresh requested", time.Now().Add(-storeui.ToastTTL))
+	if !bytes.Equal(draw(expired, platformHeader("trimui-smart-pro"), nil).Pix, draw(&storeui.Model{Items: []appstore.Item{catalogueItem()}, Focus: storeui.Browse}, platformHeader("trimui-smart-pro"), nil).Pix) {
+		t.Fatal("an expired notice still painted a bar")
+	}
+}
+
+// The strip is painted with nothing to list, so an empty tab is a screen the
+// user can step out of rather than a dead end.
+func TestEmptyCatalogueStillShowsTheTabStrip(t *testing.T) {
+	frame := draw(&storeui.Model{}, platformHeader("trimui-smart-pro"), nil)
+	pill := tabPillRectangles(tabLabels())[0]
+	if got := frame.RGBAAt(pill.Min.X, pill.Min.Y); got != palette.accent {
+		t.Fatalf("an empty catalogue has no tab strip: %v", got)
+	}
+}
+
+// An empty tab is not the same answer as an empty index, and it is the only one
+// with a way out, so it says which it is.
+func TestEmptyCatalogueNamesTheEmptyTab(t *testing.T) {
+	if got := emptyCatalogueMessage(0, 0); got != "NO PACKAGES IN CATALOGUE" {
+		t.Fatalf("empty index says %q", got)
+	}
+	if got := emptyCatalogueMessage(3, 0); got != "NO PACKAGES IN THIS TAB" {
+		t.Fatalf("empty tab says %q", got)
+	}
+	if got := emptyCatalogueMessage(3, 3); got != "NO PACKAGES IN CATALOGUE" {
+		t.Fatalf("a list with rows says %q", got)
 	}
 }
 
