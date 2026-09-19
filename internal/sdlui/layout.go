@@ -177,6 +177,7 @@ func toastRectangle() image.Rectangle {
 // emptyCatalogueMessage names why the list has no rows. An index that listed
 // nothing and a tab that hides everything it listed are different answers, and
 // the second one has a way out the first does not.
+//
 //lint:ignore U1000 used by the sdl-tagged draw code in this package
 func emptyCatalogueMessage(total, visible int) string {
 	if total > 0 && visible == 0 {
