@@ -3,6 +3,7 @@ package archive
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"os"
 	"path/filepath"
@@ -94,6 +95,64 @@ func TestExtractTarGZRejectsLinksAndExtractsRegularFiles(t *testing.T) {
 	if _, err := Extract(traversalDirectory, "tar.gz", t.TempDir(), 0, 100); err == nil {
 		t.Fatal("expected tar traversal directory to be rejected")
 	}
+}
+
+// The tar.gz arm decompresses before it trusts anything, so an input that is
+// not gzip at all has to be rejected before a tar header is ever parsed.
+func TestExtractTarGZRejectsInputThatIsNotGzip(t *testing.T) {
+	archivePath := filepath.Join(t.TempDir(), "fixture.tar.gz")
+	if err := os.WriteFile(archivePath, []byte("not a gzip stream"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Extract(archivePath, "tar.gz", t.TempDir(), 1, 1024); err == nil {
+		t.Fatal("expected a non-gzip stream to be rejected")
+	}
+}
+
+// A well-formed gzip wrapper around a damaged tar stream has to be rejected
+// too, so the failure is reported from the decompressed bytes rather than being
+// mistaken for a truncated download.
+func TestExtractTarGZRejectsACorruptTarStream(t *testing.T) {
+	archivePath := writeCorruptTarGZ(t)
+	if _, err := Extract(archivePath, "tar.gz", t.TempDir(), 1, 1024); err == nil {
+		t.Fatal("expected a corrupt tar stream to be rejected")
+	}
+}
+
+// writeCorruptTarGZ gzips a tar header whose bytes no longer match its own
+// checksum, so the damage survives compression and only shows up once the tar
+// reader parses it.
+func writeCorruptTarGZ(t *testing.T) string {
+	t.Helper()
+	var raw bytes.Buffer
+	writer := tar.NewWriter(&raw)
+	if err := writer.WriteHeader(&tar.Header{Name: "release/launch.sh", Mode: 0755, Size: 3, Typeflag: tar.TypeReg}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.Write([]byte("run")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	corrupt := raw.Bytes()
+	corrupt[0] ^= 0xff
+	archivePath := filepath.Join(t.TempDir(), "fixture.tar.gz")
+	file, err := os.Create(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compressed := gzip.NewWriter(file)
+	if _, err := compressed.Write(corrupt); err != nil {
+		t.Fatal(err)
+	}
+	if err := compressed.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return archivePath
 }
 
 func makeZIP(t *testing.T, name string, mode os.FileMode, body string) string {
