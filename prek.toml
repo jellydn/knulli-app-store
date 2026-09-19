@@ -1,0 +1,88 @@
+# prek hooks for knulli-app-store. Mirrors .github/workflows/check.yml.
+# Fast checks run on pre-commit; slow checks run on pre-push.
+# SDL hooks need headers: `brew install sdl2` / `apt install libsdl2-dev`.
+#:schema https://www.schemastore.org/prek.json
+
+default_install_hook_types = ["pre-commit", "pre-push"]
+
+[[repos]]
+repo = "builtin"
+hooks = [
+    { id = "trailing-whitespace" },
+    { id = "end-of-file-fixer" },
+    { id = "check-yaml" },
+    { id = "check-json" },
+    { id = "check-added-large-files" },
+    { id = "check-merge-conflict" },
+    { id = "mixed-line-ending", args = ["--fix=lf"] },
+]
+
+[[repos]]
+repo = "local"
+hooks = [
+    {
+        id = "gofmt",
+        name = "gofmt",
+        language = "system",
+        entry = "gofmt -w",
+        types = ["go"],
+    },
+    {
+        id = "go-vet",
+        name = "go vet",
+        language = "system",
+        entry = "go vet ./...",
+        files = "\\.go$",
+        pass_filenames = false,
+    },
+    {
+        id = "go-vet-sdl",
+        name = "go vet -tags sdl",
+        language = "system",
+        entry = "go vet -tags sdl ./...",
+        files = "\\.go$",
+        pass_filenames = false,
+    },
+    {
+        id = "catalogue-deterministic",
+        name = "catalogue index is deterministic",
+        language = "system",
+        entry = """
+            one=$(mktemp) two=$(mktemp)
+            trap 'rm -f "$one" "$two"' EXIT
+            go run ./cmd/knulli-app catalogue -output "$one"
+            go run ./cmd/knulli-app catalogue -output "$two"
+            cmp "$one" "$two"
+            """,
+        shell = "sh",
+        files = "^(catalogue/|internal/catalog/|internal/manifest/|schema/|cmd/knulli-app/)",
+        pass_filenames = false,
+    },
+    {
+        id = "go-test-race",
+        name = "go test -race",
+        language = "system",
+        entry = "go test -race ./...",
+        files = "\\.go$",
+        pass_filenames = false,
+        stages = ["pre-push"],
+    },
+    {
+        id = "staticcheck",
+        name = "staticcheck",
+        language = "system",
+        entry = "go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...",
+        files = "\\.go$",
+        pass_filenames = false,
+        stages = ["pre-push"],
+    },
+    {
+        id = "staticcheck-sdl",
+        name = "staticcheck -tags sdl",
+        language = "system",
+        entry = "go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 -tags sdl ./...",
+        files = "\\.go$",
+        pass_filenames = false,
+        stages = ["pre-push"],
+    },
+]
