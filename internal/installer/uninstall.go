@@ -14,6 +14,10 @@ import (
 // returns a zero outcome with the error.
 func (m Manager) Uninstall(ctx context.Context, id string) (OperationOutcome, error) {
 	var outcome OperationOutcome
+	// Removal drops the installed state, and a failed one can leave a
+	// destination half-restored, so the cached result goes whatever the
+	// outcome.
+	defer m.statusCache.Invalidate(id)
 	err := m.uninstall(ctx, id, &outcome)
 	return outcome, err
 }

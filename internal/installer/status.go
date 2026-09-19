@@ -120,6 +120,14 @@ func (m Manager) Status(id string) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
+	identity, err := stateIdentity(state)
+	if err != nil {
+		return Status{}, err
+	}
+	if cached, found := m.statusCache.get(id, identity); found {
+		m.event("package_health_cached", "package", id, "healthy", fmt.Sprint(cached.Healthy), "issues", fmt.Sprint(len(cached.Issues)))
+		return cached, nil
+	}
 	status := Status{Installed: true, Version: state.Manifest.Version, Healthy: true}
 	for _, file := range state.Files {
 		if file.Preserved {
@@ -153,6 +161,7 @@ func (m Manager) Status(id string) (Status, error) {
 			status.addIssue(m, state.Manifest.ID, *issue)
 		}
 	}
+	m.statusCache.put(id, identity, status)
 	m.event("package_health_checked", "package", state.Manifest.ID, "healthy", fmt.Sprint(status.Healthy), "issues", fmt.Sprint(len(status.Issues)))
 	return status, nil
 }

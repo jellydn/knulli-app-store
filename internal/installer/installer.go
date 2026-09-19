@@ -4,8 +4,10 @@
 // package is split by concern, so a change lands next to the behaviour it
 // affects: staging and the manager session in stage.go, the transaction that
 // commits a release in commit.go, removal in uninstall.go, destination
-// inventory in adoption.go, force-reinstall backups in recovery.go, and the
-// executable, patch, and path helpers in files.go.
+// inventory in adoption.go, force-reinstall backups in recovery.go, the
+// executable, patch, and path helpers in files.go, the installed-state record
+// and health checks in state.go and status.go, and the health-check cache in
+// cache.go.
 package installer
 
 import (
@@ -28,7 +30,8 @@ type Manager struct {
 	Now            func() time.Time
 	AvailableBytes func(string) (uint64, error)
 
-	platform platform.Info
+	platform    platform.Info
+	statusCache *StatusCache
 }
 
 type AdoptionConflictError struct {
@@ -61,6 +64,14 @@ func (m Manager) Platform() platform.Info {
 	return m.platform
 }
 
+// WithStatusCache returns a copy of the manager that reuses health-check
+// results for packages whose recorded state has not changed. A manager built
+// without one verifies every managed file on every call.
+func (m Manager) WithStatusCache(cache *StatusCache) Manager {
+	m.statusCache = cache
+	return m
+}
+
 // Apply runs one package lifecycle operation: download, verify, and commit the
 // reviewed release, rolling back every change on failure. The outcome is
 // returned after a commit; a failed operation returns a zero outcome with the
@@ -72,6 +83,10 @@ func (m Manager) Apply(ctx context.Context, op Op, pkg manifest.Package) (Operat
 		return OperationOutcome{}, fmt.Errorf("unsupported lifecycle operation %q", op)
 	}
 	var outcome OperationOutcome
+	// The operation can change what a health check sees, and a failed one can
+	// leave a destination half-written before the rollback, so the cached result
+	// goes whatever the outcome.
+	defer m.statusCache.Invalidate(pkg.ID)
 	err := m.apply(ctx, string(op), pkg, &outcome)
 	return outcome, err
 }
