@@ -30,6 +30,10 @@ jobs:
           staticcheck -tags sdl ./...
       - name: Unit and integration tests
         run: go test -race ./...
+      # The gate, not just a number: a package that arrives with no test file
+      # fails here, and the total may not fall below the floor.
+      - name: Coverage gate
+        run: make cover
       - name: Compile SDL2 GUI and tests
         run: go test -tags sdl ./...
       - name: Build static aarch64 CLI

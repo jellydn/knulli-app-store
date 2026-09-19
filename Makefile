@@ -1,4 +1,4 @@
-.PHONY: all build build-ui catalogue check clean fmt gui test test-ui vet walkthrough
+.PHONY: all build build-ui catalogue check clean cover cover-untested fmt gui test test-ui vet walkthrough
 
 all: check build catalogue
 
@@ -45,6 +45,31 @@ test:
 
 test-ui:
 	go test -tags sdl ./...
+
+# Coverage gate. A total percentage alone would not notice a new package
+# arriving with no tests at all, so this is two checks: every package holding
+# production Go files must have a test file, and the total must stay above
+# COVER_MIN. The sdl-tagged GUI packages need libsdl2-dev, so they are measured
+# by test-ui instead of here.
+COVER_MIN ?= 70
+
+cover: cover-untested
+	@mkdir -p build
+	go test -covermode=atomic -coverprofile=build/cover.out ./...
+	@go tool cover -func=build/cover.out | tail -1
+	@total=$$(go tool cover -func=build/cover.out | awk '/^total:/ {gsub(/%/,"",$$NF); print $$NF}'); \
+	awk -v total="$$total" -v min="$(COVER_MIN)" 'BEGIN { if (total + 0 < min + 0) { printf "coverage %.1f%% is below the %d%% floor\n", total, min; exit 1 } }'
+
+cover-untested:
+	@missing=""; \
+	for dir in $$(go list -f '{{.Dir}}' ./...); do \
+	  ls "$$dir"/*_test.go >/dev/null 2>&1 && continue; \
+	  missing="$$missing $${dir#$(CURDIR)/}"; \
+	done; \
+	if [ -n "$$missing" ]; then \
+	  echo "no test file in:$$missing"; \
+	  exit 1; \
+	fi
 
 vet:
 	go vet ./...
