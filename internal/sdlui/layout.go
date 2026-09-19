@@ -8,7 +8,9 @@ package sdlui
 import "image"
 
 const (
-	canvasWidth  = 640
+	//lint:ignore U1000 used by the sdl-tagged draw code in this package
+	canvasWidth = 640
+	//lint:ignore U1000 used by the sdl-tagged draw code in this package
 	canvasHeight = 360
 	// One panel and one footer line are shared by every screen, so a hint can
 	// only ever appear in the footer.
@@ -25,23 +27,33 @@ const (
 	// top of a row still leaves its ink inside the row.
 	glyphHeight = 11
 	// panelInset is the left margin every panel body line shares.
+	//lint:ignore U1000 used by the sdl-tagged draw code in this package
 	panelInset = 258
 	// modeHeadingBaseline is where every controller screen starts its content,
 	// so switching screens never moves the heading.
+	//lint:ignore U1000 used by the sdl-tagged draw code in this package
 	modeHeadingBaseline = 176
 	// One status block serves the catalogue, details, health and error screens.
 	// It sits above the action buttons, so a status never covers an action and
 	// never lands on the notice.
-	statusBoxLeft   = 248
-	statusBoxTop    = 190
-	statusBoxRight  = 618
+	//lint:ignore U1000 used by the sdl-tagged draw code in this package
+	statusBoxLeft = 248
+	//lint:ignore U1000 used by the sdl-tagged draw code in this package
+	statusBoxTop = 190
+	//lint:ignore U1000 used by the sdl-tagged draw code in this package
+	statusBoxRight = 618
+	//lint:ignore U1000 used by the sdl-tagged draw code in this package
 	statusBoxBottom = 246
-	statusBaseline  = 205
-	statusLines     = 3
+	//lint:ignore U1000 used by the sdl-tagged draw code in this package
+	statusBaseline = 205
+	//lint:ignore U1000 used by the sdl-tagged draw code in this package
+	statusLines = 3
 	// The action row is the lowest interactive element in the catalogue panel.
 	// The status block above it can never hide a button while it stays clear.
+	//lint:ignore U1000 used by the sdl-tagged draw code in this package
 	actionLabelBaseline = 264
-	actionRowBaseline   = 278
+	//lint:ignore U1000 used by the sdl-tagged draw code in this package
+	actionRowBaseline = 278
 )
 
 // The list column is the left panel: a heading, then one row per package. Row
