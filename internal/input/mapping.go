@@ -139,8 +139,14 @@ func (mapping Mapping) Restricted(plan []Action) Mapping {
 }
 
 func (mapping Mapping) Action(button int) (Action, bool) {
+	// Only bound entries count. An unbound optional action is absent from the
+	// map, and a Go map read then yields 0 — the same code as SDL's south face
+	// button. Treating that zero as a real binding would make every press of
+	// button 0 look like the first unbound action instead of the one that
+	// actually carries it (for example Back after a customized skip-paging
+	// setup).
 	for _, action := range Actions {
-		if mapping[action] == button {
+		if bound, ok := mapping[action]; ok && bound == button {
 			return action, true
 		}
 	}

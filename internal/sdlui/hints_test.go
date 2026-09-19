@@ -67,6 +67,106 @@ func TestFooterLabelsFollowTheActiveMapping(t *testing.T) {
 	}
 }
 
+// A customized pad that swaps the face buttons must keep showing compass
+// labels for the bindings it saved, not the default AutoMapping letters.
+// This is the device path that matters when lettering differs across shells:
+// the footer must name the physical positions the user actually assigned.
+func TestCustomizedMappingFooterUsesCompassLabelsFromSavedBindings(t *testing.T) {
+	root := t.TempDir()
+	identity := storeinput.Identity{GUID: "custom-compass", Name: "TSP Pad"}
+	controls := storeinput.NewSession(root, "trimui-smart-pro")
+	controls.Connect(identity, true)
+
+	// First-run setup: CUSTOMIZE, then SKIP PAGING so only required actions
+	// are assigned. Navigate with the detected (Auto) mapping while FirstRun.
+	pressDetected := func(action storeinput.Action) {
+		t.Helper()
+		button := storeinput.AutoMapping()[action]
+		controls.HandleButton(button)
+	}
+	pressDetected(storeinput.Down)
+	pressDetected(storeinput.Down)
+	pressDetected(storeinput.Confirm) // CUSTOMIZE
+	if controls.Mode != storeinput.Paging {
+		t.Fatalf("customize did not open the paging question: mode=%s", controls.Mode)
+	}
+	pressDetected(storeinput.Down)
+	pressDetected(storeinput.Confirm) // SKIP PAGING
+	if controls.Mode != storeinput.Calibrating {
+		t.Fatalf("customize did not start calibration: mode=%s", controls.Mode)
+	}
+
+	// Required plan order: up, down, left, right, confirm, back, diagnostics.
+	// Face buttons are deliberately swapped vs AutoMapping so the footer cannot
+	// pass by accident: Confirm=EAST, Back=SOUTH, Settings=WEST.
+	buttons := []int{
+		11, // up
+		12, // down
+		13, // left
+		14, // right
+		1,  // confirm → EAST
+		0,  // back → SOUTH
+		2,  // diagnostics → WEST
+	}
+	for index, button := range buttons {
+		controls.HandleButton(button)
+		if controls.Mode != storeinput.Review {
+			t.Fatalf("action %d skipped assignment review: mode=%s", index, controls.Mode)
+		}
+		pressDetected(storeinput.Confirm)
+	}
+	if controls.Mode != storeinput.Preview {
+		t.Fatalf("custom mapping skipped preview: mode=%s error=%q", controls.Mode, controls.ValidationError)
+	}
+	for _, button := range buttons {
+		controls.HandleButton(button)
+	}
+	if controls.Mode != storeinput.Normal || controls.Source != "saved custom mapping" {
+		t.Fatalf("custom mapping was not saved: mode=%s source=%q error=%q", controls.Mode, controls.Source, controls.ValidationError)
+	}
+	if controls.Mapping[storeinput.Confirm] != 1 || controls.Mapping[storeinput.Back] != 0 || controls.Mapping[storeinput.Diagnostics] != 2 {
+		t.Fatalf("saved face bindings are wrong: %#v", controls.Mapping)
+	}
+
+	// Catalogue footer must name the saved compass positions, including the
+	// quit chord whose trigger is the saved Settings binding (WEST).
+	if got := footerText(catalogueModel(), controls); got != "Confirm (EAST)  Settings (WEST)  Quit (SELECT + WEST)" {
+		t.Fatalf("catalogue footer after customize = %q", got)
+	}
+	model := catalogueModel()
+	model.Focus = storeui.Confirm
+	if got := footerText(model, controls); got != "Confirm (EAST)  Back (SOUTH)" {
+		t.Fatalf("confirmation footer after customize = %q", got)
+	}
+
+	// A later launch loads the same record and must keep the same labels.
+	reloaded := storeinput.NewSession(root, "trimui-smart-pro")
+	reloaded.Connect(identity, true)
+	if reloaded.Mode != storeinput.Normal || reloaded.Source != "saved controller mapping" {
+		t.Fatalf("saved custom mapping did not load: mode=%s source=%q", reloaded.Mode, reloaded.Source)
+	}
+	if got := footerText(catalogueModel(), reloaded); got != "Confirm (EAST)  Settings (WEST)  Quit (SELECT + WEST)" {
+		t.Fatalf("reloaded catalogue footer = %q", got)
+	}
+	// Mapping summary labels are compass directions too, never A/B/X/Y.
+	// Only the bound actions are checked: SortedLabels walks the full action
+	// set, and an unbound optional button would read as the zero index.
+	summary := map[storeinput.Action]string{}
+	for action, button := range reloaded.Mapping {
+		summary[action] = storeinput.ButtonLabel(button)
+	}
+	if summary[storeinput.Confirm] != "EAST" || summary[storeinput.Back] != "SOUTH" || summary[storeinput.Diagnostics] != "WEST" {
+		t.Fatalf("saved face summary labels = %#v", summary)
+	}
+	for action, label := range summary {
+		for _, letter := range []string{"A", "B", "X", "Y"} {
+			if label == letter {
+				t.Fatalf("%s summary still uses a letter face label: %q", action, label)
+			}
+		}
+	}
+}
+
 func TestFirstRunSetupFooterOffersTheDetectedBinding(t *testing.T) {
 	controls := storeinput.NewSession(t.TempDir(), "magicx-zero-28")
 	controls.Connect(storeinput.Identity{GUID: "03000000", Name: "Pad"}, true)

@@ -29,6 +29,24 @@ func TestAutoMappingUsesSemanticGameControllerButtons(t *testing.T) {
 	}
 }
 
+// A mapping that left paging unbound must not treat button 0 as PageUp. The
+// missing optional entries are absent from the map; a plain read would yield 0
+// and steal every south-face press from the action that actually binds it.
+func TestMappingActionIgnoresUnboundOptionalZeroValue(t *testing.T) {
+	mapping := AutoMapping().Without(PageUp, PageDown)
+	mapping[Back] = 0
+	mapping[Confirm] = 1
+	if action, ok := mapping.Action(0); !ok || action != Back {
+		t.Fatalf("button 0 resolved to %q ok=%v, want Back", action, ok)
+	}
+	if action, ok := mapping.Action(1); !ok || action != Confirm {
+		t.Fatalf("button 1 resolved to %q ok=%v, want Confirm", action, ok)
+	}
+	if _, ok := mapping.Action(9); ok {
+		t.Fatal("an unbound shoulder button was treated as assigned")
+	}
+}
+
 func TestDeviceProfilesDoNotInventMagicXFallback(t *testing.T) {
 	trimui := Profile("trimui-smart-pro")
 	if trimui.Resolution != "1280x720" || trimui.Fallback == nil {
