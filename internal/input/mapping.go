@@ -139,8 +139,14 @@ func (mapping Mapping) Restricted(plan []Action) Mapping {
 }
 
 func (mapping Mapping) Action(button int) (Action, bool) {
+	// Only bound entries count. An unbound optional action is absent from the
+	// map, and a Go map read then yields 0 — the same code as SDL's south face
+	// button. Treating that zero as a real binding would make every press of
+	// button 0 look like the first unbound action instead of the one that
+	// actually carries it (for example Back after a customized skip-paging
+	// setup).
 	for _, action := range Actions {
-		if mapping[action] == button {
+		if bound, ok := mapping[action]; ok && bound == button {
 			return action, true
 		}
 	}
@@ -186,12 +192,16 @@ func (mapping Mapping) Missing() []Action {
 }
 
 // ButtonLabel names the control carrying an action, whether it is an SDL
-// GameController button or a keyboard binding on a desktop run.
+// GameController button or a keyboard binding on a desktop run. Face buttons
+// use compass directions (south, east, west, north) rather than A/B/X/Y,
+// because those letters follow different physical layouts on Nintendo-style
+// and Xbox-style pads. SDL GameController indices still map Xbox-style
+// positions: 0 south, 1 east, 2 west, 3 north.
 func ButtonLabel(button int) string {
 	labels := map[int]string{
-		0: "A", 1: "B", 2: "X", 3: "Y",
+		0: "SOUTH", 1: "EAST", 2: "WEST", 3: "NORTH",
 		4: "BACK", 5: "GUIDE", 6: "START",
-		7: "LEFT STICK", 8: "RIGHT STICK", 9: "LEFT SHOULDER", 10: "RIGHT SHOULDER",
+		7: "LEFT STICK", 8: "RIGHT STICK", 9: "L1", 10: "R1",
 		11: "DPAD UP", 12: "DPAD DOWN", 13: "DPAD LEFT", 14: "DPAD RIGHT",
 	}
 	if label := labels[button]; label != "" {

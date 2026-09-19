@@ -40,12 +40,12 @@ controls while launching to force setup. If no SDL GameController exists, a
 blocked screen shows log and diagnostic paths.
 
 The footer is the only place a screen shows controls. It names each available
-action beside its binding, for example Confirm (A)  Settings (Y)  Quit
-(SELECT + Y),
+action beside its binding, for example Confirm (SOUTH)  Settings (NORTH)  Quit
+(SELECT + NORTH),
 and the same action name always means the same action. No screen repeats a
 control hint in its own text; the controller mapping summary uses the same
 names. Quitting is the one control no button carries alone: hold Select and
-press Y. On the blocked screen, Confirm exports diagnostics and that chord is
+press North. On the blocked screen, Confirm exports diagnostics and that chord is
 the way out.
 
 The catalogue opens on its whole list and carries a tab bar above the rows:

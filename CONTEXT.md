@@ -88,7 +88,7 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Verb** — The word an action carries in a footer hint, for example `Confirm` for the confirm action. Directional actions share the `Navigate` footer verb and the two paging actions share `Page`, while setup prompts and mapping summaries keep the direction visible.
 
-**Footer hint** — The single line below every screen's panel. It names each available action beside its binding, for example `Confirm (A)  Back (B)  Settings (Y)`, or gives an actionless calibration instruction. Outside the footer, mapping summaries identify saved bindings but do not instruct the user to press them.
+**Footer hint** — The single line below every screen's panel. It names each available action beside its binding, for example `Confirm (SOUTH)  Back (EAST)  Settings (NORTH)`, or gives an actionless calibration instruction. Face buttons use compass directions so the label matches the physical position on every device layout. Outside the footer, mapping summaries identify saved bindings but do not instruct the user to press them.
 
 **Keyboard binding** — A binding carried by a desktop keyboard key rather than a pad button, used when no GameController exists so a development machine can reach every screen. It is a binding set like any other, with its own identity, so a desktop run never reads or overwrites a mapping saved for a handheld controller.
 

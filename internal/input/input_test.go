@@ -13,7 +13,37 @@ func TestAutoMappingUsesSemanticGameControllerButtons(t *testing.T) {
 		t.Fatal(err)
 	}
 	if action, ok := mapping.Action(0); !ok || action != Confirm {
-		t.Fatalf("SDL A did not map to Confirm: %q %v", action, ok)
+		t.Fatalf("SDL south face button did not map to Confirm: %q %v", action, ok)
+	}
+	if got := ButtonLabel(0); got != "SOUTH" {
+		t.Fatalf("SDL face button 0 label = %q, want SOUTH", got)
+	}
+	if got := ButtonLabel(1); got != "EAST" {
+		t.Fatalf("SDL face button 1 label = %q, want EAST", got)
+	}
+	if got := ButtonLabel(2); got != "WEST" {
+		t.Fatalf("SDL face button 2 label = %q, want WEST", got)
+	}
+	if got := ButtonLabel(3); got != "NORTH" {
+		t.Fatalf("SDL face button 3 label = %q, want NORTH", got)
+	}
+}
+
+// A mapping that left paging unbound must not treat button 0 as PageUp. The
+// missing optional entries are absent from the map; a plain read would yield 0
+// and steal every south-face press from the action that actually binds it.
+func TestMappingActionIgnoresUnboundOptionalZeroValue(t *testing.T) {
+	mapping := AutoMapping().Without(PageUp, PageDown)
+	mapping[Back] = 0
+	mapping[Confirm] = 1
+	if action, ok := mapping.Action(0); !ok || action != Back {
+		t.Fatalf("button 0 resolved to %q ok=%v, want Back", action, ok)
+	}
+	if action, ok := mapping.Action(1); !ok || action != Confirm {
+		t.Fatalf("button 1 resolved to %q ok=%v, want Confirm", action, ok)
+	}
+	if _, ok := mapping.Action(9); ok {
+		t.Fatal("an unbound shoulder button was treated as assigned")
 	}
 }
 

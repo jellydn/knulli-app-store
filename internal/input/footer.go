@@ -94,7 +94,7 @@ func ActionLabel(action Action) string {
 // consistent and free of duplicated hints.
 //
 // The quit hint is the one action no button carries on its own, so the caller
-// passes the chord it is actually listening for ("SELECT + Y", "TAB + Y"). An
+// passes the chord it is actually listening for ("SELECT + NORTH", "TAB + Y"). An
 // empty chord leaves that hint out rather than printing a button that does
 // nothing.
 func Footer(mapping Mapping, hints []Hint, chord string) string {
