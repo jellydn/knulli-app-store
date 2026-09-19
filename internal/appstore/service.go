@@ -59,6 +59,10 @@ type Service struct {
 	manager installer.Manager
 }
 
+// Open loads the catalogue index and binds the service to it. The manager keeps
+// a health-check cache from here on, because Items reads a status for every
+// package on every load and would otherwise re-hash every installed package's
+// files each time. Every operation still invalidates the package it touched.
 func Open(indexPath string, manager installer.Manager) (*Service, error) {
 	index, err := catalog.Load(indexPath)
 	if err != nil {
@@ -66,7 +70,7 @@ func Open(indexPath string, manager installer.Manager) (*Service, error) {
 		return nil, err
 	}
 	manager.Diagnostics.Event("catalogue_loaded", "path", indexPath, "packages", fmt.Sprint(len(index.Packages)))
-	return &Service{index: index, manager: manager}, nil
+	return &Service{index: index, manager: manager.WithStatusCache(installer.NewStatusCache())}, nil
 }
 
 func (s *Service) Items(ctx context.Context) ([]Item, error) {
