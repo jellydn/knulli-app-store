@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -42,6 +43,36 @@ func TestToastsKeepTheirOrderAndExpireOneByOne(t *testing.T) {
 	got = toasts.Live(start.Add(ToastTTL))
 	if len(got) != 1 || got[0] != "Game list refresh requested" {
 		t.Fatalf("the older notice did not expire alone: %v", got)
+	}
+}
+
+// A burst that arrives faster than the bar can clear it does not grow the queue:
+// the newest notices are kept and the oldest are given up.
+func TestToastsKeepOnlyTheNewestNotices(t *testing.T) {
+	start := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
+	var toasts Toasts
+	for index := 0; index <= ToastLimit; index++ {
+		toasts.Push(fmt.Sprintf("notice %d", index), start)
+	}
+
+	got := toasts.Live(start)
+	if len(got) != ToastLimit {
+		t.Fatalf("a burst of %d read back %d notices, want %d", ToastLimit+1, len(got), ToastLimit)
+	}
+	if got[0] != "notice 1" || got[len(got)-1] != fmt.Sprintf("notice %d", ToastLimit) {
+		t.Fatalf("the oldest notice was not the one given up: %v", got)
+	}
+}
+
+// The bound is a property of the queue, not of the frame loop that drains it, so
+// a reader that stops reading cannot let the slice grow.
+func TestToastBoundHoldsWithoutAReader(t *testing.T) {
+	var toasts Toasts
+	for index := 0; index < ToastLimit*10; index++ {
+		toasts.Push(fmt.Sprintf("notice %d", index), time.Now())
+	}
+	if len(toasts.items) != ToastLimit {
+		t.Fatalf("queue holds %d notices with nothing reading it, want %d", len(toasts.items), ToastLimit)
 	}
 }
 
