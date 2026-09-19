@@ -87,10 +87,11 @@ func (store Store) Load(identity Identity) (Mapping, bool, error) {
 			return nil, false, fmt.Errorf("invalid saved controller identity: %w", keyErr)
 		}
 		if recordKey == key {
-			if err := record.Mapping.Validate(); err != nil {
+			migrated := record.Mapping.KeepKnown()
+			if err := migrated.Validate(); err != nil {
 				return nil, false, fmt.Errorf("invalid saved mapping: %w", err)
 			}
-			return record.Mapping.Clone(), true, nil
+			return migrated, true, nil
 		}
 	}
 	return nil, false, nil
@@ -191,7 +192,8 @@ func (store Store) read() (fileData, error) {
 		return data, corruptFileError{err: fmt.Errorf("unsupported controller mapping schema %q", data.Schema)}
 	}
 	keys := make(map[string]struct{}, len(data.Records))
-	for _, record := range data.Records {
+	for index := range data.Records {
+		record := data.Records[index]
 		key, err := record.Identity.Key()
 		if err != nil {
 			return data, corruptFileError{err: fmt.Errorf("invalid saved controller identity: %w", err)}
@@ -199,9 +201,15 @@ func (store Store) read() (fileData, error) {
 		if _, exists := keys[key]; exists {
 			return data, corruptFileError{err: fmt.Errorf("duplicate saved controller identity %q", key)}
 		}
-		if err := record.Mapping.Validate(); err != nil {
+		// A record saved by an older build may still bind the exit button that
+		// quitting used to carry. Dropping it here migrates the record instead of
+		// treating the whole file as corrupt, and the next write stores the
+		// migrated form.
+		migrated := record.Mapping.KeepKnown()
+		if err := migrated.Validate(); err != nil {
 			return data, corruptFileError{err: fmt.Errorf("invalid saved mapping for %q: %w", key, err)}
 		}
+		data.Records[index].Mapping = migrated
 		keys[key] = struct{}{}
 	}
 	return data, nil

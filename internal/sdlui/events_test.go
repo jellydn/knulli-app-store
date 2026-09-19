@@ -73,15 +73,51 @@ func TestHandleButtonReportsSemanticAction(t *testing.T) {
 	}
 }
 
-func TestHandleExitActionQuits(t *testing.T) {
+// Quitting is the held-Select chord: no single button ends a session, and the
+// trigger keeps its own action when the anchor is not held.
+func TestHandleQuitChordExitsOnlyWhileTheAnchorIsHeld(t *testing.T) {
 	model, controls, logger, _ := newRouterHarness(t)
-	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: int(storeinput.AutoMapping()[storeinput.Exit])})
+	trigger := int(storeinput.AutoMapping()[storeinput.Diagnostics])
+
+	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: trigger})
+	if effects.Exit {
+		t.Fatal("the trigger quit without the anchor held")
+	}
+
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventChordAnchor, Held: true})
+	effects = Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: trigger})
 	if !effects.Exit {
-		t.Fatal("exit action did not exit")
+		t.Fatal("Select+Y did not exit")
 	}
 }
 
-func TestHandleBackWalksFocusBeforeExiting(t *testing.T) {
+func TestHandleReleasedAnchorHandsTheTriggerBack(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	trigger := int(storeinput.AutoMapping()[storeinput.Diagnostics])
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventChordAnchor, Held: true})
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventChordAnchor, Held: false})
+	if effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: trigger}); effects.Exit {
+		t.Fatal("a released anchor still quit")
+	}
+}
+
+// Key repeat drives navigation only: a held Confirm must not confirm twice and
+// a held Back must not unwind several screens.
+func TestHandleIgnoresRepeatsForEverythingButNavigation(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	if effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyDown, Repeat: true}); effects.Action != storeinput.Down {
+		t.Fatalf("repeated navigation reported %q, want %q", effects.Action, storeinput.Down)
+	}
+	model.Focus = storeui.Actions
+	if effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyConfirm, Repeat: true}); effects.Action != "" || model.Focus != storeui.Actions {
+		t.Fatalf("repeated confirm acted: action=%q focus=%v", effects.Action, model.Focus)
+	}
+	if effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyBack, Repeat: true}); effects.Action != "" || effects.Exit {
+		t.Fatalf("repeated back acted: action=%q exit=%v", effects.Action, effects.Exit)
+	}
+}
+
+func TestHandleBackReturnsThroughFocusWithoutLeavingTheApp(t *testing.T) {
 	model, controls, logger, _ := newRouterHarness(t)
 	model.Focus = storeui.Actions
 	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: int(storeinput.AutoMapping()[storeinput.Back])})
@@ -89,8 +125,8 @@ func TestHandleBackWalksFocusBeforeExiting(t *testing.T) {
 		t.Fatal("back from the actions focus must return to browse, not exit")
 	}
 	effects = Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: int(storeinput.AutoMapping()[storeinput.Back])})
-	if !effects.Exit {
-		t.Fatal("back from browse must exit")
+	if effects.Exit {
+		t.Fatal("back from browse must not exit: quitting is the chord")
 	}
 }
 

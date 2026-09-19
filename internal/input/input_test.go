@@ -36,7 +36,7 @@ func TestCalibrationRejectsConflictsAndRequiresPreview(t *testing.T) {
 	if err := calibration.Assign(11); err == nil || calibration.Index != 1 {
 		t.Fatalf("conflict advanced calibration: %#v", calibration)
 	}
-	for _, button := range []int{12, 13, 14, 0, 1, 3, 6} {
+	for _, button := range []int{12, 13, 14, 0, 1, 3} {
 		if err := calibration.Assign(button); err != nil {
 			t.Fatal(err)
 		}
@@ -44,11 +44,40 @@ func TestCalibrationRejectsConflictsAndRequiresPreview(t *testing.T) {
 	if !calibration.Preview {
 		t.Fatal("mapping skipped preview")
 	}
-	for index, button := range []int{11, 12, 13, 14, 0, 1, 3, 6} {
+	for index, button := range []int{11, 12, 13, 14, 0, 1, 3} {
 		done := calibration.Test(button)
-		if done != (index == 7) {
+		if done != (index == len(Actions)-1) {
 			t.Fatalf("preview completed at input %d", index)
 		}
+	}
+}
+
+// A mapping saved before quitting became a chord still carries its own exit
+// button. Loading it migrates the record instead of rejecting it, so an
+// upgrade does not force the user back through controller setup.
+func TestSavedMappingWithALegacyExitButtonStillLoads(t *testing.T) {
+	root := t.TempDir()
+	identity := Identity{Device: "trimui-smart-pro", GUID: "legacy", Name: "Pad"}
+	host := filepath.Join(root, strings.TrimPrefix(Path, "/"))
+	if err := os.MkdirAll(filepath.Dir(host), 0755); err != nil {
+		t.Fatal(err)
+	}
+	legacy := `{"schema":"org.knulli.app-store/controller-mappings/v1","records":[{"identity":{"device":"trimui-smart-pro","guid":"legacy","name":"Pad"},"mapping":{"up":11,"down":12,"left":13,"right":14,"confirm":0,"back":1,"diagnostics":3,"exit":6}}]}`
+	if err := os.WriteFile(host, []byte(legacy), 0644); err != nil {
+		t.Fatal(err)
+	}
+	loaded, found, err := NewStore(root).Load(identity)
+	if err != nil || !found {
+		t.Fatalf("legacy mapping did not load: found=%v err=%v", found, err)
+	}
+	if _, ok := loaded[Exit]; ok {
+		t.Fatal("the legacy exit binding survived migration")
+	}
+	if err := loaded.Validate(); err != nil {
+		t.Fatalf("migrated mapping is not usable: %v", err)
+	}
+	if loaded[Confirm] != 0 || loaded[Diagnostics] != 3 {
+		t.Fatalf("migration changed a binding: %#v", loaded)
 	}
 }
 
@@ -271,7 +300,7 @@ func TestCustomMappingRequiresReviewAndPreviewBeforeAtomicSave(t *testing.T) {
 	press(session, Down)
 	press(session, Down)
 	press(session, Confirm)
-	buttons := []int{2, 4, 5, 7, 8, 9, 10, 15}
+	buttons := []int{2, 4, 5, 7, 8, 9, 10}
 	for index, button := range buttons {
 		session.HandleButton(button)
 		if session.Mode != Review {
@@ -301,8 +330,14 @@ func TestBlockedExportDiagnosticsBindsToConfirm(t *testing.T) {
 	if _, effect := session.HandleButton(AutoMapping()[Diagnostics]); effect != NoEffect {
 		t.Fatalf("blocked Diagnostics still exported: %q", effect)
 	}
-	if action, _ := session.HandleButton(AutoMapping()[Back]); action != Exit {
-		t.Fatalf("blocked Back did not leave: %q", action)
+	// Nothing on the blocked screen quits on its own: the held Select chord is
+	// the way out, and Back has nothing to go back to.
+	if action, _ := session.HandleButton(AutoMapping()[Back]); action != "" {
+		t.Fatalf("blocked Back produced %q", action)
+	}
+	session.SetChordAnchor(true)
+	if action, _ := session.HandleButton(AutoMapping()[Diagnostics]); action != Exit {
+		t.Fatalf("blocked Select+Y did not leave: %q", action)
 	}
 }
 
@@ -318,9 +353,14 @@ func TestNoControllerBlockedReconnectResetAndSafeExit(t *testing.T) {
 	if session.Mode != Setup || session.Source != "Knulli SDL_GAMECONTROLLERCONFIG" {
 		t.Fatalf("unexpected auto mapping state: %#v", session)
 	}
-	if action, _ := session.HandleButton(AutoMapping()[Back]); action != Exit {
-		t.Fatalf("first-run safe exit did not exit: %q", action)
+	if action, _ := session.HandleButton(AutoMapping()[Back]); action != "" {
+		t.Fatalf("first-run Back produced %q", action)
 	}
+	session.SetChordAnchor(true)
+	if action, _ := session.HandleButton(AutoMapping()[Diagnostics]); action != Exit {
+		t.Fatalf("first-run quit chord did not exit: %q", action)
+	}
+	session.SetChordAnchor(false)
 	press(session, Confirm)
 	press(session, Diagnostics)
 	press(session, Down)

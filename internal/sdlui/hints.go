@@ -19,7 +19,13 @@ func footerText(model *storeui.Model, controls *storeinput.Session) string {
 	if len(hints) == 0 {
 		return ""
 	}
-	return storeinput.Footer(footerMapping(controls), hints)
+	// Quitting is a chord, so its hint carries the chord rather than a button
+	// label. It is only offered where the app can actually be left.
+	chord := ""
+	if controls != nil {
+		chord = controls.QuitChord()
+	}
+	return storeinput.Footer(footerMapping(controls), hints, chord)
 }
 
 // footerMapping is the mapping the current screen actually accepts, so the
@@ -37,24 +43,27 @@ func footerMapping(controls *storeinput.Session) storeinput.Mapping {
 func footerHints(model *storeui.Model, controls *storeinput.Session) []storeinput.Hint {
 	confirm := storeinput.NewHint(storeinput.Confirm)
 	back := storeinput.NewHint(storeinput.Back)
+	quit := storeinput.NewHint(storeinput.Exit)
 	if controls == nil || controls.Mode == storeinput.Normal {
 		if model.Busy {
 			return nil
 		}
 		if len(model.Items) == 0 {
-			return []storeinput.Hint{back, storeinput.NewHint(storeinput.Diagnostics)}
+			return []storeinput.Hint{storeinput.NewHint(storeinput.Diagnostics), quit}
 		}
 		if model.Focus == storeui.Confirm || model.Focus == storeui.ForceConfirm {
 			return []storeinput.Hint{confirm, back}
 		}
-		return []storeinput.Hint{confirm, back, storeinput.NewHint(storeinput.Diagnostics)}
+		// The catalogue is the top of the app: there is nothing behind it, so
+		// Back is not offered and quitting is the chord.
+		return []storeinput.Hint{confirm, storeinput.NewHint(storeinput.Diagnostics), quit}
 	}
 	switch controls.Mode {
 	case storeinput.Blocked:
-		return []storeinput.Hint{confirm, back}
+		return []storeinput.Hint{confirm, quit}
 	case storeinput.Setup:
 		if controls.FirstRun {
-			return []storeinput.Hint{confirm, storeinput.NewHint(storeinput.Exit)}
+			return []storeinput.Hint{confirm, quit}
 		}
 		return []storeinput.Hint{confirm, back}
 	case storeinput.Settings, storeinput.Review:

@@ -53,8 +53,17 @@ func TestDesktopSessionOpensSetupAndSavesWithTheKeyboard(t *testing.T) {
 	if session.DetectedMapping()[Confirm] != KeyEnter || session.Mapping[Confirm] != KeyEnter {
 		t.Fatalf("desktop session did not detect the keyboard: %#v", session.Mapping)
 	}
-	if action, _ := session.HandleButton(KeyEscape); action != Exit {
-		t.Fatalf("first-run Back did not offer safe exit: %q", action)
+	// A first run leaves through the SAFE EXIT item or the quit chord, never
+	// through a lone Back press.
+	if action, _ := session.HandleButton(KeyEscape); action != "" {
+		t.Fatalf("first-run Back produced %q", action)
+	}
+	if got := session.QuitChord(); got != "TAB + Y" {
+		t.Fatalf("desktop quit chord = %q", got)
+	}
+	session.SetChordAnchor(true)
+	if action, _ := session.HandleButton(KeyY); action != Exit {
+		t.Fatalf("desktop quit chord did not exit: %q", action)
 	}
 	pressKey(t, session, Confirm)
 	if session.Mode != Normal || session.FirstRun {
