@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jellydn/knulli-app-store/internal/manifest"
+	"github.com/jellydn/knulli-app-store/internal/version"
 )
 
 type Checker struct {
@@ -180,12 +181,12 @@ func assess(pkg manifest.Package, releases []release, err error) PackageReport {
 		result.Status = "missing-assets"
 		return result
 	}
-	order, comparable := compareVersions(stable.TagName, pkg.Version)
+	order, comparable := version.CompareNumeric(stable.TagName, pkg.Version)
 	if comparable && order > 0 {
 		result.Status = "update-found"
 		return result
 	}
-	if !comparable && normalizeVersion(pkg.Version) != normalizeVersion(stable.TagName) {
+	if !comparable && version.Normalize(pkg.Version) != version.Normalize(stable.TagName) {
 		result.Status = "manual-version-review"
 		return result
 	}
@@ -207,78 +208,6 @@ func containsAsset(assets []Asset, name string) bool {
 		}
 	}
 	return false
-}
-
-func normalizeVersion(version string) string {
-	return strings.TrimPrefix(strings.ToLower(strings.TrimSpace(version)), "v")
-}
-
-func compareVersions(discovered, current string) (int, bool) {
-	discoveredNumbers, discoveredPrerelease, ok := versionParts(discovered)
-	if !ok {
-		return 0, false
-	}
-	currentNumbers, currentPrerelease, ok := versionParts(current)
-	if !ok {
-		return 0, false
-	}
-	length := len(discoveredNumbers)
-	if len(currentNumbers) > length {
-		length = len(currentNumbers)
-	}
-	for index := 0; index < length; index++ {
-		var left, right int
-		if index < len(discoveredNumbers) {
-			left = discoveredNumbers[index]
-		}
-		if index < len(currentNumbers) {
-			right = currentNumbers[index]
-		}
-		if left > right {
-			return 1, true
-		}
-		if left < right {
-			return -1, true
-		}
-	}
-	if discoveredPrerelease == currentPrerelease {
-		return 0, true
-	}
-	if discoveredPrerelease == "" {
-		return 1, true
-	}
-	if currentPrerelease == "" {
-		return -1, true
-	}
-	return 0, false
-}
-
-func versionParts(version string) ([]int, string, bool) {
-	value := normalizeVersion(version)
-	if index := strings.IndexByte(value, '+'); index >= 0 {
-		value = value[:index]
-	}
-	prerelease := ""
-	if index := strings.IndexByte(value, '-'); index >= 0 {
-		prerelease = value[index+1:]
-		value = value[:index]
-		if prerelease == "" {
-			return nil, "", false
-		}
-	}
-	parts := strings.Split(value, ".")
-	numbers := make([]int, len(parts))
-	for index, part := range parts {
-		if part == "" {
-			return nil, "", false
-		}
-		number, err := strconv.Atoi(part)
-		if err != nil || number < 0 {
-			return nil, "", false
-		}
-		numbers[index] = number
-	}
-	return numbers, prerelease, true
 }
 
 func retryable(status int, header http.Header) bool {

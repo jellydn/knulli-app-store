@@ -99,11 +99,11 @@ func TestResolveUsesGOARCHWhenArchIsNotOverridden(t *testing.T) {
 	}
 }
 
-func TestNormalizeVersionKeepsReleaseSuffixAndRejectsWhitespace(t *testing.T) {
-	if got := normalizeVersion("  scarab-dev-a1b2c3 2026/05/10 14:23\r\n"); got != "scarab-dev-a1b2c3" {
+func TestFirstVersionFieldKeepsReleaseSuffixAndRejectsWhitespace(t *testing.T) {
+	if got := firstVersionField("  scarab-dev-a1b2c3 2026/05/10 14:23\r\n"); got != "scarab-dev-a1b2c3" {
 		t.Fatalf("unexpected suffixed version: %q", got)
 	}
-	if got := normalizeVersion(" \r\n\t "); got != "" {
+	if got := firstVersionField(" \r\n\t "); got != "" {
 		t.Fatalf("malformed version became %q", got)
 	}
 }
