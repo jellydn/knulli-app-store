@@ -38,7 +38,7 @@ func TestScreenMappingMatchesTheScreenThatDrawsIt(t *testing.T) {
 }
 
 func TestMenuChoicesAreUppercaseLabels(t *testing.T) {
-	for _, items := range [][]string{SetupItems, ReviewItems, SettingsItems} {
+	for _, items := range [][]string{SetupItems, PagingItems, ReviewItems, SettingsItems} {
 		for _, item := range items {
 			if item == "" || item != strings.ToUpper(item) {
 				t.Fatalf("menu choice %q is not an uppercase label", item)

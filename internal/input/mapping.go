@@ -31,6 +31,43 @@ const (
 // the way out.
 var Actions = []Action{Up, Down, Left, Right, PageUp, PageDown, Confirm, Back, Diagnostics}
 
+// Required is the subset every mapping must bind: the actions that reach every
+// screen and every package. Paging is deliberately outside it. A pad need not
+// carry the button an optional action wants, and a user who cannot press one
+// could not finish setup, so the pair is asked about rather than demanded.
+var Required = []Action{Up, Down, Left, Right, Confirm, Back, Diagnostics}
+
+// Optional is the subset a mapping may leave unbound. Skipping it costs the
+// screenful jump and nothing else: up and down still move one row, a held
+// direction still repeats, and the tab bar still narrows the list.
+var Optional = []Action{PageUp, PageDown}
+
+// Plan is the order one setup asks for actions: every required action, and the
+// optional pair when the user asked for paging. Calibration walks a plan, so a
+// setup that skipped paging never asks for a button the pad does not have.
+func Plan(paging bool) []Action {
+	if paging {
+		return append([]Action(nil), Actions...)
+	}
+	plan := make([]Action, 0, len(Required))
+	for _, action := range Actions {
+		if !optional(action) {
+			plan = append(plan, action)
+		}
+	}
+	return plan
+}
+
+// optional reports whether an action may be left unbound.
+func optional(action Action) bool {
+	for _, candidate := range Optional {
+		if candidate == action {
+			return true
+		}
+	}
+	return false
+}
+
 type Mapping map[Action]int
 
 func AutoMapping() Mapping {
@@ -41,11 +78,17 @@ func AutoMapping() Mapping {
 	}
 }
 
+// Validate reports whether a mapping can drive the app: every required action
+// bound, no button carrying two actions, and nothing bound that is not an
+// action of its own. An optional action may be absent, which is what lets a pad
+// with no shoulder buttons keep a mapping it can actually use.
 func (mapping Mapping) Validate() error {
 	assigned := make(map[int]Action)
-	for _, action := range Actions {
-		button, ok := mapping[action]
-		if !ok || button < 0 {
+	for action, button := range mapping {
+		if !bindable(action) {
+			return fmt.Errorf("mapping contains unknown action %s", action)
+		}
+		if button < 0 {
 			return fmt.Errorf("required action %s has no button", action)
 		}
 		if other, exists := assigned[button]; exists {
@@ -53,10 +96,46 @@ func (mapping Mapping) Validate() error {
 		}
 		assigned[button] = action
 	}
-	if len(mapping) != len(Actions) {
-		return fmt.Errorf("mapping contains unknown actions")
+	for _, action := range Required {
+		if _, ok := mapping[action]; !ok {
+			return fmt.Errorf("required action %s has no button", action)
+		}
 	}
 	return nil
+}
+
+// bindable reports whether an action belongs to the bindable set.
+func bindable(action Action) bool {
+	for _, candidate := range Actions {
+		if candidate == action {
+			return true
+		}
+	}
+	return false
+}
+
+// Without returns the mapping with the given actions removed, so an optional
+// binding the user never proved can be left out before the mapping is saved.
+func (mapping Mapping) Without(actions ...Action) Mapping {
+	result := mapping.Clone()
+	for _, action := range actions {
+		delete(result, action)
+	}
+	return result
+}
+
+// Restricted returns the mapping limited to a plan. It is how a detected layout
+// becomes the mapping a setup saves: the detection reports every button the SDL
+// layout knows, including the ones this pad may not carry, and the plan says
+// which of them this setup asked for.
+func (mapping Mapping) Restricted(plan []Action) Mapping {
+	result := make(Mapping, len(plan))
+	for _, action := range plan {
+		if button, ok := mapping[action]; ok {
+			result[action] = button
+		}
+	}
+	return result
 }
 
 func (mapping Mapping) Action(button int) (Action, bool) {
@@ -90,13 +169,15 @@ func (mapping Mapping) KeepKnown() Mapping {
 	return result
 }
 
-// Missing lists the actions a mapping does not bind, in the canonical order. A
-// record saved by an older build is missing whatever the action set has grown
-// since it was written, which is how a stale record is told apart from a
-// damaged one.
+// Missing lists the required actions a mapping does not bind, in the canonical
+// order. A record saved by an older build is missing whatever required action
+// the set has grown since it was written, which is how a stale record is told
+// apart from a damaged one. An absent optional action is not listed: a mapping
+// without paging works, and reporting it as incomplete would send a pad with no
+// shoulder buttons back through setup every launch.
 func (mapping Mapping) Missing() []Action {
 	var missing []Action
-	for _, action := range Actions {
+	for _, action := range Required {
 		if _, ok := mapping[action]; !ok {
 			missing = append(missing, action)
 		}

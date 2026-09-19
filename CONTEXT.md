@@ -22,6 +22,12 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Tab** — One view of the catalogue: the whole list, the packages with something to act on, or the packages installed on this device. A tab filters on a package's typed state, never on its rendered state label.
 
+**Required action** — A semantic action every mapping must bind, because it is needed to reach a screen or a package.
+
+**Optional action** — A semantic action a mapping may leave unbound when the pad does not carry the button it wants. Paging is the optional pair; skipping it costs the screenful jump and nothing else.
+
+**Paging question** — The one question every setup path asks before it builds a mapping: whether this pad pages with the shoulder buttons. It is asked in words so a pad without them can say so instead of getting stuck on a button it does not have.
+
 ## Install lifecycle
 
 **Operation** — One of the five lifecycle actions: install, adopt, update, repair, uninstall.

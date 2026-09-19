@@ -5,6 +5,7 @@ type Mode string
 const (
 	Normal      Mode = "normal"
 	Setup       Mode = "setup"
+	Paging      Mode = "paging"
 	Blocked     Mode = "blocked"
 	Settings    Mode = "settings"
 	Calibrating Mode = "calibration"
@@ -21,6 +22,11 @@ const (
 
 var (
 	SetupItems = []string{"USE DETECTED MAPPING", "TEST DETECTED MAPPING", "CUSTOMIZE", "SAFE EXIT"}
+	// PagingItems is the one question every setup path asks before it builds a
+	// mapping. Paging is the optional half of the action set, so the answer is
+	// asked for in words: a pad without shoulder buttons says so here instead of
+	// getting stuck on a button it does not carry.
+	PagingItems = []string{"ASSIGN PAGE UP AND PAGE DOWN", "SKIP PAGING"}
 	// ReviewItems offers the way out of an assignment review: the first item
 	// confirms the assignment the way the Confirm action does, and the last
 	// one abandons it the way the Back action does. Panel text is uppercase;
@@ -38,16 +44,20 @@ type Session struct {
 	Identity Identity
 	// Detected is the mapping the input source reported before the user chose
 	// one. A desktop run reports the keyboard; a controller reports SDL's.
-	Detected        Mapping
-	Mapping         Mapping
-	Source          string
-	AutoSource      string
-	Mode            Mode
-	Connected       bool
-	FirstRun        bool
-	SetupIndex      int
-	ReviewIndex     int
-	SettingsIndex   int
+	Detected      Mapping
+	Mapping       Mapping
+	Source        string
+	AutoSource    string
+	Mode          Mode
+	Connected     bool
+	FirstRun      bool
+	SetupIndex    int
+	PagingIndex   int
+	ReviewIndex   int
+	SettingsIndex int
+	// Paging is the answer to the paging question: whether the mapping this
+	// setup is building binds the optional pair.
+	Paging          bool
 	Calibration     *Calibration
 	PendingSource   string
 	Message         string
@@ -177,6 +187,8 @@ func (session *Session) HandleButton(button int) (Action, Effect) {
 	switch session.Mode {
 	case Setup:
 		return session.handleSetup(button)
+	case Paging:
+		return session.handlePaging(button)
 	case Calibrating:
 		return session.handleCalibration(button)
 	case Review:
@@ -235,19 +247,65 @@ func (session *Session) handleSetup(button int) (Action, Effect) {
 		session.Mode = Settings
 	case Confirm:
 		switch session.SetupIndex {
-		case 0:
-			if session.saveMapping(session.detected(), "saved detected mapping") {
-				session.Message = "Detected mapping saved"
-			}
-		case 1:
-			session.startPreview(session.detected(), "tested detected mapping")
-		case 2:
-			session.startCalibration()
+		case 0, 1, 2:
+			// Every path that builds a mapping asks the paging question first, so
+			// a pad without shoulder buttons can leave the pair out before it is
+			// asked to press one. Safe Exit builds nothing and asks nothing.
+			session.askPaging()
 		case 3:
 			return Exit, NoEffect
 		}
 	}
 	return "", NoEffect
+}
+
+// askPaging opens the paging question. It is one screen for every setup path,
+// because the answer belongs to the mapping rather than to the path that builds
+// it.
+func (session *Session) askPaging() {
+	session.Mode = Paging
+	session.PagingIndex = 0
+	session.ValidationError = ""
+	session.Message = ""
+}
+
+// handlePaging answers the paging question and then carries out the setup item
+// it interrupted.
+func (session *Session) handlePaging(button int) (Action, Effect) {
+	action, ok := session.activeMapping().Action(button)
+	if !ok {
+		return "", NoEffect
+	}
+	switch action {
+	case Up, Left:
+		session.PagingIndex = wrap(session.PagingIndex-1, len(PagingItems))
+	case Down, Right:
+		session.PagingIndex = wrap(session.PagingIndex+1, len(PagingItems))
+	case Back:
+		// Back returns to the setup choices, so the answer can be changed before
+		// a single button has been assigned.
+		session.Mode = Setup
+	case Confirm:
+		session.Paging = session.PagingIndex == 0
+		session.runSetupChoice()
+	}
+	return "", NoEffect
+}
+
+// runSetupChoice carries out the setup item the paging question interrupted. A
+// detected layout is trimmed to the plan the answer chose, so a mapping that
+// skipped paging never binds a shoulder button it may not have.
+func (session *Session) runSetupChoice() {
+	switch session.SetupIndex {
+	case 0:
+		if session.saveMapping(session.detected().Restricted(Plan(session.Paging)), "saved detected mapping") {
+			session.Message = "Detected mapping saved"
+		}
+	case 1:
+		session.startPreview(session.detected().Restricted(Plan(session.Paging)), "tested detected mapping")
+	case 2:
+		session.startCalibration()
+	}
 }
 
 func (session *Session) handleCalibration(button int) (Action, Effect) {
@@ -346,6 +404,8 @@ func (session *Session) openSetup(firstRun bool) {
 	session.Mode = Setup
 	session.FirstRun = firstRun
 	session.SetupIndex = 0
+	session.PagingIndex = 0
+	session.Paging = false
 	session.Calibration = nil
 	session.ValidationError = ""
 	session.Message = ""
@@ -353,7 +413,7 @@ func (session *Session) openSetup(firstRun bool) {
 
 func (session *Session) startCalibration() {
 	session.Mode = Calibrating
-	session.Calibration = NewCalibration()
+	session.Calibration = NewCalibration(session.Paging)
 	session.PendingSource = "saved custom mapping"
 	session.ValidationError = ""
 	session.Message = ""
@@ -370,7 +430,7 @@ func (session *Session) startPreview(mapping Mapping, source string) {
 func (session *Session) retryAssignment() {
 	if session.Calibration.Index > 0 {
 		session.Calibration.Index--
-		action := Actions[session.Calibration.Index]
+		action := session.Calibration.Actions[session.Calibration.Index]
 		delete(session.Calibration.Mapping, action)
 		session.Calibration.Preview = false
 	}
@@ -411,7 +471,7 @@ func (session *Session) saveMapping(mapping Mapping, source string) bool {
 // the session mapping.
 func (session *Session) ScreenMapping() Mapping {
 	switch session.Mode {
-	case Blocked, Setup:
+	case Blocked, Setup, Paging:
 		return session.activeMapping()
 	case Preview:
 		if session.Calibration != nil {

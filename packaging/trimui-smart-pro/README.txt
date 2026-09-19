@@ -26,9 +26,13 @@ CONTROLS
 
 The first launch for each device/controller identity opens Controller Setup
 before the catalogue. Choose Use Detected Mapping, Test Detected Mapping,
-Customize, or Safe Exit. Customize reviews each detected button and offers
-Select, Retry, Start Over, and Back. Tested and custom mappings require a
-complete nine-action preview before atomic save. No timeout skips setup.
+Customize, or Safe Exit. Every choice that builds a mapping asks one question
+first: whether this pad pages with the shoulder buttons. Paging is optional, so
+a pad without them answers SKIP PAGING and setup asks only for the required
+actions. Customize reviews each detected button and offers Select, Retry, Start
+Over, and Back. The preview is finished by the required actions, and an
+optional binding never pressed is left out of what is saved. No timeout skips
+setup.
 
 Later launches load the saved mapping. Settings can rerun setup, export
 diagnostics, or reset the active mapping. Hold the saved Back and Settings

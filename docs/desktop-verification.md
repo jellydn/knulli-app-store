@@ -1,9 +1,10 @@
 # Desktop GUI verification
 
 The SDL GUI can be walked end to end on a development machine, with no handheld
-and no controller attached. The keyboard carries the nine semantic actions and a
-scratch fixture root supplies the Knulli files that platform detection reads, so
-a desktop run can simulate the selected device matrix. The target architecture
+and no controller attached. The keyboard carries every semantic action — the
+seven required ones and the optional paging pair — and a scratch fixture root
+supplies the Knulli files that platform detection reads, so a desktop run can
+simulate the selected device matrix. The target architecture
 and resolution are explicit desktop overrides; they are not measurements from a
 real handheld.
 
@@ -115,8 +116,9 @@ A flow is a key sequence:
 
 | Flow | Covers |
 | --- | --- |
-| `first-run-use-detected` | Setup, saving the detected mapping |
-| `first-run-test-detected` | Setup, preview, testing all nine actions, save |
+| `first-run-use-detected` | Setup, the paging question, saving the detected mapping |
+| `first-run-skip-paging` | The paging question answered Skip: the saved file binds the required actions only |
+| `first-run-test-detected` | Setup, the paging question, preview, testing every bound action, save |
 | `first-run-customize` | Calibration, assignment review, preview, save |
 | `first-run-safe-exit` | Leaving setup without a mapping |
 | `catalogue-walk` | Catalogue, details, action list, confirmation, back out |
@@ -131,6 +133,12 @@ A flow is a key sequence:
 
 The `--install` flows download a real package, so they need network access and
 are left out of the default run and CI. Everything else runs offline.
+
+Two flows answer the paging question the other way round, because the answer is
+a decision with no screen left to read afterwards: the walk script checks the
+mapping file each of them wrote, so `first-run-use-detected` and
+`install-package` must have saved the pair and `first-run-skip-paging` must
+not. That check is what keeps "skippable" from meaning "quietly dropped".
 
 ### Reading the evidence
 
@@ -168,8 +176,12 @@ artifact is useful evidence when a device run is not available.
 | Diagnostics | Y |
 | Quit | Tab (or F5) held, then Y |
 
-The nine actions above Quit are a binding set like any other, so the footer and
-the mapping summary name them. A catalogue that shows all of its rows reads
+Every action above Quit is a binding set like any other, so the footer and the
+mapping summary name them. Seven of them are required — up, down, left,
+right, confirm, back, and diagnostics — and the paging pair is optional, so a
+pad with no shoulder buttons answers the paging question with **Skip paging**
+and finishes setup without them. When the pair is unbound the catalogue never
+advertises it: the footer's paired hint names both buttons or neither. A catalogue that shows all of its rows reads
 `Confirm (ENTER)  Settings (Y)  Quit (TAB + Y)`; once the list outgrows the
 window, the range under the last row names where the window sits and the footer
 gains the one hint that carries two buttons, `Page (PGUP/PGDN)`. Quitting is

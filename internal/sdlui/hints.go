@@ -78,7 +78,9 @@ func footerHints(model *storeui.Model, controls *storeinput.Session) []storeinpu
 			return []storeinput.Hint{confirm, quit}
 		}
 		return []storeinput.Hint{confirm, back}
-	case storeinput.Settings, storeinput.Review:
+	case storeinput.Paging, storeinput.Settings, storeinput.Review:
+		// The paging question is a choice between two items, so it offers the
+		// same pair of actions the other choice screens do.
 		return []storeinput.Hint{confirm, back}
 	case storeinput.Calibrating:
 		return []storeinput.Hint{{Verb: storeinput.VerbAnyButton}}
