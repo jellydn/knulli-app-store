@@ -1,0 +1,133 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "io.github.jellydn.retsend",
+  "name": "RetSend",
+  "version": "0.9.1",
+  "type": "utility",
+  "summary": "Sends and receives files over local Wi-Fi between a Knulli handheld and any LocalSend peer.",
+  "repository": "https://github.com/jellydn/retsend",
+  "license": "GPL-3.0-only",
+  "review": {
+    "status": "experimental",
+    "approval": {
+      "provenance": "maintainer"
+    },
+    "notes": [
+      "RetSend 0.9.1 is authorized for broad experimental Knulli testing only on detected aarch64 glibc systems with a system SDL2, the declared libc, and a validated 640x480 through 1280x720 display. This is not universal verification, and no device test has been reported for this version.",
+      "The reviewed artifact is published by the App Store maintainer's fork of the GPL-3.0-only upstream RetSend. Upstream RetSend does not publish a Knulli package, so the fork is the provenance of this build, not a mirror of an upstream release.",
+      "GitHub reports the release and its mutable `prerelease` tag as not immutable. The Store therefore treats the URL only as a locator and pins the accepted bytes with the exact compressed size, installed size, and SHA-256 above. Verification happens before extraction, so a replacement upstream asset cannot install.",
+      "The reviewed release is titled RetSend v0.9.1, and the built tree still declares 0.9.0 in Cargo.toml and Cargo.lock. The catalogue records the release title; the evidence records the exact commit the artifact was published from.",
+      "The archive holds five regular files in one RetSend directory, no links, devices, or duplicate names. The launcher and the binary are stored with mode 0755 and the Store restores execute mode for exactly those two files.",
+      "RetSend keeps configuration, transfer history, and its TLS identity in /userdata/system/configs/retsend, on the persistent partition outside the package directory, so install, repair, update, and uninstall cannot destroy or silently regenerate them. Uninstall intentionally leaves that directory and /userdata/roms/retsend-inbox behind; this disclosure is the reviewed policy.",
+      "The launcher sets HOME to the package directory so SDL's preference path cannot fall back into the read-only rootfs, roots the in-app browser at /userdata/roms and the inbox only, and runs the reviewed binary from the package directory with no display or input overrides.",
+      "Network use is required for the package's only function: LAN multicast discovery on UDP 53317 and HTTPS transfers between peers on the same network, with self-signed peer certificates. The Store downloads only the reviewed release asset.",
+      "The Store owns one EmulationStation entry in /userdata/roms/tools/gamelist.xml for the reviewed launcher and removes that entry on uninstall. Shared or modified entries are never edited.",
+      "Open catalogue blockers recorded by the artifact's own tracker: no TLS certificate pinning, TLS key creation without a restrictive mode, receive writes not proven symlink-safe, no reviewed overwrite or collision default, no transfer quota enforcement, and no signed release, attestation, or per-crate SBOM. They stay open and block any verified status.",
+      "The platform check can only confirm that a system SDL2 exists. RetSend additionally needs SDL 2.0.18 or later for SDL_RenderGeometry, which detection cannot verify, and controller-only navigation and gamepad A/B labels remain unreviewed on a device."
+    ],
+    "evidence": [
+      {
+        "kind": "repository",
+        "url": "https://github.com/jellydn/retsend",
+        "note": "Maintainer's fork of mxmgorin/retsend. Every evidence link below pins commit e73257c, the commit the reviewed artifact was published from, because the `prerelease` tag is a moving name."
+      },
+      {
+        "kind": "upstream-project",
+        "url": "https://github.com/mxmgorin/retsend",
+        "note": "Upstream LocalSend-compatible client for retro handhelds, licensed GPL-3.0. Upstream publishes ARM64 and PortMaster assets but no Knulli package."
+      },
+      {
+        "kind": "release-asset",
+        "url": "https://github.com/jellydn/retsend/releases/download/prerelease/retsend-knulli.zip",
+        "note": "Knulli ZIP asset 4,119,423 bytes compressed and 8,000,277 bytes across five extracted regular files, SHA-256 9d50bad60af73aff059aef3c1523c53a900213cb5cfc68bb9374faa594d661b6, matching the published retsend-knulli.zip.sha256. GitHub marks the release itself non-immutable, so the Store relies on exact size and digest and rejects replacement bytes. Inventory: RetSend/RetSend.sh, RetSend/retsend, RetSend/LICENSE, RetSend/NOTICES, RetSend/README.md."
+      },
+      {
+        "kind": "archive-inventory",
+        "url": "https://github.com/jellydn/retsend/releases/download/prerelease/archive-inventory.txt",
+        "note": "Release-published inventory of the five archive paths, reproduced by the local extraction reviewed here."
+      },
+      {
+        "kind": "source-commit",
+        "url": "https://github.com/jellydn/retsend/blob/e73257c052f360f842072ef2da065398c9997ea2/Cargo.toml",
+        "note": "The built tree declares version 0.9.0, while the release is titled v0.9.1. Cargo.lock in the same commit is the exact dependency record."
+      },
+      {
+        "kind": "license",
+        "url": "https://github.com/jellydn/retsend/blob/e73257c052f360f842072ef2da065398c9997ea2/LICENSE",
+        "note": "GPL-3.0 text reviewed and shipped inside the package as RetSend/LICENSE. The binary is built from the fork's source, which is published at the pinned commit."
+      },
+      {
+        "kind": "third-party-notices",
+        "url": "https://github.com/jellydn/retsend/blob/e73257c052f360f842072ef2da065398c9997ea2/knulli/NOTICES",
+        "note": "Family-level notices for the shipped Rust crates plus the system SDL2, glibc, libm, libdl, and libpthread. A per-crate SBOM from Cargo.lock is planned and not done."
+      },
+      {
+        "kind": "launcher-and-write-paths",
+        "url": "https://github.com/jellydn/retsend/blob/e73257c052f360f842072ef2da065398c9997ea2/knulli/RetSend.sh",
+        "note": "Reviewed the launcher's constrained paths: /userdata/system/configs/retsend, /userdata/roms/retsend-inbox, HOME inside the package directory, browser roots /userdata/roms and the inbox, and a fail-closed check of the binary. The launcher runs no remote installer and invokes no PortMaster helper."
+      },
+      {
+        "kind": "runtime-dependency-review",
+        "url": "https://github.com/jellydn/retsend/blob/e73257c052f360f842072ef2da065398c9997ea2/.github/workflows/build-knulli.yml",
+        "note": "CI builds with zigbuild at a 2.28 glibc floor and fails on any higher GLIBC_ symbol version. Local inspection of the extracted binary agrees: AArch64 PIE, interpreter /lib/ld-linux-aarch64.so.1, NEEDED libSDL2-2.0.so.0, libc.so.6, libm.so.6, libdl.so.2, libpthread.so.0, highest GLIBC_ symbol version 2.28."
+      },
+      {
+        "kind": "package-verification",
+        "url": "https://github.com/jellydn/retsend/blob/e73257c052f360f842072ef2da065398c9997ea2/tools/knulli/verify-package.sh",
+        "note": "The release build ran launcher syntax, archive content, ZIP safety, executable mode, ELF architecture, exact NEEDED allowlist, and license/source file checks before publishing."
+      },
+      {
+        "kind": "catalogue-blockers",
+        "url": "https://github.com/jellydn/retsend/blob/e73257c052f360f842072ef2da065398c9997ea2/goals/knulli-build/deferred-blockers.md",
+        "note": "The artifact's own tracker lists the eight admission blockers that remain open: TLS pinning, TLS key file mode, symlink-safe receive writes, overwrite default, quotas, immutable signed release, attestation, and per-crate SBOM."
+      },
+      {
+        "kind": "device-scope-review",
+        "url": "https://github.com/jellydn/knulli-app-store/issues/2",
+        "note": "Evaluation request for RetSend on Knulli. It records that the upstream UI assumes gamepad labels and 640x480 scaling, and that controller adaptation and per-device matrices still need direct testing."
+      }
+    ]
+  },
+  "release": {
+    "url": "https://github.com/jellydn/retsend/releases/download/prerelease/retsend-knulli.zip",
+    "sha256": "9d50bad60af73aff059aef3c1523c53a900213cb5cfc68bb9374faa594d661b6",
+    "size": 4119423,
+    "installed_size": 8000277,
+    "format": "zip",
+    "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "minimum_glibc": "2.28",
+    "dependencies": ["sdl2", "libc"],
+    "device_scope": "any",
+    "display_bounds": {
+      "minimum_width": 640,
+      "minimum_height": 480,
+      "maximum_width": 1280,
+      "maximum_height": 720
+    }
+  },
+  "install": {
+    "destination": "/userdata/roms/tools/RetSend",
+    "strip_components": 1,
+    "launcher": "RetSend.sh",
+    "executables": ["RetSend.sh", "retsend"],
+    "warning": "Unverified experimental test on this device. RetSend needs local Wi-Fi, keeps its configuration and TLS identity in /userdata/system/configs/retsend, and receives files in /userdata/roms/retsend-inbox. Both stay after uninstall.",
+    "menu": {
+      "gamelist": "/userdata/roms/tools/gamelist.xml",
+      "path": "./RetSend/RetSend.sh",
+      "name": "RetSend",
+      "description": "Send and receive files over local Wi-Fi with LocalSend peers."
+    },
+    "network": true,
+    "allowed_write_paths": [
+      "/userdata/roms/tools/RetSend",
+      "/userdata/roms/tools/gamelist.xml",
+      "/userdata/system/configs/retsend",
+      "/userdata/roms/retsend-inbox"
+    ]
+  }
+}

@@ -104,16 +104,17 @@ The installer never runs remote install scripts. It only copies regular files fr
 
 ## Catalogue status
 
-The catalogue has four packages. Community approval records provenance separately from technical and real-device status.
+The catalogue has five packages. Recorded approval provenance stays separate from technical and real-device status.
 
 | Package | Status | Remaining blocker |
 | --- | --- | --- |
 | [PlayTime 1.0.0](https://github.com/unitreign/playtime) | Broad experimental Knulli | Exact 1.0.0 Smart Pro evidence only; other matching devices are experimental |
 | [Grout 5.2.0.0](https://github.com/rommapp/grout) | Broad experimental Knulli | No 5.2.0.0 device test; Store staging disables the self-updater with a verified binary patch |
+| [RetSend 0.9.1](https://github.com/jellydn/retsend) | Broad experimental Knulli | No device test; bytes are pinned by size and SHA-256 because the maintainer fork's `prerelease` tag is mutable, and its own tracker still lists TLS pinning, key mode, receive containment, overwrite default, quotas, and signed provenance as open |
 | [RAOfflineProxy](https://github.com/misantronic/RAOfflineProxy) v1.13.0-alpha1 | Approved; blocked | The Knulli asset is a self-extracting script; supported archive, extracted size, dependencies, narrow writes, and updater safety are unresolved |
 | [PocketCurator](https://github.com/tomtombombadil/PocketCurator) v1.1.2 | Approved; blocked | The release is mutable; extracted inventory/size, narrow ROM and game-list writes, updater safety, and exact Knulli evidence are unresolved |
 
-These notes record evidence reviewed on 2026-09-15. Upstream facts can change. The weekly [catalogue update check](https://github.com/jellydn/knulli-app-store/actions/workflows/catalogue-updates.yml) reports metadata changes for manual review; it never edits or approves a package.
+These notes record evidence reviewed on 2026-09-15 and 2026-09-17. Upstream facts can change. The weekly [catalogue update check](https://github.com/jellydn/knulli-app-store/actions/workflows/catalogue-updates.yml) reports metadata changes for manual review; it never edits or approves a package.
 
 ## Current scope
 
@@ -123,7 +124,7 @@ These notes record evidence reviewed on 2026-09-15. Upstream facts can change. T
 - ZIP and `tar.gz` release archives, up to 512 MiB compressed and installed
 - Writes below `/userdata` only
 
-The GUI is functional on one community-tested TrimUI Smart Pro. A real MagicX diagnostic confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController `magicx-input`; full GUI testing is still incomplete. PlayTime and Grout are available for experimental tests on any detected device that satisfies their exact architecture, ABI, dependency, and display bounds. A matching device is not verified unless the manifest has evidence for that exact package version and matrix.
+The GUI is functional on one community-tested TrimUI Smart Pro. A real MagicX diagnostic confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController `magicx-input`; full GUI testing is still incomplete. PlayTime, Grout, and RetSend are available for experimental tests on any detected device that satisfies their exact architecture, ABI, dependency, and display bounds. A matching device is not verified unless the manifest has evidence for that exact package version and matrix.
 
 ROM-download sources are outside the official catalogue policy.
 
