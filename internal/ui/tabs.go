@@ -55,15 +55,39 @@ func (tab Tab) Match(item appstore.Item) bool {
 	}
 }
 
-// Tabs is the catalogue's tab selection. It is pure state, so the switching
-// rule is testable without a renderer or a device.
+// Tabs is the catalogue's tab selection: which tab is showing, and where the
+// user was in each one. It is pure state, so the switching rule is testable
+// without a renderer or a device.
 type Tabs struct {
 	active Tab
+	// at is the package each tab was last left on. A view selector that forgot
+	// would send a reader back to the top of a list they had already crossed,
+	// which is the one thing coming back to a tab should not do.
+	at map[Tab]string
 }
 
 // Active is the tab whose packages the list shows.
 func (tabs Tabs) Active() Tab {
 	return tabs.active
+}
+
+// Remember records the package the active tab is being left on. An empty id —
+// a tab with no rows — remembers nothing, so leaving an empty tab cannot erase
+// where the reader stopped in the tab that has rows.
+func (tabs *Tabs) Remember(id string) {
+	if id == "" {
+		return
+	}
+	if tabs.at == nil {
+		tabs.at = make(map[Tab]string)
+	}
+	tabs.at[tabs.active] = id
+}
+
+// Remembered is the package the active tab was last left on, or empty when the
+// user has not been in it before.
+func (tabs Tabs) Remembered() string {
+	return tabs.at[tabs.active]
 }
 
 // Cycle steps to the previous or next tab. The bar is a ring: right from the

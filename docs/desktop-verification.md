@@ -71,8 +71,13 @@ make walkthrough
 
 That walks the offline flows below with the keyboard and writes their opening,
 post-key, and operation-completion frames under `build/walkthrough/<flow>/`. It
-also renders every screen state under `build/walkthrough/screens/`. For a host
-with no window server, run:
+also renders every screen state under `build/walkthrough/screens/`, at both
+target resolutions. Those stills name the screen they show, so the catalogue
+view is `<device>-gui-catalogue.png` with its tab bar, `-gui-tabs-ready.png`
+for the bar on another view, `-gui-notice.png` for the notice bar over a
+completed operation, and one file per remaining state. The screenshots are
+generated evidence and are not checked in; the `gui-walkthrough` artifact
+carries them. For a host with no window server, run:
 
 ```sh
 SDL_VIDEODRIVER=dummy make walkthrough
@@ -181,7 +186,10 @@ with an install or an adoption waiting; `INSTALLED` holds the packages the app
 manages on the device, failing health checks included. The active tab carries
 the same accent wash and ring as a selected row. Sideways steps the bar and
 vertically steps the rows, so a direction key never means two things at once,
-and an empty tab still steps, which is the way out of it.
+and an empty tab still steps, which is the way out of it. Each tab remembers
+the row it was left on, so coming back to one lands where the reader stopped;
+a tab never opened opens on the package the user was already reading, and a
+remembered package that has since left the tab gives way to its first row.
 
 A finished operation reports itself in a notice bar over the panel foot instead
 of leaving a status banner behind: it is drawn below the action row and above

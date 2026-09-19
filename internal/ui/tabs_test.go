@@ -146,6 +146,55 @@ func TestTabSwitchKeepsTheSelectedPackageOrLandsOnTheFirstRow(t *testing.T) {
 	}
 }
 
+// A tab remembers where it was left, so coming back to it lands where the
+// reader stopped rather than at the top of a list they had already crossed.
+func TestATabRemembersTheRowItWasLeftOn(t *testing.T) {
+	model := loadedModel(t,
+		tabItem("org.example.ready-a", appstore.StateAvailable),
+		tabItem("org.example.ready-b", appstore.StateAvailable),
+		tabItem("org.example.installed", appstore.StateInstalled),
+	)
+	model.Selected = 1 // ready-b, in the whole list
+	model.Horizontal(1)
+	// The Ready tab has never been open, so it carries the package the user was
+	// already reading.
+	if got := model.Items[model.Selected].Package.ID; got != "org.example.ready-b" {
+		t.Fatalf("a tab that was never open landed on %q", got)
+	}
+	model.Horizontal(1)
+	if got := model.Items[model.Selected].Package.ID; got != "org.example.installed" {
+		t.Fatalf("stepping to the installed tab landed on %q", got)
+	}
+	// Ready was left on ready-b, which is not the first row, so landing there
+	// again is the memory rather than the fallback.
+	model.Horizontal(-1)
+	if got := model.Items[model.Selected].Package.ID; got != "org.example.ready-b" {
+		t.Fatalf("Ready did not remember the row it was left on: %q", got)
+	}
+}
+
+// A remembered package can leave the tab while the user is elsewhere — an
+// uninstall takes it out of the index — and the tab then starts at its first
+// row rather than on a package it no longer shows.
+func TestATabFallsBackWhenItsRememberedPackageIsGone(t *testing.T) {
+	model := loadedModel(t,
+		tabItem("org.example.ready-a", appstore.StateAvailable),
+		tabItem("org.example.ready-b", appstore.StateAvailable),
+		tabItem("org.example.installed", appstore.StateInstalled),
+	)
+	model.Selected = 1
+	model.Horizontal(1) // Ready, carrying ready-b
+	model.Horizontal(1) // Installed, remembering Ready on ready-b
+	model.setCatalogue([]appstore.Item{
+		tabItem("org.example.ready-a", appstore.StateAvailable),
+		tabItem("org.example.installed", appstore.StateInstalled),
+	})
+	model.Horizontal(-1)
+	if got := model.Items[model.Selected].Package.ID; got != "org.example.ready-a" {
+		t.Fatalf("Ready landed on %q after its remembered package left", got)
+	}
+}
+
 // A tab with nothing in it is still a tab: sideways steps out of it, which is
 // the only way back to a list the user can act on.
 func TestAnEmptyTabStillStepsSideways(t *testing.T) {

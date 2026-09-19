@@ -62,10 +62,7 @@ func (m *Model) Load(ctx context.Context) error {
 // screen, so a tab switch or a refresh after an operation never moves the
 // selection out from under them.
 func (m *Model) setCatalogue(items []appstore.Item) {
-	keep := ""
-	if item, ok := m.selectedItem(); ok {
-		keep = item.Package.ID
-	}
+	keep := m.selectedID()
 	m.catalogue = items
 	m.filter(keep)
 }
@@ -139,19 +136,23 @@ func (m *Model) Horizontal(delta int) {
 		m.Move(delta)
 		return
 	}
-	keep := ""
-	if item, ok := m.selectedItem(); ok {
-		keep = item.Package.ID
-	}
+	// Leaving a tab stores where the reader stopped; entering one prefers that
+	// memory and falls back to the package they were already reading, so a tab
+	// opens where it was last left and a tab never seen opens on the same
+	// package instead of jumping to the top.
+	carried := m.selectedID()
+	m.Tabs.Remember(carried)
 	m.Tabs.Cycle(delta)
-	m.filter(keep)
+	m.filter(m.Tabs.Remembered(), carried)
 	m.Error = ""
 }
 
-// filter shows the packages the active tab matches. A model that has never
-// loaded a catalogue has nothing to narrow, so its rows are left alone: a tab
-// can only hide packages the index actually listed.
-func (m *Model) filter(keep string) {
+// filter shows the packages the active tab matches. The selection is the first
+// preferred package the tab still shows, and the tab's own first row when it
+// shows none of them. A model that has never loaded a catalogue has nothing to
+// narrow, so its rows are left alone: a tab can only hide packages the index
+// actually listed.
+func (m *Model) filter(preferred ...string) {
 	if m.catalogue == nil {
 		m.clamp()
 		return
@@ -165,15 +166,27 @@ func (m *Model) filter(keep string) {
 	m.Items = visible
 	m.Action = 0
 	m.Selected = 0
-	if keep != "" {
-		for index, item := range visible {
-			if item.Package.ID == keep {
-				m.Selected = index
-				break
-			}
+	for _, candidate := range preferred {
+		if index := indexOfPackage(visible, candidate); index >= 0 {
+			m.Selected = index
+			break
 		}
 	}
 	m.clamp()
+}
+
+// indexOfPackage is the row a package occupies in a list, or -1 when the list
+// does not show it. An empty id is never a row.
+func indexOfPackage(items []appstore.Item, id string) int {
+	if id == "" {
+		return -1
+	}
+	for index, item := range items {
+		if item.Package.ID == id {
+			return index
+		}
+	}
+	return -1
 }
 
 // Page moves the selection by a screenful and clamps at both ends: a page past
@@ -311,6 +324,16 @@ func (m *Model) selectedItem() (appstore.Item, bool) {
 		return appstore.Item{}, false
 	}
 	return m.Items[m.Selected], true
+}
+
+// selectedID is the package under the cursor, or empty when the list has no
+// row to read.
+func (m *Model) selectedID() string {
+	item, ok := m.selectedItem()
+	if !ok {
+		return ""
+	}
+	return item.Package.ID
 }
 
 func (m *Model) start(ctx context.Context) {
