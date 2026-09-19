@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/jellydn/knulli-app-store/internal/manifest"
+	"github.com/jellydn/knulli-app-store/internal/version"
 )
 
 type Info struct {
@@ -211,7 +212,7 @@ func detect(root string) Info {
 		{path: "/etc/knulli-release:VERSION_ID", value: legacyRelease["VERSION_ID"]},
 	}
 	for _, source := range versionSources {
-		if normalized := normalizeVersion(source.value); normalized != "" {
+		if normalized := firstVersionField(source.value); normalized != "" {
 			info.Version = normalized
 			info.evidence.VersionRaw = source.value
 			info.evidence.VersionSource = source.path
@@ -307,7 +308,7 @@ func Check(pkg manifest.Package, current Info) error {
 		if current.Version == "" || !comparableVersions(current.Version, wanted.MinimumVersion) {
 			return compatibilityError("firmware_version", current, constraint+"; detected release ordering is unknown")
 		}
-		if compareVersions(current.Version, wanted.MinimumVersion) < 0 {
+		if version.Compare(current.Version, wanted.MinimumVersion) < 0 {
 			return compatibilityError("firmware_version", current, constraint)
 		}
 	}
@@ -317,7 +318,7 @@ func Check(pkg manifest.Package, current Info) error {
 	if len(wanted.ABIs) > 0 && !includes(wanted.ABIs, current.ABI) {
 		return compatibilityError("abi", current, fmt.Sprintf("package requires one of abis=%q", strings.Join(wanted.ABIs, ",")))
 	}
-	if wanted.MinimumGLIBC != "" && (current.GLIBCVersion == "" || compareVersions(current.GLIBCVersion, wanted.MinimumGLIBC) < 0) {
+	if wanted.MinimumGLIBC != "" && (current.GLIBCVersion == "" || version.Compare(current.GLIBCVersion, wanted.MinimumGLIBC) < 0) {
 		return compatibilityError("abi", current, fmt.Sprintf("package requires glibc>=%q", wanted.MinimumGLIBC))
 	}
 	for _, dependency := range wanted.Dependencies {
@@ -380,9 +381,9 @@ func detectGLIBCVersion(root string) string {
 		}
 		latest := ""
 		for _, match := range matcher.FindAllSubmatch(data, -1) {
-			version := string(match[1])
-			if latest == "" || compareVersions(version, latest) > 0 {
-				latest = version
+			candidate := string(match[1])
+			if latest == "" || version.Compare(candidate, latest) > 0 {
+				latest = candidate
 			}
 		}
 		return latest
@@ -412,8 +413,6 @@ func detectDependencies(root string) []string {
 	return found
 }
 
-var versionPart = regexp.MustCompile(`[0-9]+|[a-zA-Z]+`)
-var numericVersion = regexp.MustCompile(`^[0-9]`)
 var resolutionNumbers = regexp.MustCompile(`([0-9]+)[x,]([0-9]+)`)
 
 func normalizeFirmware(value string) string {
@@ -423,7 +422,10 @@ func normalizeFirmware(value string) string {
 	return ""
 }
 
-func normalizeVersion(value string) string {
+// firstVersionField takes the first whitespace-separated field of a Knulli
+// release string. It is deliberately not version.Normalize: the release file
+// reads "scarab 2026/05/10 14:23", and only the codename names the release.
+func firstVersionField(value string) string {
 	parts := strings.Fields(strings.TrimSpace(value))
 	if len(parts) == 0 {
 		return ""
@@ -431,36 +433,11 @@ func normalizeVersion(value string) string {
 	return parts[0]
 }
 
+// comparableVersions reports whether two values are meaningful to order. A
+// Knulli release may be named by codename rather than by number, and the
+// minimum-version gate refuses to guess at an ordering it cannot establish.
 func comparableVersions(left, right string) bool {
-	return strings.EqualFold(left, right) || (numericVersion.MatchString(left) && numericVersion.MatchString(right))
-}
-
-func compareVersions(left, right string) int {
-	a := versionPart.FindAllString(strings.ToLower(left), -1)
-	b := versionPart.FindAllString(strings.ToLower(right), -1)
-	for index := 0; index < len(a) || index < len(b); index++ {
-		if index >= len(a) {
-			return -1
-		}
-		if index >= len(b) {
-			return 1
-		}
-		leftNumber, leftErr := strconv.Atoi(a[index])
-		rightNumber, rightErr := strconv.Atoi(b[index])
-		var result int
-		if leftErr == nil && rightErr == nil {
-			result = leftNumber - rightNumber
-		} else {
-			result = strings.Compare(a[index], b[index])
-		}
-		if result < 0 {
-			return -1
-		}
-		if result > 0 {
-			return 1
-		}
-	}
-	return 0
+	return strings.EqualFold(left, right) || (version.StartsNumeric(left) && version.StartsNumeric(right))
 }
 
 func includes(values []string, wanted string) bool {
