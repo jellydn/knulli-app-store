@@ -30,21 +30,21 @@ func TestCatalogueFooterUsesOneCanonicalHint(t *testing.T) {
 	model := catalogueModel()
 	// The catalogue is the top of the app: nothing sits behind it, so Back is
 	// absent and the way out is the Select chord.
-	if got := footerText(model, controls); got != "Confirm (A)  Settings (Y)  Quit (SELECT + Y)" {
+	if got := footerText(model, controls); got != "Confirm (SOUTH)  Settings (NORTH)  Quit (SELECT + NORTH)" {
 		t.Fatalf("catalogue footer = %q", got)
 	}
 	model.Focus = storeui.Confirm
-	if got := footerText(model, controls); got != "Confirm (A)  Back (B)" {
+	if got := footerText(model, controls); got != "Confirm (SOUTH)  Back (EAST)" {
 		t.Fatalf("confirmation footer = %q", got)
 	}
 	model.Focus = storeui.ForceConfirm
-	if got := footerText(model, controls); got != "Confirm (A)  Back (B)" {
+	if got := footerText(model, controls); got != "Confirm (SOUTH)  Back (EAST)" {
 		t.Fatalf("force confirmation footer = %q", got)
 	}
 }
 
 func TestEmptyCatalogueFooterDropsUnavailableActions(t *testing.T) {
-	if got := footerText(&storeui.Model{}, normalControls(t)); got != "Settings (Y)  Quit (SELECT + Y)" {
+	if got := footerText(&storeui.Model{}, normalControls(t)); got != "Settings (NORTH)  Quit (SELECT + NORTH)" {
 		t.Fatalf("empty catalogue footer = %q", got)
 	}
 }
@@ -62,7 +62,7 @@ func TestFooterLabelsFollowTheActiveMapping(t *testing.T) {
 	controls.Mapping = storeinput.AutoMapping()
 	controls.Mapping[storeinput.Confirm] = 2
 	controls.Mapping[storeinput.Back] = 0
-	if got := footerText(catalogueModel(), controls); got != "Confirm (X)  Settings (Y)  Quit (SELECT + Y)" {
+	if got := footerText(catalogueModel(), controls); got != "Confirm (WEST)  Settings (NORTH)  Quit (SELECT + NORTH)" {
 		t.Fatalf("footer ignored the custom mapping: %q", got)
 	}
 }
@@ -73,7 +73,7 @@ func TestFirstRunSetupFooterOffersTheDetectedBinding(t *testing.T) {
 	if controls.Mode != storeinput.Setup || !controls.FirstRun {
 		t.Fatalf("connect did not open first-run setup: mode=%q", controls.Mode)
 	}
-	if got := footerText(catalogueModel(), controls); got != "Confirm (A)  Quit (SELECT + Y)" {
+	if got := footerText(catalogueModel(), controls); got != "Confirm (SOUTH)  Quit (SELECT + NORTH)" {
 		t.Fatalf("first-run footer = %q", got)
 	}
 }
@@ -119,7 +119,7 @@ func TestCatalogueOffersPagingOnlyWhenTheListOutgrowsTheWindow(t *testing.T) {
 		t.Fatalf("a catalogue that fits advertised paging: %q", got)
 	}
 	long := &storeui.Model{Items: make([]appstore.Item, listRows+1)}
-	want := "Confirm (A)  Page (LEFT SHOULDER/RIGHT SHOULDER)  Settings (Y)  Quit (SELECT + Y)"
+	want := "Confirm (SOUTH)  Page (L1/R1)  Settings (NORTH)  Quit (SELECT + NORTH)"
 	if got := footerText(long, controls); got != want {
 		t.Fatalf("paged catalogue footer = %q, want %q", got, want)
 	}
@@ -145,7 +145,7 @@ func TestCatalogueDropsThePageHintWhenPagingIsNotBound(t *testing.T) {
 	if strings.Contains(got, "Page") {
 		t.Fatalf("a mapping without paging still advertised paging: %q", got)
 	}
-	if want := "Confirm (A)  Settings (Y)  Quit (SELECT + Y)"; got != want {
+	if want := "Confirm (SOUTH)  Settings (NORTH)  Quit (SELECT + NORTH)"; got != want {
 		t.Fatalf("footer without paging = %q, want %q", got, want)
 	}
 }

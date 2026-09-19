@@ -13,7 +13,19 @@ func TestAutoMappingUsesSemanticGameControllerButtons(t *testing.T) {
 		t.Fatal(err)
 	}
 	if action, ok := mapping.Action(0); !ok || action != Confirm {
-		t.Fatalf("SDL A did not map to Confirm: %q %v", action, ok)
+		t.Fatalf("SDL south face button did not map to Confirm: %q %v", action, ok)
+	}
+	if got := ButtonLabel(0); got != "SOUTH" {
+		t.Fatalf("SDL face button 0 label = %q, want SOUTH", got)
+	}
+	if got := ButtonLabel(1); got != "EAST" {
+		t.Fatalf("SDL face button 1 label = %q, want EAST", got)
+	}
+	if got := ButtonLabel(2); got != "WEST" {
+		t.Fatalf("SDL face button 2 label = %q, want WEST", got)
+	}
+	if got := ButtonLabel(3); got != "NORTH" {
+		t.Fatalf("SDL face button 3 label = %q, want NORTH", got)
 	}
 }
 

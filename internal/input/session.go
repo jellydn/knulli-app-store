@@ -30,7 +30,7 @@ var (
 	// ReviewItems offers the way out of an assignment review: the first item
 	// confirms the assignment the way the Confirm action does, and the last
 	// one abandons it the way the Back action does. Panel text is uppercase;
-	// the footer shows the same actions as "Confirm (A)  Back (B)".
+	// the footer shows the same actions as "Confirm (SOUTH)  Back (EAST)".
 	ReviewItems   = []string{"CONFIRM", "RETRY", "START OVER", "BACK"}
 	SettingsItems = []string{"SET UP CONTROLLER", "EXPORT DIAGNOSTICS", "RESET MAPPING", "CLOSE SETTINGS"}
 )
