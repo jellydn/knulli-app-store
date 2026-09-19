@@ -117,6 +117,53 @@ func TestRecoverRestoresOpenJournalAfterCrash(t *testing.T) {
 	}
 }
 
+// A recovery that cannot undo an open journal has to report the failure and
+// leave the journal in place, because the destination is in neither state and
+// only an operator can decide what to keep.
+func TestRecoverReportsAFailedRollback(t *testing.T) {
+	root := t.TempDir()
+	guard, err := NewGuard(root, []string{"/userdata/test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "userdata/test"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	parent := t.TempDir()
+	tx, err := Begin(guard, parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Write("/userdata/test/new", []byte("new"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	// Nothing existed at that path, so the rollback removes it. Replace it with
+	// a non-empty directory so the removal cannot succeed.
+	host, err := guard.Resolve("/userdata/test/new")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(host); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(host, "child"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(host, "child", "blocker"), []byte("x"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	err = Recover(root, parent)
+	if err == nil {
+		t.Fatal("expected the failed rollback to be reported")
+	}
+	if !strings.Contains(err.Error(), "roll back transaction journal") || !strings.Contains(err.Error(), tx.directory) {
+		t.Fatalf("recovery error does not name the journal it could not roll back: %v", err)
+	}
+	if _, statErr := os.Stat(tx.directory); statErr != nil {
+		t.Fatalf("journal directory should remain for manual inspection: %v", statErr)
+	}
+}
+
 func TestPendingForPathValidatesAndMatchesOpenJournal(t *testing.T) {
 	root := t.TempDir()
 	guard, err := NewGuard(root, []string{"/userdata/app", "/userdata/system/manager"})
