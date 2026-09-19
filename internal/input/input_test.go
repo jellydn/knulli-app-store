@@ -29,7 +29,7 @@ func TestDeviceProfilesDoNotInventMagicXFallback(t *testing.T) {
 }
 
 func TestCalibrationRejectsConflictsAndRequiresPreview(t *testing.T) {
-	calibration := NewCalibration()
+	calibration := NewCalibration(true)
 	if err := calibration.Assign(11); err != nil {
 		t.Fatal(err)
 	}
@@ -44,10 +44,12 @@ func TestCalibrationRejectsConflictsAndRequiresPreview(t *testing.T) {
 	if !calibration.Preview {
 		t.Fatal("mapping skipped preview")
 	}
-	for index, button := range []int{11, 12, 13, 14, 9, 10, 0, 1, 3} {
-		done := calibration.Test(button)
-		if done != (index == len(Actions)-1) {
-			t.Fatalf("preview completed at input %d", index)
+	// The preview is finished by the required actions, so it completes on the
+	// last one of those however many optional bindings the mapping carries.
+	for step, action := range Required {
+		done := calibration.Test(calibration.Mapping[action])
+		if done != (step == len(Required)-1) {
+			t.Fatalf("preview completed after %d of %d required actions", step+1, len(Required))
 		}
 	}
 }
@@ -81,12 +83,14 @@ func TestSavedMappingWithALegacyExitButtonStillLoads(t *testing.T) {
 	}
 }
 
-// Growing the action set must not cost a user the mapping saved for another
-// controller. A record written before paging existed cannot drive the current
-// screens and no button can be invented for the gap, so that one record is
-// dropped while every other identity keeps what it saved — and the file is not
-// renamed away as corrupt, which would take the other identities with it.
-func TestRecordSavedBeforeTheActionSetGrewIsSkippedWithoutLosingOtherRecords(t *testing.T) {
+// Growing the *required* action set must not cost a user the mapping saved for
+// another controller. A record missing a required action cannot drive the
+// current screens and no button can be invented for the gap, so that one record
+// is dropped while every other identity keeps what it saved — and the file is
+// not renamed away as corrupt, which would take the other identities with it.
+// An absent optional action is a different case, and is covered by
+// TestRecordMissingOnlyTheOptionalPairStillDrivesTheCatalogue.
+func TestRecordMissingARequiredActionIsSkippedWithoutLosingOtherRecords(t *testing.T) {
 	root := t.TempDir()
 	stale := Identity{Device: "magicx-zero-28", GUID: "stale", Name: "Pad"}
 	current := Identity{Device: "trimui-smart-pro", GUID: "current", Name: "Pad"}
@@ -95,7 +99,7 @@ func TestRecordSavedBeforeTheActionSetGrewIsSkippedWithoutLosingOtherRecords(t *
 		t.Fatal(err)
 	}
 	stored := `{"schema":"org.knulli.app-store/controller-mappings/v1","records":[` +
-		`{"identity":{"device":"magicx-zero-28","guid":"stale","name":"Pad"},"mapping":{"up":11,"down":12,"left":13,"right":14,"confirm":0,"back":1,"diagnostics":3}},` +
+		`{"identity":{"device":"magicx-zero-28","guid":"stale","name":"Pad"},"mapping":{"up":11,"down":12,"left":13,"right":14,"back":1,"diagnostics":3}},` +
 		`{"identity":{"device":"trimui-smart-pro","guid":"current","name":"Pad"},"mapping":{"up":11,"down":12,"left":13,"right":14,"page-up":9,"page-down":10,"confirm":0,"back":1,"diagnostics":3}}]}`
 	if err := os.WriteFile(host, []byte(stored), 0644); err != nil {
 		t.Fatal(err)
@@ -283,6 +287,10 @@ func TestFirstRunTestsDetectedMappingBeforeCatalogueAndLoadsOnRestart(t *testing
 	}
 	press(session, Down)
 	press(session, Confirm)
+	if session.Mode != Paging {
+		t.Fatalf("detected mapping test skipped the paging question: %s", session.Mode)
+	}
+	press(session, Confirm)
 	if session.Mode != Preview {
 		t.Fatalf("detected mapping test did not open preview: %s", session.Mode)
 	}
@@ -305,6 +313,7 @@ func TestFirstRunCustomMappingReviewConflictRetryStartOverAndCancel(t *testing.T
 	session.Connect(Identity{GUID: "one", Name: "Pad"}, true)
 	press(session, Down)
 	press(session, Down)
+	press(session, Confirm)
 	press(session, Confirm)
 	if session.Mode != Calibrating {
 		t.Fatalf("customize did not start calibration: %s", session.Mode)
@@ -346,6 +355,7 @@ func TestCustomMappingRequiresReviewAndPreviewBeforeAtomicSave(t *testing.T) {
 	session.Connect(identity, false)
 	press(session, Down)
 	press(session, Down)
+	press(session, Confirm)
 	press(session, Confirm)
 	buttons := []int{2, 4, 5, 6, 7, 8, 9, 10, 3}
 	for index, button := range buttons {
@@ -409,6 +419,7 @@ func TestNoControllerBlockedReconnectResetAndSafeExit(t *testing.T) {
 	}
 	session.SetChordAnchor(false)
 	press(session, Confirm)
+	press(session, Confirm)
 	press(session, Diagnostics)
 	press(session, Down)
 	press(session, Down)
@@ -429,6 +440,7 @@ func TestNoControllerBlockedReconnectResetAndSafeExit(t *testing.T) {
 func TestControllerSetupRemainsAvailableAndSupportsStartupOverride(t *testing.T) {
 	session := NewSession(t.TempDir(), "trimui-smart-pro")
 	session.Connect(Identity{GUID: "one", Name: "Pad"}, false)
+	press(session, Confirm)
 	press(session, Confirm)
 	if session.Mode != Normal {
 		t.Fatalf("detected mapping choice did not enter catalogue: %s", session.Mode)

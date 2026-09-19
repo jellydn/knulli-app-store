@@ -268,7 +268,7 @@ func TestHandleModeDependentButtons(t *testing.T) {
 		{name: "blocked diagnostics", prepare: func(controls *storeinput.Session) { controls.Disconnect() }, button: storeinput.AutoMapping()[storeinput.Confirm], wantMode: storeinput.Blocked, wantExport: true},
 		{name: "calibration assignment", prepare: func(controls *storeinput.Session) {
 			controls.Mode = storeinput.Calibrating
-			controls.Calibration = storeinput.NewCalibration()
+			controls.Calibration = storeinput.NewCalibration(true)
 		}, button: 42, wantMode: storeinput.Review},
 		{name: "settings diagnostics", prepare: func(controls *storeinput.Session) { controls.Mode = storeinput.Settings; controls.SettingsIndex = 1 }, button: storeinput.AutoMapping()[storeinput.Confirm], wantMode: storeinput.Settings, wantExport: true},
 	} {

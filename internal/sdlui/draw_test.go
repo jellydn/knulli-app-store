@@ -218,9 +218,10 @@ func TestFooterIsTheOnlyHintOnEveryScreen(t *testing.T) {
 		{name: "confirmation", model: &storeui.Model{Items: []appstore.Item{item}, Focus: storeui.Confirm}, controls: normal()},
 		{name: "force-confirmation", model: &storeui.Model{Items: []appstore.Item{item}, Focus: storeui.ForceConfirm}, controls: normal()},
 		{name: "blocked", model: &storeui.Model{}, controls: mode(storeinput.Blocked, nil)},
+		{name: "paging", model: &storeui.Model{}, controls: mode(storeinput.Paging, nil)},
 		{name: "settings", model: &storeui.Model{}, controls: mode(storeinput.Settings, nil)},
-		{name: "review", model: &storeui.Model{}, controls: mode(storeinput.Review, func(controls *storeinput.Session) { controls.Calibration = storeinput.NewCalibration() })},
-		{name: "calibrating", model: &storeui.Model{}, controls: mode(storeinput.Calibrating, func(controls *storeinput.Session) { controls.Calibration = storeinput.NewCalibration() })},
+		{name: "review", model: &storeui.Model{}, controls: mode(storeinput.Review, func(controls *storeinput.Session) { controls.Calibration = storeinput.NewCalibration(true) })},
+		{name: "calibrating", model: &storeui.Model{}, controls: mode(storeinput.Calibrating, func(controls *storeinput.Session) { controls.Calibration = storeinput.NewCalibration(true) })},
 		{name: "preview", model: &storeui.Model{}, controls: mode(storeinput.Preview, func(controls *storeinput.Session) {
 			controls.Calibration = storeinput.NewPreview(storeinput.AutoMapping())
 		})},
@@ -263,6 +264,77 @@ func TestHeaderIncludesBrandMark(t *testing.T) {
 	}
 	if frame.RGBAAt(27, 12) != palette.background {
 		t.Fatalf("outlined brand tile missing inner background: got %#v", frame.RGBAAt(27, 12))
+	}
+}
+
+// countMutedInBand counts muted pixels in one text band, which is how a test
+// reads a line of panel text without a font.
+func countMutedInBand(frame *image.RGBA, top, baseline int) int {
+	muted := 0
+	for y := top; y <= baseline; y++ {
+		for x := 0; x < canvasWidth; x++ {
+			if frame.RGBAAt(x, y) == palette.muted {
+				muted++
+			}
+		}
+	}
+	return muted
+}
+
+// The paging question is the one screen that decides whether the optional half
+// of the action set belongs to this pad, so both answers are rendered and
+// carried in the screenshot set.
+func TestRenderControllerPagingQuestion(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		index int
+	}{
+		{name: "assign", index: 0},
+		{name: "skip", index: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			controls := storeinput.NewSession(t.TempDir(), "trimui-smart-pro")
+			controls.Connect(storeinput.Identity{GUID: "03000000", Name: "Runtime controller"}, true)
+			controls.HandleButton(storeinput.AutoMapping()[storeinput.Confirm])
+			if controls.Mode != storeinput.Paging {
+				t.Fatalf("the setup choice skipped the paging question: %s", controls.Mode)
+			}
+			controls.PagingIndex = test.index
+			frame := draw(&storeui.Model{}, platformHeader("trimui-smart-pro"), controls)
+			if frame.Bounds() != image.Rect(0, 0, canvasWidth, canvasHeight) {
+				t.Fatalf("paging question frame failed: %v", frame.Bounds())
+			}
+			if directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR"); directory != "" {
+				if err := os.MkdirAll(directory, 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := saveOutputScreenshot(filepath.Join(directory, "trimui-smart-pro-controller-paging-"+test.name+".png"), frame, 1280, 720); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+// The preview is finished by the required actions, so it has to say what an
+// optional binding the user never pressed will cost, and say nothing when the
+// mapping never asked for the pair.
+func TestPreviewSaysWhatAnUnpressedOptionalButtonCosts(t *testing.T) {
+	controls := storeinput.NewSession(t.TempDir(), "trimui-smart-pro")
+	controls.Connect(storeinput.Identity{GUID: "03000000", Name: "Runtime controller"}, true)
+	controls.Mode = storeinput.Preview
+	controls.Calibration = storeinput.NewPreview(storeinput.AutoMapping())
+	controls.Calibration.Test(storeinput.AutoMapping()[storeinput.Up])
+	frame := draw(&storeui.Model{}, platformHeader("trimui-smart-pro"), controls)
+	if muted := countMutedInBand(frame, 308-glyphHeight, 308); muted == 0 {
+		t.Fatal("the preview did not say what an unpressed optional button costs")
+	}
+
+	controls.Calibration = storeinput.NewPreview(storeinput.AutoMapping().Without(storeinput.PageUp, storeinput.PageDown))
+	controls.Calibration.Test(storeinput.AutoMapping()[storeinput.Up])
+	frame = draw(&storeui.Model{}, platformHeader("trimui-smart-pro"), controls)
+	if muted := countMutedInBand(frame, 308-glyphHeight, 308); muted != 0 {
+		t.Fatalf("a preview without paging warned about paging (%d pixels)", muted)
 	}
 }
 
@@ -345,6 +417,7 @@ func TestRenderControllerPreviewAndBlockedState(t *testing.T) {
 	preview.Connect(storeinput.Identity{GUID: "03000000", Name: "Runtime controller"}, true)
 	preview.HandleButton(storeinput.AutoMapping()[storeinput.Down])
 	preview.HandleButton(storeinput.AutoMapping()[storeinput.Confirm])
+	preview.HandleButton(storeinput.AutoMapping()[storeinput.Confirm])
 	if preview.Mode != storeinput.Preview {
 		t.Fatalf("test did not create preview: %s", preview.Mode)
 	}
@@ -366,6 +439,7 @@ func TestRenderControllerPreviewAndBlockedState(t *testing.T) {
 	review.HandleButton(storeinput.AutoMapping()[storeinput.Down])
 	review.HandleButton(storeinput.AutoMapping()[storeinput.Down])
 	review.HandleButton(storeinput.AutoMapping()[storeinput.Confirm])
+	review.HandleButton(storeinput.AutoMapping()[storeinput.Confirm])
 	review.HandleButton(2)
 	if review.Mode != storeinput.Review {
 		t.Fatalf("test did not create assignment review: %s", review.Mode)
@@ -382,18 +456,31 @@ func TestRenderControllerPreviewAndBlockedState(t *testing.T) {
 	}
 }
 
+// The progress line counts what the screen actually asks for: a calibration
+// walks the plan it was given, a preview only has to see the required actions,
+// and a saved mapping reports the required set as complete.
 func TestControllerSetupProgress(t *testing.T) {
 	controls := storeinput.NewSession(t.TempDir(), "magicx-zero-28")
-	if got := controllerSetupProgress(controls); got != fmt.Sprintf("PROGRESS  0 OF %d ACTIONS", len(storeinput.Actions)) {
+	if got := controllerSetupProgress(controls); got != fmt.Sprintf("PROGRESS  0 OF %d ACTIONS", len(storeinput.Required)) {
 		t.Fatalf("unexpected blocked progress: %q", got)
 	}
 	controls.Connect(storeinput.Identity{GUID: "one", Name: "Pad"}, true)
+	controls.Calibration = storeinput.NewCalibration(false)
+	controls.Calibration.Assign(2)
+	if got := controllerSetupProgress(controls); got != fmt.Sprintf("PROGRESS  1 OF %d ACTIONS", len(storeinput.Required)) {
+		t.Fatalf("unexpected calibration progress: %q", got)
+	}
 	controls.Mode = storeinput.Preview
 	controls.Calibration = storeinput.NewPreview(storeinput.AutoMapping())
 	controls.Calibration.Test(storeinput.AutoMapping()[storeinput.Up])
 	controls.Calibration.Test(storeinput.AutoMapping()[storeinput.Confirm])
-	if got := controllerSetupProgress(controls); got != fmt.Sprintf("PROGRESS  2 OF %d ACTIONS", len(storeinput.Actions)) {
+	if got := controllerSetupProgress(controls); got != fmt.Sprintf("PROGRESS  2 OF %d ACTIONS", len(storeinput.Required)) {
 		t.Fatalf("unexpected preview progress: %q", got)
+	}
+	controls.Mode = storeinput.Normal
+	controls.Calibration = nil
+	if got := controllerSetupProgress(controls); got != fmt.Sprintf("PROGRESS  %d OF %d ACTIONS", len(storeinput.Required), len(storeinput.Required)) {
+		t.Fatalf("unexpected saved progress: %q", got)
 	}
 }
 
@@ -440,13 +527,20 @@ func TestControllerSetupLogsTransitionsWithoutRawButtonSpam(t *testing.T) {
 	model := &storeui.Model{}
 	processButton(context.Background(), model, controls, storeinput.AutoMapping()[storeinput.Down], logger)
 	processButton(context.Background(), model, controls, storeinput.AutoMapping()[storeinput.Confirm], logger)
+	if controls.Mode != storeinput.Paging {
+		t.Fatalf("the setup choice did not ask about paging: %s", controls.Mode)
+	}
+	processButton(context.Background(), model, controls, storeinput.AutoMapping()[storeinput.Confirm], logger)
 	data, err := os.ReadFile(filepath.Join(root, "userdata/system/logs/knulli-app-store.log"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	logText := string(data)
-	if !strings.Contains(logText, `event=controller_screen_transition from="setup" to="preview"`) {
-		t.Fatalf("setup transition was not logged: %s", logText)
+	// The question is a screen of its own, so both transitions are recorded.
+	for _, transition := range []string{`from="setup" to="paging"`, `from="paging" to="preview"`} {
+		if !strings.Contains(logText, transition) {
+			t.Fatalf("transition %s was not logged: %s", transition, logText)
+		}
 	}
 	if strings.Contains(logText, "controller_input") || strings.Contains(logText, "button=") {
 		t.Fatalf("raw button spam remains in setup log: %s", logText)

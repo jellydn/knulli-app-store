@@ -88,6 +88,7 @@ func TestEveryScreenShowsOneFooterLine(t *testing.T) {
 	sessions["setup"] = firstRun
 	for name, mode := range map[string]storeinput.Mode{
 		"optional-setup": storeinput.Setup,
+		"paging":         storeinput.Paging,
 		"settings":       storeinput.Settings,
 		"review":         storeinput.Review,
 		"calibrating":    storeinput.Calibrating,
@@ -130,6 +131,22 @@ func TestCatalogueOffersPagingOnlyWhenTheListOutgrowsTheWindow(t *testing.T) {
 	long.Focus = storeui.Confirm
 	if got := footerText(long, controls); strings.Contains(got, "Page") {
 		t.Fatalf("a confirmation offered paging: %q", got)
+	}
+}
+
+// A mapping that skipped paging binds neither button, so the catalogue must not
+// promise a gesture the pad cannot make: the paired hint names both buttons or
+// neither.
+func TestCatalogueDropsThePageHintWhenPagingIsNotBound(t *testing.T) {
+	controls := normalControls(t)
+	controls.Mapping = storeinput.AutoMapping().Without(storeinput.PageUp, storeinput.PageDown)
+	long := &storeui.Model{Items: make([]appstore.Item, listRows+1)}
+	got := footerText(long, controls)
+	if strings.Contains(got, "Page") {
+		t.Fatalf("a mapping without paging still advertised paging: %q", got)
+	}
+	if want := "Confirm (A)  Settings (Y)  Quit (SELECT + Y)"; got != want {
+		t.Fatalf("footer without paging = %q, want %q", got, want)
 	}
 }
 

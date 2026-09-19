@@ -143,7 +143,7 @@ func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName 
 		action, _ := controls.Calibration.Current()
 		text(frame, 32, modeHeadingBaseline, palette.warning, "ASSIGN A BUTTON TO")
 		text(frame, 32, 205, palette.text, storeinput.ActionLabel(action))
-		text(frame, 32, 226, palette.muted, fmt.Sprintf("ACTION %d OF %d", controls.Calibration.Index+1, len(storeinput.Actions)))
+		text(frame, 32, 226, palette.muted, fmt.Sprintf("ACTION %d OF %d", controls.Calibration.Index+1, len(controls.Calibration.Actions)))
 		text(frame, 32, 252, palette.muted, "A BUTTON CAN HAVE ONLY ONE ACTION")
 		text(frame, 344, modeHeadingBaseline, palette.muted, "COMPLETED ACTIONS")
 		drawMappingSummary(frame, controls.Calibration.Mapping, nil, 344, 196, 140, 20)
@@ -165,9 +165,27 @@ func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName 
 		}
 		text(frame, 344, modeHeadingBaseline, palette.muted, "CURRENT ASSIGNMENTS")
 		drawMappingSummary(frame, controls.Calibration.Mapping, nil, 344, 196, 140, 20)
+	case storeinput.Paging:
+		text(frame, 32, modeHeadingBaseline, palette.warning, "PAGING IS OPTIONAL")
+		text(frame, 32, 199, palette.muted, "PAGE UP AND PAGE DOWN MOVE A LONG LIST A SCREENFUL AT A TIME.")
+		text(frame, 32, 214, palette.muted, "UP AND DOWN STILL MOVE ONE ROW, AND THE TABS STILL NARROW THE LIST.")
+		for index, item := range storeinput.PagingItems {
+			prefix := "  "
+			shade := palette.text
+			if index == controls.PagingIndex {
+				prefix = "> "
+				shade = palette.accent
+			}
+			text(frame, 48, 245+index*25, shade, prefix+item)
+		}
 	case storeinput.Preview:
-		text(frame, 32, modeHeadingBaseline, palette.warning, "TEST ALL ACTIONS BEFORE SAVE")
+		text(frame, 32, modeHeadingBaseline, palette.warning, "TEST EVERY ACTION THIS PAD HAS")
 		drawMappingSummary(frame, controls.Calibration.Mapping, controls.Calibration.Tested, 48, 205, 280, 36)
+		if untested := storeinput.UntestedLabels(controls.Calibration); untested != "" {
+			// The preview is finished by the required actions, so this line says
+			// what happens to an optional binding the user could not press.
+			text(frame, 32, 308, palette.muted, shorten("NOT SAVED UNLESS TESTED  "+untested, 82))
+		}
 	}
 	if controls.ValidationError != "" {
 		text(frame, 32, 318, palette.error, shorten(strings.ToUpper(controls.ValidationError), 78))
@@ -224,17 +242,26 @@ func controllerIdentityStatus(controls *storeinput.Session) string {
 	return "GUID " + shorten(strings.ToUpper(guid), 32)
 }
 
+// controllerSetupProgress reports how far a setup has come. The count follows
+// the screen: a calibration walks the plan it was given, which is shorter when
+// the user skipped paging, while a preview only has to see the required
+// actions, because an optional button this pad does not carry cannot be
+// pressed.
 func controllerSetupProgress(controls *storeinput.Session) string {
+	total := len(storeinput.Required)
 	completed := 0
 	if controls.Mode == storeinput.Normal || controls.Mode == storeinput.Settings {
-		completed = len(storeinput.Actions)
-	} else if controls.Calibration != nil {
+		completed = total
+	}
+	if controls.Calibration != nil {
+		total = len(controls.Calibration.Actions)
 		completed = controls.Calibration.Index
 		if controls.Mode == storeinput.Preview {
-			completed = len(controls.Calibration.Tested)
+			total = len(storeinput.Required)
+			completed = controls.Calibration.RequiredTested()
 		}
 	}
-	return fmt.Sprintf("PROGRESS  %d OF %d ACTIONS", completed, len(storeinput.Actions))
+	return fmt.Sprintf("PROGRESS  %d OF %d ACTIONS", completed, total)
 }
 
 // drawList paints the visible window of catalogue rows. The model owns which

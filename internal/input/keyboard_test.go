@@ -66,6 +66,10 @@ func TestDesktopSessionOpensSetupAndSavesWithTheKeyboard(t *testing.T) {
 		t.Fatalf("desktop quit chord did not exit: %q", action)
 	}
 	pressKey(t, session, Confirm)
+	if session.Mode != Paging {
+		t.Fatalf("the detected choice skipped the paging question: %s", session.Mode)
+	}
+	pressKey(t, session, Confirm)
 	if session.Mode != Normal || session.FirstRun {
 		t.Fatalf("detected keyboard mapping did not open the catalogue: mode=%s", session.Mode)
 	}
@@ -87,6 +91,7 @@ func TestDesktopSessionPersistsWithoutPlatformDeviceMetadata(t *testing.T) {
 	root := t.TempDir()
 	session := NewDesktopSession(root, "")
 	pressKey(t, session, Confirm)
+	pressKey(t, session, Confirm)
 	if session.Mode != Normal || session.ValidationError != "" {
 		t.Fatalf("device-less desktop mapping was not saved: mode=%s error=%q", session.Mode, session.ValidationError)
 	}
@@ -101,6 +106,7 @@ func TestDesktopKeyboardCompletesCustomSetupAndPreview(t *testing.T) {
 	session := NewDesktopSession(t.TempDir(), "magicx-zero-28")
 	pressKey(t, session, Down)
 	pressKey(t, session, Down)
+	pressKey(t, session, Confirm)
 	pressKey(t, session, Confirm)
 	if session.Mode != Calibrating {
 		t.Fatalf("customize did not start calibration: %s", session.Mode)
