@@ -20,6 +20,8 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **External provider** — A catalogue this project features but does not own, mirror, or install from (PortMaster). Two launch paths stay visibly separate.
 
+**Tab** — One view of the catalogue: the whole list, the packages with something to act on, or the packages installed on this device. A tab filters on a package's typed state, never on its rendered state label.
+
 ## Install lifecycle
 
 **Operation** — One of the five lifecycle actions: install, adopt, update, repair, uninstall.
@@ -37,6 +39,8 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 **Uninstall** — Remove owned managed files, restore originals where they exist, and release menu ownership. Preserved and unmanaged files stay.
 
 **Outcome** — What an operation reports after committing: whether the game list refresh was accepted, or a restart is required. The operation is committed either way.
+
+**Notice** — A transient line reporting a finished operation, shown in the notice bar and cleared after three seconds. A failure is not a notice: it stays in the status block until it is answered.
 
 **Originals** — Backups of files the installer replaced, kept so a failed operation can be reversed and an uninstall can restore what was there before.
 

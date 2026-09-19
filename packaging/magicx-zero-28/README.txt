@@ -40,6 +40,13 @@ names. Quitting is the one control no button carries alone: hold Select and
 press Y. On the blocked screen, Confirm exports diagnostics and that chord is
 the way out.
 
+The catalogue opens on its whole list and carries a tab bar above the rows:
+ALL, READY, and INSTALLED, with the active view marked in the accent colour.
+Left and right step the bar, up and down step the rows, and the shoulders page
+a list longer than its window. A finished operation reports in a notice bar
+over the bottom of the panel and clears itself after three seconds; a failure
+is not a notice and keeps the status block until it is answered.
+
 Mappings are stored by Knulli device plus controller GUID under:
   /userdata/system/configs/knulli-app-store/controller-mappings.json
 

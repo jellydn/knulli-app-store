@@ -21,6 +21,8 @@ Later launches load the saved mapping directly. Open Settings with the control t
 
 The footer is the only place the interface shows controls. It names each action available on the current screen beside its binding, for example `Confirm (A)  Settings (Y)  Quit (SELECT + Y)` on the catalogue, and the same action name always means the same action. No screen repeats a control hint in its body text, and the controller mapping summary lists the same names beside the buttons that carry them. Quitting is the one control no button carries alone: hold Select and press Y. On the blocked screen, Confirm exports diagnostics and the same chord is the way out.
 
+The catalogue opens on its whole list and carries a tab bar above the rows: **ALL**, **READY**, and **INSTALLED**, with the active view marked in the accent colour. Left and right step the bar, up and down step the rows, and the shoulders page a list longer than its window. A finished operation reports in a notice bar over the bottom of the panel and clears itself after three seconds; a failure is not a notice and keeps the status block until it is answered.
+
 Every screen can be checked on a development machine first, with no handheld and no controller: `make gui GUI_DEVICE=magicx-zero-28 GUI_RESOLUTION=640x480` opens the interactive GUI from the keyboard against a scratch fixture root. `make walkthrough WALK_DEVICE=magicx-zero-28 WALK_RESOLUTION=640x480` replays the offline flows and records the opening, post-key, and operation-completion frames. Add `WALK_FLAGS=--install` for the network-backed package lifecycle flows. Neither run exercises a real GameController or touches a real `/userdata`. See [Desktop GUI verification](desktop-verification.md).
 
 Mappings use this versioned file:

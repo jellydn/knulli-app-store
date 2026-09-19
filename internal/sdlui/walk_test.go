@@ -3,6 +3,7 @@ package sdlui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
 	storeinput "github.com/jellydn/knulli-app-store/internal/input"
@@ -122,14 +123,17 @@ func TestWalkDetailRecordsTheSelectedItemAndError(t *testing.T) {
 		Selected: 0,
 		Action:   1,
 		Focus:    storeui.Confirm,
-		Message:  "Install completed",
+		Message:  "Downloading, verifying, and applying Grout",
 		Error:    "SHA-256 mismatch",
 	}
+	model.Toasts.Push("Install completed", time.Now())
 	session := storeinput.NewDesktopSession(t.TempDir(), "trimui-smart-pro")
 	session.Mode = storeinput.Normal
 	session.Message = "Controller mapping tested and saved"
 	detail := WalkDetail(model, session)
-	for _, want := range []string{"io.github.unitreign.playtime", "confirm", "uninstall", "false", "normal", "Controller mapping tested and saved", "Install completed", "SHA-256 mismatch"} {
+	// A completion now reaches the record through the notice bar, so the evidence
+	// still says what the screen showed after an operation finished.
+	for _, want := range []string{"io.github.unitreign.playtime", "confirm", "uninstall", "false", "normal", "all", "Controller mapping tested and saved", "Downloading, verifying, and applying Grout", "Install completed", "SHA-256 mismatch"} {
 		if !strings.Contains(detail, want) {
 			t.Fatalf("detail %q does not record %q", detail, want)
 		}
@@ -142,12 +146,13 @@ func TestWalkDetailRecordsTheSelectedItemAndError(t *testing.T) {
 
 func TestWalkDetailKeepsMessagesInsideOneTSVRecord(t *testing.T) {
 	model := &storeui.Model{Message: "first\tsecond", Error: "line one\nline two\rline three"}
+	model.Toasts.Push("notice\twith\rbreaks", time.Now())
 	detail := WalkDetail(model, nil)
 	if strings.ContainsAny(detail, "\r\n") {
 		t.Fatalf("detail contains a line break: %q", detail)
 	}
-	if fields := strings.Split(detail, "\t"); len(fields) != 8 {
-		t.Fatalf("detail has %d fields, want 8: %q", len(fields), detail)
+	if fields := strings.Split(detail, "\t"); len(fields) != 10 {
+		t.Fatalf("detail has %d fields, want 10: %q", len(fields), detail)
 	}
 }
 
@@ -245,7 +250,7 @@ func TestNilWalkRunnerIsInert(t *testing.T) {
 
 func TestWalkRecordCarriesTheEvidenceColumns(t *testing.T) {
 	shot := WalkShot{File: "001-enter-catalogue.png", State: "catalogue", Key: KeyConfirm}
-	record := WalkRecord(shot, "io.github.unitreign.playtime\tbrowse\tinstall\tfalse\tnormal\t\t\t")
+	record := WalkRecord(shot, "io.github.unitreign.playtime\tbrowse\tinstall\tfalse\tnormal\tall\t\t\t\t")
 	fields := strings.Split(strings.TrimSuffix(record, "\n"), "\t")
 	if len(fields) != len(strings.Split(strings.TrimSuffix(WalkHeader, "\n"), "\t")) {
 		t.Fatalf("record has %d columns for the %d column header: %q", len(fields), len(strings.Split(WalkHeader, "\t")), record)

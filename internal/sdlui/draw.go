@@ -56,12 +56,18 @@ func draw(model *storeui.Model, platformName string, controls *storeinput.Sessio
 	fill(frame, image.Rect(panelLeft, panelTop, listPanelRight, panelBottom), palette.panel)
 	fill(frame, image.Rect(detailPanelLeft, panelTop, panelRight, panelBottom), palette.panel)
 	if len(model.Items) == 0 {
-		text(frame, 30, 75, palette.muted, "NO PACKAGES IN CATALOGUE")
+		// An empty catalogue and an empty tab are different answers, and the
+		// list is the only place that can tell the user which one they are
+		// looking at. The strip is painted either way, so the way out of an
+		// empty tab is visible from inside it.
+		drawTabs(frame, model)
+		text(frame, listLeft+tabPillPaddingX, 88, palette.muted, emptyCatalogueMessage(model.Total(), len(model.Items)))
 	} else {
 		drawList(frame, model)
 		drawDetails(frame, model)
 	}
 	drawStatus(frame, model)
+	drawToast(frame, model)
 	drawFooter(frame, model, controls)
 	return frame
 }
@@ -235,15 +241,8 @@ func controllerSetupProgress(controls *storeinput.Session) string {
 // rows that window shows, so the list and the paging keys can never disagree
 // about how far a screenful is.
 func drawList(frame *image.RGBA, model *storeui.Model) {
-	text(frame, 30, 62, palette.muted, "CATALOGUE")
+	drawTabs(frame, model)
 	start, end := model.Window(listRows)
-	if paged(model) {
-		// The range is worth showing exactly when the list is longer than the
-		// window — the same condition the footer uses to offer paging — because
-		// a list that fits would only repeat its own count.
-		position := fmt.Sprintf("%d-%d OF %d", start+1, end, len(model.Items))
-		text(frame, listRight-len(position)*7, 62, palette.muted, position)
-	}
 	for index := start; index < end; index++ {
 		item := model.Items[index]
 		row := listRowRectangle(index - start)
@@ -256,6 +255,64 @@ func drawList(frame *image.RGBA, model *storeui.Model) {
 		}
 		text(frame, row.Min.X+rowTextInset, listRowTitleBaseline(row), palette.text, shorten(name, rowTitleCharacters))
 		text(frame, row.Min.X+rowTextInset, listRowDetailBaseline(row), statusColor(item), shorten(rowTrustLabel(item)+"  |  "+rowInstallState(item), rowDetailCharacters))
+	}
+	if paged(model) {
+		// The range is worth showing exactly when the list is longer than the
+		// window — the same condition the footer uses to offer paging — because
+		// a list that fits would only repeat its own count. It sits under the
+		// rows it describes, right-aligned, so the strip above them holds only
+		// tabs.
+		caption := listRangeCaption(start, end, len(model.Items))
+		text(frame, listRangePosition(caption), listRangeBaseline, palette.muted, caption)
+	}
+}
+
+// listRangeCaption names the window a paged list is showing.
+func listRangeCaption(start, end, total int) string {
+	return fmt.Sprintf("%d-%d OF %d", start+1, end, total)
+}
+
+// drawTabs paints the catalogue's view selector. The active tab carries the
+// same accent wash and accent ring as a selected row, so "this is the view you
+// are in" reads the same way wherever it appears, and the inactive labels stay
+// visible rather than hidden behind a menu.
+func drawTabs(frame *image.RGBA, model *storeui.Model) {
+	labels := tabLabels()
+	for index, rectangle := range tabPillRectangles(labels) {
+		shade := palette.muted
+		if storeui.TabOrder[index] == model.Tab() {
+			fill(frame, rectangle, blend(palette.accent, palette.panel, selectionWash))
+			ring(frame, rectangle, palette.accent)
+			shade = palette.text
+		}
+		text(frame, rectangle.Min.X+tabPillPaddingX, tabStripBaseline, shade, labels[index])
+	}
+}
+
+// drawToast paints the bottom-anchored notice bar. It is drawn over the panel's
+// foot so it never reflows the screen it lands on, and it keeps away from the
+// footer, because the footer is the one line a screen must not lose: a notice
+// is transient, an instruction is not.
+func drawToast(frame *image.RGBA, model *storeui.Model) {
+	notices := model.LiveToasts()
+	if len(notices) == 0 {
+		return
+	}
+	bar := toastRectangle()
+	fill(frame, bar, blend(palette.accent, palette.panel, toastWash))
+	ring(frame, bar, palette.accent)
+	// Oldest first, capped at the bar's height: the queue holds one notice in
+	// practice, since operations are serialised, and a burst shows its first
+	// lines rather than overrunning the panel.
+	lines := 0
+	for _, notice := range notices {
+		for _, line := range wrapText(strings.ToUpper(notice), toastCharacterLimit) {
+			if lines == toastMaxLines {
+				return
+			}
+			text(frame, bar.Min.X+toastInsetX, toastFirstLine+lines*toastLineHeight, palette.text, line)
+			lines++
+		}
 	}
 }
 
@@ -270,6 +327,10 @@ func drawRowSelection(frame *image.RGBA, row image.Rectangle) {
 // selectionWash is how much accent a selected row carries. The rest of the row
 // stays panel, so the wash reads as a tint rather than as a filled button.
 const selectionWash = 0.22
+
+// toastWash is the notice bar's tint. It is weaker than a selection, so a
+// notice never reads as something the user has selected or should act on.
+const toastWash = 0.14
 
 // ring strokes a one pixel outline just inside a rectangle, so the outline
 // never grows the row, covers the row beside it, or touches the next one.

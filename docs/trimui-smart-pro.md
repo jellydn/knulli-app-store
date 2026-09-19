@@ -79,6 +79,8 @@ If SDL exposes no GameController, the setup screen stays blocked, automatically 
 
 The footer is the only place the interface shows controls. It names each action available on the current screen beside its binding, for example `Confirm (A)  Settings (Y)  Quit (SELECT + Y)` on the catalogue, and the same action name always means the same action: Confirm accepts or opens, Back cancels or steps back a panel, Settings opens controller settings. No screen repeats a control hint in its body text, and the controller mapping summary lists the same names beside the buttons that carry them. Quitting is the one control no button carries alone: hold Select and press Y. On the blocked screen, Confirm exports diagnostics and the same chord is the way out.
 
+The catalogue opens on its whole list and carries a tab bar above the rows: **ALL**, **READY**, and **INSTALLED**, with the active view marked in the accent colour. Left and right step the bar, up and down step the rows, and the shoulders page a list longer than its window. A finished operation reports in a notice bar over the bottom of the panel and clears itself after three seconds; a failure is not a notice and keeps the status block until it is answered.
+
 Every screen can be checked on a development machine first, with no handheld and no controller: `make gui` opens the interactive GUI from the keyboard against a scratch fixture root, where the footer reads `Confirm (ENTER)  Settings (Y)  Quit (TAB + Y)`. `make walkthrough` replays the offline flows and records the opening, post-key, and operation-completion frames; each pull request publishes that evidence as the `gui-walkthrough` artifact. Add `WALK_FLAGS=--install` for the network-backed package lifecycle flows. Neither run exercises a real GameController or touches a real `/userdata`, so the checklist below still needs the device. See [Desktop GUI verification](desktop-verification.md).
 
 ## Device test checklist
@@ -88,6 +90,7 @@ Every screen can be checked on a development machine first, with no handheld and
 - Confirm text, selection, trust state, and package details are readable with no clipping.
 - Confirm D-pad navigation, select, back, and exit with Knulli's default Ports layout.
 - Confirm the footer is the only control hint on screen: one line of `VERB (BUTTON)` pairs for the active mapping, with no repeated hint in the panel. Record the log if no controller appears.
+- Confirm the tab bar marks the active view, that left and right step it, and that a finished operation reports in the notice bar without covering the action buttons.
 - Open Settings with its displayed physical label, export diagnostics, and inspect the bundle for platform and mapping decisions. Do not send it if manual inspection finds private data.
 - Confirm the header shows `TRIMUI SMART PRO / 1280X720`. Unknown boards must show `UNKNOWN DEVICE`, and failed runtime-size detection must identify its fallback.
 - Confirm Grout and RetSend show `EXPERIMENTAL`, PlayTime shows `DEVICE TESTED`, and RAOfflineProxy and PocketCurator remain read-only.

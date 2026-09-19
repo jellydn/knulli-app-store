@@ -11,6 +11,7 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/appstore"
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
 	storeinput "github.com/jellydn/knulli-app-store/internal/input"
+	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/platform"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
 )
@@ -165,6 +166,55 @@ func TestHandleKeyUsesNonDefaultActiveMapping(t *testing.T) {
 	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyDown})
 	if effects.Action != storeinput.Down {
 		t.Fatalf("key used the default binding instead of the active mapping: action=%q", effects.Action)
+	}
+}
+
+// Sideways walks the tab bar and vertically walks the rows, so one direction key
+// never means two things at once. Paging stays on its own two buttons.
+func TestHandleStepsTabsSidewaysAndRowsVertically(t *testing.T) {
+	model, controls, logger, backend := newRouterHarness(t)
+	backend.items = []appstore.Item{
+		{Package: manifest.Package{ID: "org.example.alpha"}, Verdict: appstore.Verdict{State: appstore.StateAvailable}},
+		{Package: manifest.Package{ID: "org.example.beta"}, Verdict: appstore.Verdict{State: appstore.StateAvailable}},
+	}
+	if err := model.Load(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	model.Selected = 1
+
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyUp})
+	if model.Selected != 0 {
+		t.Fatalf("up selected row %d", model.Selected)
+	}
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyDown})
+	if model.Selected != 1 {
+		t.Fatalf("down selected row %d", model.Selected)
+	}
+
+	// Right steps onto the Ready tab, where both packages still have a row, so
+	// the selection follows the package the user was reading.
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyRight})
+	if model.Tab() != storeui.TabReady {
+		t.Fatalf("right landed on %q", model.Tab().Label())
+	}
+	if len(model.Items) != 2 || model.Items[model.Selected].Package.ID != "org.example.beta" {
+		t.Fatalf("the tab step lost the selected package: %d of %d rows", model.Selected, len(model.Items))
+	}
+
+	// Left walks the bar back the way it came. One more left wraps past the
+	// front to the last tab: nothing is installed in this fixture, so that tab
+	// is empty, and the way out of it is the same key that got in.
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyLeft})
+	if model.Tab() != storeui.TabAll || len(model.Items) != 2 {
+		t.Fatalf("left landed on %q with %d rows", model.Tab().Label(), len(model.Items))
+	}
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyLeft})
+	if model.Tab() != storeui.TabInstalled || len(model.Items) != 0 {
+		t.Fatalf("left wrapped onto %q with %d rows", model.Tab().Label(), len(model.Items))
+	}
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyRight})
+	if model.Tab() != storeui.TabAll || len(model.Items) != 2 {
+		t.Fatalf("stepping out of the empty tab landed on %q with %d rows", model.Tab().Label(), len(model.Items))
 	}
 }
 
