@@ -17,36 +17,6 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-const (
-	canvasWidth  = 640
-	canvasHeight = 360
-	// One panel and one footer line are shared by every screen, so a hint can
-	// only ever appear in the footer.
-	panelTop       = 42
-	panelLeft      = 16
-	panelRight     = 624
-	panelBottom    = 330
-	footerBaseline = 348
-	// panelInset is the left margin every panel body line shares.
-	panelInset = 258
-	// modeHeadingBaseline is where every controller screen starts its content,
-	// so switching screens never moves the heading.
-	modeHeadingBaseline = 176
-	// One status block serves the catalogue, details, health and error screens.
-	// It sits above the action buttons, so a status never covers an action and
-	// never lands on the notice.
-	statusBoxLeft   = 248
-	statusBoxTop    = 190
-	statusBoxRight  = 618
-	statusBoxBottom = 246
-	statusBaseline  = 205
-	statusLines     = 3
-	// The action row is the lowest interactive element in the catalogue panel.
-	// The status block above it can never hide a button while it stays clear.
-	actionLabelBaseline = 264
-	actionRowBaseline   = 278
-)
-
 const experimentalLabel = "EXPERIMENTAL"
 
 var palette = struct {
@@ -83,8 +53,8 @@ func draw(model *storeui.Model, platformName string, controls *storeinput.Sessio
 		drawFooter(frame, model, controls)
 		return frame
 	}
-	fill(frame, image.Rect(panelLeft, panelTop, 230, panelBottom), palette.panel)
-	fill(frame, image.Rect(242, panelTop, panelRight, panelBottom), palette.panel)
+	fill(frame, image.Rect(panelLeft, panelTop, listPanelRight, panelBottom), palette.panel)
+	fill(frame, image.Rect(detailPanelLeft, panelTop, panelRight, panelBottom), palette.panel)
 	if len(model.Items) == 0 {
 		text(frame, 30, 75, palette.muted, "NO PACKAGES IN CATALOGUE")
 	} else {
@@ -214,8 +184,11 @@ func drawMappingSummary(frame *image.RGBA, mapping storeinput.Mapping, tested ma
 				mark = "[ ] "
 			}
 		}
-		column := index / 4
-		row := index % 4
+		// The summary is two columns tall by however many the action set needs,
+		// so adding actions grows the summary downwards instead of off the
+		// panel's right edge.
+		column := index % 2
+		row := index / 2
 		label := storeinput.ActionLabel(action)
 		text(frame, x+column*columnWidth, y+row*22, palette.text, shorten(mark+label+": "+storeinput.ButtonLabel(button), maximumCharacters))
 	}
@@ -258,36 +231,62 @@ func controllerSetupProgress(controls *storeinput.Session) string {
 	return fmt.Sprintf("PROGRESS  %d OF %d ACTIONS", completed, len(storeinput.Actions))
 }
 
+// drawList paints the visible window of catalogue rows. The model owns which
+// rows that window shows, so the list and the paging keys can never disagree
+// about how far a screenful is.
 func drawList(frame *image.RGBA, model *storeui.Model) {
 	text(frame, 30, 62, palette.muted, "CATALOGUE")
-	start := model.Selected - 2
-	if start < 0 {
-		start = 0
-	}
-	if start+5 > len(model.Items) {
-		start = len(model.Items) - 5
-		if start < 0 {
-			start = 0
-		}
-	}
-	end := start + 5
-	if end > len(model.Items) {
-		end = len(model.Items)
+	start, end := model.Window(listRows)
+	if paged(model) {
+		// The range is worth showing exactly when the list is longer than the
+		// window — the same condition the footer uses to offer paging — because
+		// a list that fits would only repeat its own count.
+		position := fmt.Sprintf("%d-%d OF %d", start+1, end, len(model.Items))
+		text(frame, listRight-len(position)*7, 62, palette.muted, position)
 	}
 	for index := start; index < end; index++ {
 		item := model.Items[index]
-		y := 72 + (index-start)*44
+		row := listRowRectangle(index - start)
 		if index == model.Selected {
-			fill(frame, image.Rect(24, y, 222, y+38), palette.selected)
-			fill(frame, image.Rect(24, y, 28, y+38), palette.accent)
+			drawRowSelection(frame, row)
 		}
 		name := strings.ToUpper(item.Package.Name)
 		if item.Package.Version != "" {
 			name += "  " + strings.ToUpper(item.Package.Version)
 		}
-		text(frame, 34, y+15, palette.text, shorten(name, 24))
-		text(frame, 34, y+31, statusColor(item), shorten(rowTrustLabel(item)+"  |  "+rowInstallState(item), 26))
+		text(frame, row.Min.X+rowTextInset, listRowTitleBaseline(row), palette.text, shorten(name, rowTitleCharacters))
+		text(frame, row.Min.X+rowTextInset, listRowDetailBaseline(row), statusColor(item), shorten(rowTrustLabel(item)+"  |  "+rowInstallState(item), rowDetailCharacters))
 	}
+}
+
+// drawRowSelection marks the selected row: a translucent accent wash, so the
+// row's own text stays legible, inside a solid accent ring, so the selection is
+// unmistakable on a small panel where a wash alone is easy to miss.
+func drawRowSelection(frame *image.RGBA, row image.Rectangle) {
+	fill(frame, row, blend(palette.accent, palette.panel, selectionWash))
+	ring(frame, row, palette.accent)
+}
+
+// selectionWash is how much accent a selected row carries. The rest of the row
+// stays panel, so the wash reads as a tint rather than as a filled button.
+const selectionWash = 0.22
+
+// ring strokes a one pixel outline just inside a rectangle, so the outline
+// never grows the row, covers the row beside it, or touches the next one.
+func ring(frame *image.RGBA, row image.Rectangle, shade color.Color) {
+	fill(frame, image.Rect(row.Min.X, row.Min.Y, row.Max.X, row.Min.Y+1), shade)
+	fill(frame, image.Rect(row.Min.X, row.Max.Y-1, row.Max.X, row.Max.Y), shade)
+	fill(frame, image.Rect(row.Min.X, row.Min.Y, row.Min.X+1, row.Max.Y), shade)
+	fill(frame, image.Rect(row.Max.X-1, row.Min.Y, row.Max.X, row.Max.Y), shade)
+}
+
+// blend mixes foreground into background. amount is how much of the foreground
+// shows: 0 keeps the background, 1 replaces it.
+func blend(foreground, background color.RGBA, amount float64) color.RGBA {
+	mix := func(front, back uint8) uint8 {
+		return uint8(float64(front)*amount + float64(back)*(1-amount))
+	}
+	return color.RGBA{R: mix(foreground.R, background.R), G: mix(foreground.G, background.G), B: mix(foreground.B, background.B), A: 255}
 }
 
 func drawDetails(frame *image.RGBA, model *storeui.Model) {

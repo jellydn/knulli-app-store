@@ -13,23 +13,30 @@ const (
 	Down        Action = "down"
 	Left        Action = "left"
 	Right       Action = "right"
+	PageUp      Action = "page-up"
+	PageDown    Action = "page-down"
 	Confirm     Action = "confirm"
 	Back        Action = "back"
 	Diagnostics Action = "diagnostics"
 	Exit        Action = "exit"
 )
 
-// Actions is every action a user binds during controller setup. Exit is
-// deliberately absent: quitting is the Select+Y chord the input layer reads
-// from held state, so no single button can end a session by accident and no
-// mapping can claim to be the way out.
-var Actions = []Action{Up, Down, Left, Right, Confirm, Back, Diagnostics}
+// Actions is every action a user binds during controller setup. PageUp and
+// PageDown are separate actions rather than a modifier on the directions,
+// because a page is a different distance from a step: a list that outgrows its
+// window is paged with the shoulders and stepped with the d-pad, and neither
+// gesture has to guess which the user meant. Exit is deliberately absent:
+// quitting is the Select+Y chord the input layer reads from held state, so no
+// single button can end a session by accident and no mapping can claim to be
+// the way out.
+var Actions = []Action{Up, Down, Left, Right, PageUp, PageDown, Confirm, Back, Diagnostics}
 
 type Mapping map[Action]int
 
 func AutoMapping() Mapping {
 	return Mapping{
 		Up: 11, Down: 12, Left: 13, Right: 14,
+		PageUp: 9, PageDown: 10,
 		Confirm: 0, Back: 1, Diagnostics: 3,
 	}
 }
@@ -81,6 +88,20 @@ func (mapping Mapping) KeepKnown() Mapping {
 		}
 	}
 	return result
+}
+
+// Missing lists the actions a mapping does not bind, in the canonical order. A
+// record saved by an older build is missing whatever the action set has grown
+// since it was written, which is how a stale record is told apart from a
+// damaged one.
+func (mapping Mapping) Missing() []Action {
+	var missing []Action
+	for _, action := range Actions {
+		if _, ok := mapping[action]; !ok {
+			missing = append(missing, action)
+		}
+	}
+	return missing
 }
 
 // ButtonLabel names the control carrying an action, whether it is an SDL

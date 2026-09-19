@@ -28,7 +28,7 @@ The first launch for each device/controller identity opens Controller Setup
 before the catalogue. Choose Use Detected Mapping, Test Detected Mapping,
 Customize, or Safe Exit. Customize reviews each detected button and offers
 Select, Retry, Start Over, and Back. Tested and custom mappings require a
-complete eight-action preview before atomic save. No timeout skips setup.
+complete nine-action preview before atomic save. No timeout skips setup.
 
 Later launches load the saved mapping. Settings can rerun setup, export
 diagnostics, or reset the active mapping. Hold the saved Back and Settings

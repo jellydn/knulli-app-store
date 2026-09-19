@@ -36,7 +36,7 @@ func TestCalibrationRejectsConflictsAndRequiresPreview(t *testing.T) {
 	if err := calibration.Assign(11); err == nil || calibration.Index != 1 {
 		t.Fatalf("conflict advanced calibration: %#v", calibration)
 	}
-	for _, button := range []int{12, 13, 14, 0, 1, 3} {
+	for _, button := range []int{12, 13, 14, 9, 10, 0, 1, 3} {
 		if err := calibration.Assign(button); err != nil {
 			t.Fatal(err)
 		}
@@ -44,7 +44,7 @@ func TestCalibrationRejectsConflictsAndRequiresPreview(t *testing.T) {
 	if !calibration.Preview {
 		t.Fatal("mapping skipped preview")
 	}
-	for index, button := range []int{11, 12, 13, 14, 0, 1, 3} {
+	for index, button := range []int{11, 12, 13, 14, 9, 10, 0, 1, 3} {
 		done := calibration.Test(button)
 		if done != (index == len(Actions)-1) {
 			t.Fatalf("preview completed at input %d", index)
@@ -62,7 +62,7 @@ func TestSavedMappingWithALegacyExitButtonStillLoads(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(host), 0755); err != nil {
 		t.Fatal(err)
 	}
-	legacy := `{"schema":"org.knulli.app-store/controller-mappings/v1","records":[{"identity":{"device":"trimui-smart-pro","guid":"legacy","name":"Pad"},"mapping":{"up":11,"down":12,"left":13,"right":14,"confirm":0,"back":1,"diagnostics":3,"exit":6}}]}`
+	legacy := `{"schema":"org.knulli.app-store/controller-mappings/v1","records":[{"identity":{"device":"trimui-smart-pro","guid":"legacy","name":"Pad"},"mapping":{"up":11,"down":12,"left":13,"right":14,"page-up":9,"page-down":10,"confirm":0,"back":1,"diagnostics":3,"exit":6}}]}`
 	if err := os.WriteFile(host, []byte(legacy), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -78,6 +78,48 @@ func TestSavedMappingWithALegacyExitButtonStillLoads(t *testing.T) {
 	}
 	if loaded[Confirm] != 0 || loaded[Diagnostics] != 3 {
 		t.Fatalf("migration changed a binding: %#v", loaded)
+	}
+}
+
+// Growing the action set must not cost a user the mapping saved for another
+// controller. A record written before paging existed cannot drive the current
+// screens and no button can be invented for the gap, so that one record is
+// dropped while every other identity keeps what it saved — and the file is not
+// renamed away as corrupt, which would take the other identities with it.
+func TestRecordSavedBeforeTheActionSetGrewIsSkippedWithoutLosingOtherRecords(t *testing.T) {
+	root := t.TempDir()
+	stale := Identity{Device: "magicx-zero-28", GUID: "stale", Name: "Pad"}
+	current := Identity{Device: "trimui-smart-pro", GUID: "current", Name: "Pad"}
+	host := filepath.Join(root, strings.TrimPrefix(Path, "/"))
+	if err := os.MkdirAll(filepath.Dir(host), 0755); err != nil {
+		t.Fatal(err)
+	}
+	stored := `{"schema":"org.knulli.app-store/controller-mappings/v1","records":[` +
+		`{"identity":{"device":"magicx-zero-28","guid":"stale","name":"Pad"},"mapping":{"up":11,"down":12,"left":13,"right":14,"confirm":0,"back":1,"diagnostics":3}},` +
+		`{"identity":{"device":"trimui-smart-pro","guid":"current","name":"Pad"},"mapping":{"up":11,"down":12,"left":13,"right":14,"page-up":9,"page-down":10,"confirm":0,"back":1,"diagnostics":3}}]}`
+	if err := os.WriteFile(host, []byte(stored), 0644); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore(root)
+	loaded, found, err := store.Load(current)
+	if err != nil || !found || loaded[Diagnostics] != 3 {
+		t.Fatalf("usable record was lost with the stale one: loaded=%#v found=%v err=%v", loaded, found, err)
+	}
+	if _, found, err := store.Load(stale); err != nil || found {
+		t.Fatalf("stale record should report no saved mapping: found=%v err=%v", found, err)
+	}
+	if err := store.Save(current, AutoMapping()); err != nil {
+		t.Fatalf("writing after a stale record failed: %v", err)
+	}
+	encoded, err := os.ReadFile(host)
+	if err != nil {
+		t.Fatalf("mapping file did not survive a stale record: %v", err)
+	}
+	if strings.Contains(string(encoded), "stale") {
+		t.Fatal("stale record was written back")
+	}
+	if _, err := os.Stat(host + ".corrupt"); !os.IsNotExist(err) {
+		t.Fatal("a stale record renamed the shared mapping file as corrupt")
 	}
 }
 
@@ -186,6 +228,11 @@ func TestStoreRejectsCorruptConfigAndResetKeepsOtherControllers(t *testing.T) {
 	}
 }
 
+// A record this build cannot trust is reported, not ignored, even when the
+// identity asking for a mapping is a different one. Bindings that conflict are
+// damage; a record that is merely missing bindings the action set has grown
+// since is stale, which TestRecordSavedBeforeTheActionSetGrewIsSkippedWithoutLosingOtherRecords
+// covers.
 func TestStoreValidatesEverySavedRecord(t *testing.T) {
 	root := t.TempDir()
 	store := NewStore(root)
@@ -193,7 +240,7 @@ func TestStoreValidatesEverySavedRecord(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		t.Fatal(err)
 	}
-	encoded := `{"schema":"org.knulli.app-store/controller-mappings/v1","records":[{"identity":{"device":"magicx-zero-28","guid":"bad"},"mapping":{"up":11}}]}`
+	encoded := `{"schema":"org.knulli.app-store/controller-mappings/v1","records":[{"identity":{"device":"magicx-zero-28","guid":"bad"},"mapping":{"up":11,"down":11,"left":13,"right":14,"page-up":9,"page-down":10,"confirm":0,"back":1,"diagnostics":3}}]}`
 	if err := os.WriteFile(path, []byte(encoded), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +347,7 @@ func TestCustomMappingRequiresReviewAndPreviewBeforeAtomicSave(t *testing.T) {
 	press(session, Down)
 	press(session, Down)
 	press(session, Confirm)
-	buttons := []int{2, 4, 5, 7, 8, 9, 10}
+	buttons := []int{2, 4, 5, 6, 7, 8, 9, 10, 3}
 	for index, button := range buttons {
 		session.HandleButton(button)
 		if session.Mode != Review {

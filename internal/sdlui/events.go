@@ -45,6 +45,8 @@ const (
 	KeyLeft
 	KeyDown
 	KeyRight
+	KeyPageUp
+	KeyPageDown
 	KeyConfirm
 	KeyBack
 	KeyDiagnostics
@@ -140,6 +142,10 @@ func keyAction(key Key) storeinput.Action {
 		return storeinput.Down
 	case KeyRight:
 		return storeinput.Right
+	case KeyPageUp:
+		return storeinput.PageUp
+	case KeyPageDown:
+		return storeinput.PageDown
 	case KeyConfirm:
 		return storeinput.Confirm
 	case KeyBack:
@@ -155,7 +161,8 @@ func keyAction(key Key) storeinput.Action {
 // answer an input source's own key repeat.
 func navigates(action storeinput.Action) bool {
 	switch action {
-	case storeinput.Up, storeinput.Down, storeinput.Left, storeinput.Right:
+	case storeinput.Up, storeinput.Down, storeinput.Left, storeinput.Right,
+		storeinput.PageUp, storeinput.PageDown:
 		return true
 	default:
 		return false
@@ -210,6 +217,10 @@ func dispatchAction(ctx context.Context, model *storeui.Model, action storeinput
 		model.Move(-1)
 	case storeinput.Down, storeinput.Right:
 		model.Move(1)
+	case storeinput.PageUp:
+		model.Page(-1, listRows)
+	case storeinput.PageDown:
+		model.Page(1, listRows)
 	case storeinput.Confirm:
 		model.Select(ctx)
 	case storeinput.Back:

@@ -319,6 +319,10 @@ func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, 
 			key = KeyDown
 		case C.SDLK_RIGHT:
 			key = KeyRight
+		case C.SDLK_PAGEUP:
+			key = KeyPageUp
+		case C.SDLK_PAGEDOWN:
+			key = KeyPageDown
 		case C.SDLK_RETURN, C.SDLK_SPACE:
 			key = KeyConfirm
 		case C.SDLK_ESCAPE:

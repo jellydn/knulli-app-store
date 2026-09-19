@@ -16,14 +16,16 @@ import (
 // keySpecs names each portable key as the -keys flag writes it. The names match
 // the documented desktop bindings.
 var keySpecs = map[string]Key{
-	"up":    KeyUp,
-	"down":  KeyDown,
-	"left":  KeyLeft,
-	"right": KeyRight,
-	"enter": KeyConfirm,
-	"esc":   KeyBack,
-	"y":     KeyDiagnostics,
-	"tab":   KeyChordAnchor,
+	"up":     KeyUp,
+	"down":   KeyDown,
+	"left":   KeyLeft,
+	"right":  KeyRight,
+	"pgup":   KeyPageUp,
+	"pgdown": KeyPageDown,
+	"enter":  KeyConfirm,
+	"esc":    KeyBack,
+	"y":      KeyDiagnostics,
+	"tab":    KeyChordAnchor,
 }
 
 // KeyName is the -keys spelling of a key, and the spelling used in an evidence
@@ -59,7 +61,7 @@ func ParseKeys(specification string) ([]Key, error) {
 
 // KeyNames lists every accepted key spelling, in a stable order.
 func KeyNames() []string {
-	return []string{"up", "down", "left", "right", "enter", "esc", "y", "tab"}
+	return []string{"up", "down", "left", "right", "pgup", "pgdown", "enter", "esc", "y", "tab"}
 }
 
 // WalkState names the screen a rendered frame shows. The input session owns the

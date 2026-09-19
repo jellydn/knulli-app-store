@@ -72,11 +72,11 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 ## Interface
 
-**Semantic action** — One of the eight controls the GUI exposes: up, down, left, right, confirm, back, diagnostics, and exit. An action is named independently of any physical button, so a device layout never changes what an action means.
+**Semantic action** — One of the nine controls the GUI exposes: up, down, left, right, page up, page down, confirm, back, and diagnostics. An action is named independently of any physical button, so a device layout never changes what an action means. Exit is not one of them: quitting is the Select chord, so no single press carries it.
 
 **Binding** — The physical SDL GameController button that carries one semantic action for one device and controller identity. Bindings are detected, tested, and saved per identity; no physical position is assumed.
 
-**Verb** — The word an action carries in a footer hint, for example `Confirm` for the confirm action. Directional actions share the `Navigate` footer verb, while setup prompts and mapping summaries keep the direction visible.
+**Verb** — The word an action carries in a footer hint, for example `Confirm` for the confirm action. Directional actions share the `Navigate` footer verb and the two paging actions share `Page`, while setup prompts and mapping summaries keep the direction visible.
 
 **Footer hint** — The single line below every screen's panel. It names each available action beside its binding, for example `Confirm (A)  Back (B)  Settings (Y)`, or gives an actionless calibration instruction. Outside the footer, mapping summaries identify saved bindings but do not instruct the user to press them.
 

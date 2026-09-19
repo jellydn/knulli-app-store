@@ -37,6 +37,12 @@ func footerMapping(controls *storeinput.Session) storeinput.Mapping {
 	return controls.ScreenMapping()
 }
 
+// paged reports whether the catalogue holds more rows than the list can show,
+// which is the one case where paging moves anything.
+func paged(model *storeui.Model) bool {
+	return len(model.Items) > listRows
+}
+
 // footerHints selects the instructions for the current screen. A screen picks
 // semantic actions only; the verbs come from the canonical table in the input
 // package and the button labels from the active mapping.
@@ -55,8 +61,14 @@ func footerHints(model *storeui.Model, controls *storeinput.Session) []storeinpu
 			return []storeinput.Hint{confirm, back}
 		}
 		// The catalogue is the top of the app: there is nothing behind it, so
-		// Back is not offered and quitting is the chord.
-		return []storeinput.Hint{confirm, storeinput.NewHint(storeinput.Diagnostics), quit}
+		// Back is not offered and quitting is the chord. Paging is offered only
+		// when the list is longer than the window, so a short catalogue never
+		// advertises a gesture that would move nothing.
+		hints := []storeinput.Hint{confirm}
+		if paged(model) {
+			hints = append(hints, storeinput.PageHint())
+		}
+		return append(hints, storeinput.NewHint(storeinput.Diagnostics), quit)
 	}
 	switch controls.Mode {
 	case storeinput.Blocked:

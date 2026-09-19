@@ -13,6 +13,10 @@ type Hint struct {
 	Action Action
 	// Verb is the action's meaning on the current screen.
 	Verb string
+	// With is the second action a paired hint names. Paging is one verb with
+	// two directions, so its hint reads "Page (PGUP/PGDN)" instead of stating
+	// the same verb twice with a different button each time.
+	With Action
 }
 
 // Canonical footer verbs are screen-independent for the actions that recur, so
@@ -20,6 +24,7 @@ type Hint struct {
 // name in title case; the button hint beside it carries the physical label.
 const (
 	VerbNavigate    = "Navigate"
+	VerbPage        = "Page"
 	VerbSelect      = "Confirm"
 	VerbBack        = "Back"
 	VerbSettings    = "Settings"
@@ -34,10 +39,18 @@ var Verbs = map[Action]string{
 	Down:        VerbNavigate,
 	Left:        VerbNavigate,
 	Right:       VerbNavigate,
+	PageUp:      VerbPage,
+	PageDown:    VerbPage,
 	Confirm:     VerbSelect,
 	Back:        VerbBack,
 	Diagnostics: VerbSettings,
 	Exit:        VerbExit,
+}
+
+// PageHint is the one hint that names two buttons, because paging is a single
+// verb with two directions. Both actions must be bound for it to render.
+func PageHint() Hint {
+	return Hint{Action: PageUp, With: PageDown, Verb: VerbPage}
 }
 
 // NewHint describes an action with its canonical verb.
@@ -56,7 +69,7 @@ func Verb(action Action) string {
 
 // ActionLabel identifies an action outside the footer, where panel text is
 // uppercase. Directional actions keep their direction here even though they
-// share the Navigate footer verb.
+// share a footer verb with their opposite.
 func ActionLabel(action Action) string {
 	switch action {
 	case Up:
@@ -67,6 +80,10 @@ func ActionLabel(action Action) string {
 		return "LEFT"
 	case Right:
 		return "RIGHT"
+	case PageUp:
+		return "PAGE UP"
+	case PageDown:
+		return "PAGE DOWN"
 	default:
 		return strings.ToUpper(Verb(action))
 	}
@@ -90,6 +107,15 @@ func Footer(mapping Mapping, hints []Hint, chord string) string {
 			if chord != "" {
 				parts = append(parts, hint.Verb+" ("+chord+")")
 			}
+		case hint.With != "":
+			// A paired hint names both buttons or neither: half a pair would
+			// promise a direction the current screen does not accept.
+			first, hasFirst := mapping[hint.Action]
+			second, hasSecond := mapping[hint.With]
+			if !hasFirst || !hasSecond {
+				continue
+			}
+			parts = append(parts, hint.Verb+" ("+ButtonLabel(first)+"/"+ButtonLabel(second)+")")
 		default:
 			parts = append(parts, hint.Verb+" ("+ButtonLabel(mapping[hint.Action])+")")
 		}

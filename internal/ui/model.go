@@ -67,6 +67,50 @@ func (m *Model) Move(delta int) {
 	}
 }
 
+// Window returns the first and last row of the list the catalogue shows for a
+// given number of rows. The window follows the selection and stops at the end
+// of the list, so a short list shows no empty rows and the selection is always
+// one of the rows shown. The row count belongs to the renderer, which is why it
+// arrives as an argument instead of living here.
+func (m *Model) Window(rows int) (int, int) {
+	total := len(m.Items)
+	if rows <= 0 || total == 0 {
+		return 0, 0
+	}
+	if rows > total {
+		rows = total
+	}
+	start := m.Selected - rows/2
+	if start < 0 {
+		start = 0
+	}
+	if start+rows > total {
+		start = total - rows
+	}
+	return start, start + rows
+}
+
+// Page moves the selection by a screenful and clamps at both ends: a page past
+// the end of the list stops on the last row rather than wrapping to the first,
+// because a reader who holds a shoulder button expects to arrive at the end.
+// Paging is defined in the catalogue only; there is no second screenful of
+// action buttons to move through.
+func (m *Model) Page(delta, rows int) {
+	if m.Busy || len(m.Items) == 0 || m.Focus != Browse || rows < 1 {
+		return
+	}
+	next := m.Selected + delta*rows
+	if next < 0 {
+		next = 0
+	}
+	if next > len(m.Items)-1 {
+		next = len(m.Items) - 1
+	}
+	m.Selected = next
+	m.Action = 0
+	m.Error = ""
+}
+
 func (m *Model) Select(ctx context.Context) {
 	if m.Busy || len(m.Items) == 0 {
 		return

@@ -65,6 +65,24 @@ func TestQuitChordNamesTheAnchorOfEachInputSource(t *testing.T) {
 	}
 }
 
+// Paging is one verb with two directions, so its hint names both buttons
+// instead of stating the same verb twice with a different button each time.
+func TestFooterRendersAPairedHintForAnActionWithTwoDirections(t *testing.T) {
+	if got := Footer(AutoMapping(), []Hint{PageHint()}, ""); got != "Page (LEFT SHOULDER/RIGHT SHOULDER)" {
+		t.Fatalf("paging hint = %q", got)
+	}
+	if got := Footer(KeyboardMapping(), []Hint{PageHint()}, ""); got != "Page (PGUP/PGDN)" {
+		t.Fatalf("desktop paging hint = %q", got)
+	}
+	// Half a pair would promise a direction the screen does not accept, so an
+	// unbound direction drops the whole hint.
+	partial := AutoMapping()
+	delete(partial, PageDown)
+	if got := Footer(partial, []Hint{PageHint()}, ""); got != "" {
+		t.Fatalf("half a paging hint = %q", got)
+	}
+}
+
 func TestFooterKeepsCanonicalVerbsDistinctFromButtonLabels(t *testing.T) {
 	for _, verb := range []string{VerbSelect, VerbBack, VerbSettings, VerbExit} {
 		if strings.Contains(verb, "SDL ") {
@@ -74,7 +92,7 @@ func TestFooterKeepsCanonicalVerbsDistinctFromButtonLabels(t *testing.T) {
 }
 
 func TestActionLabelKeepsDirectionsDistinct(t *testing.T) {
-	wants := map[Action]string{Up: "UP", Down: "DOWN", Left: "LEFT", Right: "RIGHT", Confirm: "CONFIRM"}
+	wants := map[Action]string{Up: "UP", Down: "DOWN", Left: "LEFT", Right: "RIGHT", PageUp: "PAGE UP", PageDown: "PAGE DOWN", Confirm: "CONFIRM"}
 	for action, want := range wants {
 		if got := ActionLabel(action); got != want {
 			t.Fatalf("ActionLabel(%q) = %q, want %q", action, got, want)

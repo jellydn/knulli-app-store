@@ -110,6 +110,29 @@ func TestEveryScreenShowsOneFooterLine(t *testing.T) {
 	}
 }
 
+// Paging is offered only when the list is longer than the window: a catalogue
+// that fits never advertises a gesture that would move nothing.
+func TestCatalogueOffersPagingOnlyWhenTheListOutgrowsTheWindow(t *testing.T) {
+	controls := normalControls(t)
+	if got := footerText(catalogueModel(), controls); strings.Contains(got, "Page") {
+		t.Fatalf("a catalogue that fits advertised paging: %q", got)
+	}
+	long := &storeui.Model{Items: make([]appstore.Item, listRows+1)}
+	want := "Confirm (A)  Page (LEFT SHOULDER/RIGHT SHOULDER)  Settings (Y)  Quit (SELECT + Y)"
+	if got := footerText(long, controls); got != want {
+		t.Fatalf("paged catalogue footer = %q, want %q", got, want)
+	}
+	if len(want) > footerCharacterLimit {
+		t.Fatalf("the paged catalogue footer is %d characters, wider than the canvas allows (%d)", len(want), footerCharacterLimit)
+	}
+	// Paging belongs to the catalogue list, not to the screens with four fixed
+	// choices of their own.
+	long.Focus = storeui.Confirm
+	if got := footerText(long, controls); strings.Contains(got, "Page") {
+		t.Fatalf("a confirmation offered paging: %q", got)
+	}
+}
+
 func TestFooterFitsTheCanvasWithTheWidestLabels(t *testing.T) {
 	controls := normalControls(t)
 	controls.Mapping = storeinput.AutoMapping()
