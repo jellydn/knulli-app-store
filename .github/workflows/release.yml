@@ -42,7 +42,7 @@ jobs:
         run: echo "tag=v$(date -u +%Y.%m.%d)-$(printf '%.7s' "$SHA")" >> "$GITHUB_OUTPUT"
 
       - name: Download verified device artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
@@ -96,7 +96,7 @@ jobs:
       matrix:
         target: [trimui-smart-pro, magicx-zero-28]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # The same script the CI path uses, so a tag release cannot be built with
       # a relaxed ABI gate, a different signing step, or an older dependency
       # list.
@@ -104,7 +104,7 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: scripts/device-build.sh "${{ matrix.target }}" "$TAG" dist
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: knulli-app-store-${{ matrix.target }}-tag
           path: dist/
@@ -117,7 +117,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Download tagged device artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: knulli-app-store-*-tag
           path: dist
