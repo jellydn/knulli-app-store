@@ -15,11 +15,9 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 )
 
-const maximumReleaseBytes int64 = 512 << 20
-
 func download(ctx context.Context, client *http.Client, release manifest.Release, destination string) error {
-	if release.Size > maximumReleaseBytes {
-		return fmt.Errorf("release size %d exceeds the %d-byte limit", release.Size, maximumReleaseBytes)
+	if release.Size > manifest.MaxPackageBytes {
+		return fmt.Errorf("release size %d exceeds the %d-byte limit", release.Size, manifest.MaxPackageBytes)
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, release.URL, nil)
 	if err != nil {

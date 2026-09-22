@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -118,6 +119,40 @@ func TestDecodeRejectsUnknownAndTrailingData(t *testing.T) {
 		if _, err := Decode(strings.NewReader(input)); err == nil {
 			t.Fatalf("expected invalid JSON to fail: %s", input)
 		}
+	}
+}
+
+// The package byte budget has one home, manifest.MaxPackageBytes. A manifest
+// that validated on one side of the cap and was rejected on the other would
+// turn a policy limit into an inconsistency, so the boundary is pinned here
+// and the message has to agree with the constant it comes from.
+func TestValidateBoundsReleaseAndInstalledSizeByThePackageLimit(t *testing.T) {
+	limit := fmt.Sprintf("%d MiB", MaxPackageBytes>>20)
+	cases := []struct {
+		name    string
+		mutate  func(*Package)
+		problem string
+	}{
+		{name: "zero release size", mutate: func(p *Package) { p.Release.Size = 0 }, problem: "release size must be between 1 byte and " + limit},
+		{name: "negative release size", mutate: func(p *Package) { p.Release.Size = -1 }, problem: "release size must be between 1 byte and " + limit},
+		{name: "release one byte over the cap", mutate: func(p *Package) { p.Release.Size = MaxPackageBytes + 1 }, problem: "release size must be between 1 byte and " + limit},
+		{name: "zero installed size", mutate: func(p *Package) { p.Release.InstalledSize = 0 }, problem: "installed size must be between 1 byte and " + limit},
+		{name: "installed size one byte over the cap", mutate: func(p *Package) { p.Release.InstalledSize = MaxPackageBytes + 1 }, problem: "installed size must be between 1 byte and " + limit},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			pkg := validPackage()
+			testCase.mutate(&pkg)
+			if err := pkg.Validate(); err == nil || !strings.Contains(err.Error(), testCase.problem) {
+				t.Fatalf("expected %q, got %v", testCase.problem, err)
+			}
+		})
+	}
+	pkg := validPackage()
+	pkg.Release.Size = MaxPackageBytes
+	pkg.Release.InstalledSize = MaxPackageBytes
+	if err := pkg.Validate(); err != nil {
+		t.Fatalf("a release exactly at the cap was rejected: %v", err)
 	}
 }
 

@@ -7,10 +7,9 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
-
-const maximumAdoptionBytes = 512 << 20
 
 type existingFile struct {
 	Virtual string
@@ -47,8 +46,8 @@ func inventoryExisting(destinationHost, destination string) ([]existingFile, uin
 			return err
 		}
 		size := uint64(info.Size())
-		if size > maximumAdoptionBytes || total > maximumAdoptionBytes-size {
-			return fmt.Errorf("pre-existing package exceeds the 512 MiB adoption limit; move it aside before retrying")
+		if size > manifest.MaxPackageBytes || total > manifest.MaxPackageBytes-size {
+			return fmt.Errorf("pre-existing package exceeds the %d MiB adoption limit; move it aside before retrying", manifest.MaxPackageBytes>>20)
 		}
 		total += size
 		digest, err := safefs.SHA256(host)
