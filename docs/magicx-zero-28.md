@@ -33,6 +33,36 @@ Mappings use this versioned file:
 
 The key combines Knulli device ID and controller GUID. An all-zero or absent GUID falls back to normalized controller name plus device ID. A controller with neither is not persisted. Corrupt files are preserved as `.corrupt` before a replacement is written.
 
+## Recording a reviewed controller layout
+
+This device has no reviewed layout, and `Profile("magicx-zero-28")` says so deliberately: `Fallback` is `nil` and its evidence reads `raw controls unavailable`. `TestDeviceProfilesDoNotInventMagicXFallback` fails if either changes with no report behind it. Nothing here matches the reviewed fallback the Smart Pro carries.
+
+Runtime behaviour is unaffected. Every session starts on SDL's canonical logical layout — `0` south, `1` east, `3` north, `9`/`10` shoulders, `11`–`14` d-pad — and first launch walks the user through using, testing, or customizing it before the catalogue opens. The source label comes from the launch environment: `Knulli SDL_GAMECONTROLLERCONFIG` when Knulli set that variable, otherwise `SDL GameController mapping`. The indices are SDL's canonical numbering either way, because SDL reports GameController events in that numbering by design. What a report therefore establishes is that this pad's buttons land where a user expects, not what the indices are.
+
+Only a real-device navigation report makes a layout reviewed. A Knulli board file, a device tree, a shared A133 family, and an SDL GameController name are not it. Neither is the desktop walkthrough: it runs on a keyboard against a fixture root, and the records it writes name `desktop-keyboard` because no controller was present.
+
+### Capture
+
+Reach the catalogue on the device with the mapping you intend to record, then capture:
+
+- **Controller identity** — the SDL GameController GUID (32 hex characters) and name, both read from the device. A controller with no GUID is recorded under its normalized name plus the device ID; a controller with neither is not persisted.
+- **The mapping summary** — the screen listing each action beside the button that carries it, for example `CONFIRM: SOUTH`. This is the evidence for which button a user pressed to reach each action. A description such as "the left face button" cannot supply it, because face-button letters differ across layouts.
+- **The mapping source label** — `Knulli SDL_GAMECONTROLLERCONFIG` or `SDL GameController mapping`, exactly as the diagnostics export records it.
+- **Which actions you used** — navigate in all four directions, confirm, back, and open Settings. Confirm the quit chord too: hold Select and press North. It is the one control no single button carries.
+- **Whether paging worked** — shoulders or nothing. A pad that cannot page answers **Skip paging** and records a mapping with no page bindings, which is a complete result rather than a gap.
+- **What did not work** — a conflict, a button that reached the wrong action, an action you could not bind. A partial report is worth more than none, as long as it states what was not established.
+
+Export diagnostics from the device and keep the lines naming the controller identity and the mapping source; that export is the artifact a report cites.
+
+### Where it lands
+
+1. `internal/input/mapping.go` — `Profile("magicx-zero-28")` gains `Fallback` from the report and an `Evidence` string naming it. `AutoMapping()` is the right value when the report confirms SDL's canonical positions; anything else is recorded as the bindings the report lists.
+2. `docs/real-device-tests.md` — a dated entry shaped like the Smart Pro one: tester, device context, firmware context, what was exercised, controller identity, the report, and its provenance.
+3. `internal/input/input_test.go` — `TestDeviceProfilesDoNotInventMagicXFallback` stops asserting that no layout exists and starts asserting that the recorded one matches the report, so the guard keeps its purpose: it still fails when controls are recorded with nothing behind them.
+4. This file — the paragraphs above and the checklist below stop describing the layout as unavailable.
+
+The profile stays as it is until all four move together. Recording the layout in some of these places and not others splits the claim from the evidence, which is the outcome this device has avoided so far.
+
 ## Package status
 
 - **Grout 5.2.0.0 is a user-authorized experimental test.** It is allowed only after Knulli, AArch64, glibc 2.17 or later, all SDL libraries, the device identity, and 640×480 pass detection. The Store disables its self-updater with an exact verified staging patch. No Grout version has MagicX real-device evidence.
@@ -44,7 +74,7 @@ Successful App Store navigation does not prove a package. Grout, PlayTime, and R
 
 ## Test checklist
 
-1. Record Knulli version, hardware revision, and the displayed SDL controller name/GUID.
+1. Record Knulli version, hardware revision, and the displayed SDL controller name/GUID. [Recording a reviewed controller layout](#recording-a-reviewed-controller-layout) lists everything else a reviewed layout needs and where each field lands.
 2. Confirm the header says `MagicX Zero 28 / 640x480`, with readable letterboxed content and no clipping.
 3. Confirm first launch stays on the dedicated screen. Test Use Detected Mapping, then reset and test Customize.
 4. Run setup, intentionally create one conflict, retry, assign all actions, and test all actions before save.
