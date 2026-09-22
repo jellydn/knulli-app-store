@@ -13,6 +13,12 @@ import (
 
 const SchemaV1 = "org.knulli.app-store/package-manifest/v1"
 
+// ManagerStatePath is the installer's own state directory: the installed-state
+// records, original backups, journals, and recovery backups. It is exported
+// because the installer reads the same constant rather than keeping a copy, so
+// the policy here and the paths it protects cannot drift apart.
+const ManagerStatePath = "/userdata/system/knulli-app-store"
+
 var (
 	idPattern      = regexp.MustCompile(`^[a-z][a-z0-9]*(\.[a-z0-9][a-z0-9-]*){2,}$`)
 	sha256Pattern  = regexp.MustCompile(`^[a-f0-9]{64}$`)
@@ -294,8 +300,8 @@ func (p Package) validateInstallable() []string {
 		if !safeAbsolute(allowed) || !under(allowed, "/userdata") {
 			problems = append(problems, "allowed write paths must be clean paths under /userdata")
 		}
-		if under("/userdata/system/knulli-app-store", allowed) {
-			problems = append(problems, "package write paths must not include app-manager state")
+		if overlaps(allowed, ManagerStatePath) {
+			problems = append(problems, "package write paths must not overlap app-manager state")
 		}
 	}
 	if !coveredBy(p.Install.Destination, p.Install.AllowedWritePaths) {
@@ -345,6 +351,14 @@ func safeRelative(value string) bool {
 
 func under(value, parent string) bool {
 	return value == parent || strings.HasPrefix(value, parent+"/")
+}
+
+// overlaps reports whether either path contains the other. Package policy needs
+// both directions: a write path inside manager state could rewrite the
+// installer's own record of what it installed, and a write path above manager
+// state could reach the same files from the other side.
+func overlaps(left, right string) bool {
+	return under(left, right) || under(right, left)
 }
 
 func coveredBy(value string, allowed []string) bool {

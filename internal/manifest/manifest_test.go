@@ -121,6 +121,57 @@ func TestDecodeRejectsUnknownAndTrailingData(t *testing.T) {
 	}
 }
 
+// The manager-state rule is deliberately symmetric, so the helper it reads is
+// pinned directly and not only through the rule that calls it. The neighbour
+// case matters: a prefix match without the separator is a different directory.
+func TestOverlapsCoversBothDirections(t *testing.T) {
+	cases := []struct {
+		name  string
+		left  string
+		right string
+		want  bool
+	}{
+		{name: "identical", left: ManagerStatePath, right: ManagerStatePath, want: true},
+		{name: "left is inside", left: ManagerStatePath + "/installed", right: ManagerStatePath, want: true},
+		{name: "right is inside", left: ManagerStatePath, right: ManagerStatePath + "/installed", want: true},
+		{name: "left contains", left: "/userdata", right: ManagerStatePath, want: true},
+		{name: "right contains", left: ManagerStatePath, right: "/userdata", want: true},
+		{name: "neighbour with a shared prefix", left: "/userdata/system/knulli-app-store-other", right: ManagerStatePath, want: false},
+		{name: "sibling directory", left: "/userdata/system/configs/demo", right: ManagerStatePath, want: false},
+		{name: "unrelated", left: "/userdata/roms/tools/demo", right: ManagerStatePath, want: false},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := overlaps(testCase.left, testCase.right); got != testCase.want {
+				t.Fatalf("overlaps(%q, %q) = %v, want %v", testCase.left, testCase.right, got, testCase.want)
+			}
+		})
+	}
+}
+
+func verifiedPackage() Package {
+	pkg := validPackage()
+	pkg.Review.Status = "verified"
+	pkg.Review.Evidence = []Evidence{{
+		Kind: "real-device-test", URL: "https://example.com/report", Tester: "Tester", Date: "2026-09-15",
+		PackageVersion: pkg.Version, Firmware: "knulli", Architecture: "aarch64", Device: "h700", Resolution: "640x480", Result: "passed",
+	}}
+	return pkg
+}
+
+// broadExperimentalPackage is the only shape allowed to declare a display range
+// instead of an exact resolution list.
+func broadExperimentalPackage() Package {
+	pkg := validPackage()
+	pkg.Review.Status = "experimental"
+	pkg.Compatibility.MinimumVersion = ""
+	pkg.Compatibility.Devices = nil
+	pkg.Compatibility.Resolutions = nil
+	pkg.Compatibility.DeviceScope = "any"
+	pkg.Install.Warning = "Unverified broad device test."
+	return pkg
+}
+
 func validPackage() Package {
 	return Package{
 		Schema:     SchemaV1,
