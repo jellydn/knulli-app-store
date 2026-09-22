@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"runtime"
 	"strings"
@@ -114,29 +115,9 @@ func run(arguments []string) error {
 		fmt.Fprintf(os.Stderr, "signed %s\n", catalog.SignaturePath(*output))
 		return nil
 	case "install", "adopt", "update", "repair":
-		return runApply(arguments[0], arguments[1:])
+		return runApply(arguments[0], arguments[1:], applyDeps{})
 	case "uninstall":
-		flags := flag.NewFlagSet("uninstall", flag.ContinueOnError)
-		root := flags.String("root", "/", "filesystem root")
-		if err := flags.Parse(arguments[1:]); err != nil {
-			return err
-		}
-		if flags.NArg() != 1 {
-			return fmt.Errorf("uninstall requires one package id")
-		}
-		diagnosticLog, err := diagnostics.Open(*root)
-		if err != nil {
-			return fmt.Errorf("open diagnostics log: %w", err)
-		}
-		diagnosticLog.Event("startup", "component", "cli", "command", "uninstall")
-		manager := installer.Manager{Root: *root, Diagnostics: diagnosticLog}
-		outcome, err := manager.Uninstall(context.Background(), flags.Arg(0))
-		if err != nil {
-			return err
-		}
-		fmt.Printf("uninstalled %s\n", flags.Arg(0))
-		printGameListOutcome(outcome)
-		return nil
+		return runUninstall(arguments[1:], applyDeps{})
 	default:
 		return fmt.Errorf("unknown command %q", arguments[0])
 	}
@@ -159,7 +140,51 @@ func writeNewFile(path string, data []byte, mode os.FileMode) error {
 	return nil
 }
 
-func runApply(operation string, arguments []string) error {
+// applyDeps carries the two collaborators a lifecycle command can express
+// neither as a flag nor by reading the filesystem. A manifest pins its release
+// URL to github.com, so a test cannot redirect a download by rewriting the
+// manifest, and the game-list refresh address is a fixed loopback port. They
+// arrive as arguments the way cmd/check-updates takes a Checker: production
+// passes the zero value, which keeps the installer's own defaults, and a test
+// supplies its own instead of editing the code under test.
+type applyDeps struct {
+	client     *http.Client
+	refreshURL string
+}
+
+// newManager builds the manager one command operates through. A nil deps.client
+// and an empty deps.refreshURL select the installer's production defaults.
+func newManager(root string, log *diagnostics.Log, deps applyDeps) installer.Manager {
+	return installer.Manager{Root: root, Client: deps.client, RefreshURL: deps.refreshURL, Diagnostics: log}
+}
+
+// runUninstall removes an owned package and reports whether the game list could
+// be reloaded. It is separate from run so a test can supply its own refresh
+// address, which is otherwise a fixed loopback port.
+func runUninstall(arguments []string, deps applyDeps) error {
+	flags := flag.NewFlagSet("uninstall", flag.ContinueOnError)
+	root := flags.String("root", "/", "filesystem root")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if flags.NArg() != 1 {
+		return fmt.Errorf("uninstall requires one package id")
+	}
+	diagnosticLog, err := diagnostics.Open(*root)
+	if err != nil {
+		return fmt.Errorf("open diagnostics log: %w", err)
+	}
+	diagnosticLog.Event("startup", "component", "cli", "command", "uninstall")
+	outcome, err := newManager(*root, diagnosticLog, deps).Uninstall(context.Background(), flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	fmt.Printf("uninstalled %s\n", flags.Arg(0))
+	printGameListOutcome(outcome)
+	return nil
+}
+
+func runApply(operation string, arguments []string, deps applyDeps) error {
 	flags := flag.NewFlagSet(operation, flag.ContinueOnError)
 	root := flags.String("root", "/", "filesystem root")
 	firmware := flags.String("firmware", "", "firmware id")
@@ -204,7 +229,7 @@ func runApply(operation string, arguments []string) error {
 	if !known {
 		return fmt.Errorf("unknown operation %q", operation)
 	}
-	manager := installer.Manager{Root: *root, Diagnostics: diagnosticLog}.WithPlatform(current)
+	manager := newManager(*root, diagnosticLog, deps).WithPlatform(current)
 	outcome, err := manager.Apply(context.Background(), op, pkg)
 	if err != nil {
 		return err
