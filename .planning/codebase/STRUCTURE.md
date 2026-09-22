@@ -1,186 +1,199 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-09-19
+**Analysis Date:** 2026-09-21
 
 ## Directory Layout
 
 ```
 knulli-app-store/
-├── cmd/                      # Process entry points (thin adapters)
-│   ├── knulli-app/           # CGO-free installer CLI
-│   ├── knulli-app-ui/        # SDL2 GUI (sdl build tag)
-│   └── check-updates/        # Weekly GitHub release metadata checker
-├── internal/                 # Importable only inside this module
-│   ├── appstore/             # Catalogue facade: Service, Item, verdict
-│   ├── archive/              # ZIP and tar.gz staging
-│   ├── catalog/              # Deterministic index build/load + ed25519 signing
-│   ├── diagnostics/          # Redacted, bounded logs and export
-│   ├── gamelist/             # Owned gamelist.xml entry planning and XML edits
-│   ├── input/                # Semantic mappings, setup session, keyboard
-│   ├── installer/            # Download, lifecycle, state, health, refresh
-│   ├── manifest/             # Package contract and validation
-│   ├── platform/             # Device/firmware/resolution detection
-│   ├── safefs/               # Allowed paths, atomic writes, transactions
-│   ├── sdlui/                # SDL adapter, raster UI, walkthrough harness
-│   ├── ui/                   # Pure-Go catalogue model, tabs, notices
-│   └── updatecheck/          # Read-only GitHub release reports
+├── .agents/setup              # Cloud-agent bootstrap: pinned Go 1.27.1 (SHA-256 checked) + libsdl2-dev
+├── .github/workflows/         # check.yml, release.yml, catalogue-updates.yml
 ├── catalogue/
-│   ├── packages/             # One JSON manifest per package (five)
-│   └── providers/            # External providers (PortMaster)
-├── schema/                   # package-manifest-v1 JSON Schema
-├── packaging/                # Per-device Ports launcher and README
-├── scripts/                  # Device packaging and desktop verification
-├── docs/                     # Operator, review, security, ADR docs
-├── .agents/setup             # Installs Go 1.27.1 + libsdl2-dev when missing
-├── .github/workflows/        # check, release, catalogue-updates
-├── .planning/codebase/       # Generated codebase map
-├── CONTEXT.md                # Shared domain glossary
-├── Makefile                  # fmt, vet, test, build, build-ui, catalogue, gui, walkthrough
-└── go.mod                    # module github.com/jellydn/knulli-app-store
+│   ├── packages/              # One reviewed manifest per package (5 files)
+│   └── providers/             # External provider declarations (portmaster.json)
+├── cmd/
+│   ├── check-updates/         # Read-only upstream release metadata reporter
+│   ├── knulli-app/            # Static CGO-free CLI
+│   └── knulli-app-ui/         # SDL2 GUI entry point (sdl build tag)
+├── docs/
+│   ├── adr/                   # 8 accepted architecture decision records
+│   └── *.md                   # Device guides, security model, review notes
+├── internal/
+│   ├── appstore/              # Backend interface + typed catalogue verdict
+│   ├── archive/               # Bounded ZIP / tar.gz extraction
+│   ├── catalog/               # Deterministic index, ed25519 signing
+│   ├── diagnostics/           # Redacted, bounded, rotating event log
+│   ├── gamelist/              # EmulationStation menu ownership
+│   ├── input/                 # Semantic actions, mappings, session, footer
+│   ├── installer/             # The only owner of side effects
+│   ├── manifest/              # v1 contract + semantic policy
+│   ├── platform/              # Detection, evidence, compatibility checks
+│   ├── safefs/                # Path guard, transaction/journal, atomic writes
+│   ├── sdlui/                 # SDL2 event/render adapter (mostly sdl-tagged)
+│   ├── ui/                    # Pure-Go catalogue state machine
+│   └── version/               # Every version comparison
+├── packaging/
+│   ├── magicx-zero-28/        # "Knulli App Store.sh" launcher + README.txt
+│   └── trimui-smart-pro/      # "Knulli App Store.sh" launcher + README.txt
+├── schema/package-manifest-v1.schema.json
+├── scripts/                   # device-build, package-device, desktop-fixture, desktop-walk
+├── AGENTS.md                  # Agent-facing constraints and commands
+├── CONTEXT.md                 # Normative domain glossary
+├── CONTRIBUTING.md
+├── Makefile
+├── prek.toml
+├── go.mod / go.sum
+└── renovate.json
 ```
 
 ## Directory Purposes
 
-**cmd:**
-- Purpose: flag parsing and wiring only; no product policy
-- Contains: `main.go` per command plus `cmd/knulli-app/main_test.go`
-- Key files: `cmd/knulli-app/main.go` (223 lines), `cmd/knulli-app-ui/main.go` (97), `cmd/check-updates/main.go`
+**`catalogue/packages/`:**
+- Purpose: The reviewed package manifests — the product of the project.
+- Contains: One JSON file per package, named `<reverse-domain-id>.json`. Currently `app.romm.grout.json`, `io.github.jellydn.retsend.json`, `io.github.misantronic.raofflineproxy.json`, `io.github.tomtombombadil.pocketcurator.json`, `io.github.unitreign.playtime.json`.
+- Key files: `io.github.unitreign.playtime.json` is the richest example (release, compatibility, install, review evidence).
 
-**internal:**
-- Purpose: all product logic, kept out of other modules
-- Contains: 13 packages with co-located `_test.go` files
-- Key files: `internal/installer/installer.go` (819), `internal/sdlui/draw.go` (730), `internal/platform/platform.go` (531), `internal/input/session.go` (520), `internal/ui/model.go` (417)
+**`catalogue/providers/`:**
+- Purpose: Declare catalogues this project features but does not own, mirror, or install from.
+- Contains: `portmaster.json` (ADR-0005).
 
-**catalogue:**
-- Purpose: reviewed data, not code
-- Contains: five package manifests and one provider record
-- Key files: `catalogue/packages/io.github.unitreign.playtime.json`, `app.romm.grout.json`, `io.github.jellydn.retsend.json`, `io.github.misantronic.raofflineproxy.json`, `io.github.tomtombombadil.pocketcurator.json`, `catalogue/providers/portmaster.json`
+**`internal/`:**
+- Purpose: All production logic. Nothing here is `main`; nothing here imports a `cmd/` package.
+- Split rule: one package per concern, and within a large package one file per concern (see `internal/installer/`).
 
-**schema:**
-- Purpose: the machine-readable half of the manifest contract
-- Contains: `schema/package-manifest-v1.schema.json`, Draft 2020-12 with `additionalProperties: false` and conditional `allOf` rules per review status
+**`docs/adr/`:**
+- Purpose: Accepted decisions with Context / Decision / Consequences, indexed by `docs/adr/README.md`.
 
-**packaging:**
-- Purpose: per-device Ports launcher and operator README copied into the release archive
-- Contains: `packaging/trimui-smart-pro/`, `packaging/magicx-zero-28/`
+**`packaging/`:**
+- Purpose: Per-device launcher scripts and end-user README text that ship inside the release zip.
+- Contains: `Knulli App Store.sh` (POSIX sh launcher) and `README.txt` per device.
 
-**scripts:**
-- Purpose: shell entry points for packaging and device-free verification
-- Contains: `package-device.sh` (build the device ZIP), `desktop-fixture.sh` (write a scratch Knulli root), `desktop-walk.sh` (walk GUI flows and record evidence)
+**`scripts/`:**
+- Purpose: The shell side of the build and verification story.
+- Key files: `device-build.sh` (the single home of the signed cross-compile and ABI gate), `package-device.sh`, `desktop-fixture.sh` (writes Knulli fixture files into a scratch root), `desktop-walk.sh` (scripted keyboard walkthrough with evidence).
 
-**docs:**
-- Purpose: operator, review, and design documentation
-- Contains: `docs/architecture.md`, `docs/security-model.md`, `docs/desktop-verification.md`, `docs/real-device-tests.md`, `docs/how-to-add-a-package.md`, device guides, dated catalogue reviews, and `docs/adr/`
+**`schema/`:**
+- Purpose: The JSON Schema that describes the manifest shape. Semantic rules live in `internal/manifest/manifest.go`, not here.
+
+**`build/` and `dist/`:**
+- Purpose: Generated output. **Gitignored** — never committed.
 
 ## Key File Locations
 
 **Entry Points:**
-- `cmd/knulli-app/main.go`: installer CLI (`validate`, `catalogue`, `install`, `adopt`, `update`, `repair`, `uninstall`)
-- `cmd/knulli-app-ui/main.go`: device GUI, `//go:build sdl`
-- `cmd/check-updates/main.go`: weekly metadata report
-- `packaging/*/Knulli App Store.sh`: Ports launchers
+- `cmd/knulli-app/main.go`: CLI (`validate`, `catalogue`, `install`, `adopt`, `update`, `repair`, `uninstall`); `run` dispatches, `runApply`/`runUninstall` take an `applyDeps` seam so a test can supply a loopback release server and refresh address
+- `cmd/knulli-app-ui/main.go`: GUI (`//go:build sdl`); flags for catalogue, root, platform overrides, screenshots, walkthroughs
+- `cmd/check-updates/main.go`: weekly read-only release metadata report
+- `internal/sdlui/run.go`: the SDL main loop (`Run`)
+- `internal/installer/installer.go`: `Manager.Apply` — the lifecycle entry point
 
 **Configuration:**
-- `go.mod`, `go.sum`, `Makefile`, `renovate.json`, `.gitignore`
-- `schema/package-manifest-v1.schema.json`
-- `.github/workflows/check.yml`, `.github/workflows/release.yml`, `.github/workflows/catalogue-updates.yml`
-- `.agents/setup`
+- `Makefile`: every developer/CI task
+- `prek.toml`: local git hooks mirroring CI
+- `.github/workflows/check.yml`: the CI gate (`test`, `gui-walkthrough`, `device-artifact`)
+- `.github/workflows/release.yml`: pre-release and tag release publishing
+- `go.mod`: module path and the single direct dependency
+- `renovate.json`: dependency update policy
 
 **Core Logic:**
-- `internal/manifest/manifest.go` (390) and `internal/manifest/load.go`
-- `internal/catalog/catalog.go` (148) and `internal/catalog/sign.go` (166)
-- `internal/platform/platform.go` (531)
-- `internal/safefs/guard.go` (97), `internal/safefs/transaction.go` (330), `internal/safefs/files.go` (110)
-- `internal/archive/archive.go` (183)
-- `internal/installer/installer.go`, `lifecycle.go`, `state.go`, `status.go`, `refresh.go`, `download.go`
-- `internal/gamelist/menu.go`, `internal/gamelist/xml.go`
-- `internal/appstore/service.go` (352), `internal/appstore/verdict.go` (163)
-- `internal/ui/model.go`, `tabs.go`, `toast.go`
-- `internal/input/mapping.go`, `session.go`, `store.go`, `calibration.go`, `footer.go`, `keyboard.go`
-- `internal/sdlui/run.go`, `draw.go`, `events.go`, `layout.go`, `hints.go`, `walk.go`, `repeat.go`, `input_mode.go`
-- `internal/updatecheck/check.go` (305), `internal/updatecheck/report.go`
+- `internal/manifest/manifest.go`: contract + policy (414 lines, the largest single policy file)
+- `internal/installer/stage.go`: acquire, lock, recover, download, extract
+- `internal/installer/commit.go`: the transaction that commits a release
+- `internal/installer/status.go`: health checks and pre-existence detection
+- `internal/safefs/guard.go`: path policy; `internal/safefs/transaction.go`: journal + rollback
+- `internal/archive/archive.go`: adversarial-path-resistant extraction
+- `internal/platform/platform.go`: detection, evidence, `Check`
+- `internal/appstore/verdict.go`: the single home of the catalogue verdict
+- `internal/ui/model.go`: catalogue state machine
+- `internal/input/mapping.go` / `session.go`: semantic actions and the setup mode machine
+- `internal/sdlui/draw.go` (730 lines) and `layout.go`: rendering and all geometry tokens
 
 **Testing:**
-- Co-located `*_test.go` under every `internal/` package and `cmd/knulli-app/`
-- `internal/installer/installer_test.go` (1,421) is the lifecycle suite; `internal/installer/testdata/gamelist.xml` is its XML fixture
-- `internal/appstore/test_helpers_test.go` holds shared catalogue fixtures
-- `internal/input/physical_button_audit_test.go` is the source audit
-- `internal/sdlui/draw_test.go` (788) renders and optionally screenshots every screen state
+- Co-located `*_test.go` beside every production file's package. 35 test files.
+- `internal/installer/testdata/gamelist.xml`: the only committed fixture directory
+- `internal/installer/installer_test.go` (1,421 lines): the largest test file, integration over temp roots
+- `internal/sdlui/draw_test.go` (788 lines): layout/render assertions
+- `internal/appstore/test_helpers_test.go`: shared fake-backend/manager helpers
 
 ## Naming Conventions
 
 **Files:**
-- Package directory matches the Go package name: `internal/safefs`, `internal/gamelist`
-- One concept per file: `guard.go`, `download.go`, `refresh.go`, `tabs.go`, `toast.go`, `repeat.go`
-- Tests: `*_test.go`; shared fixtures in `test_helpers_test.go`; audits named for their subject
-- Manifests: reverse-domain id + `.json`, for example `io.github.unitreign.playtime.json`
-- ADRs: `NNNN-kebab-title.md` under `docs/adr/`
-- Dated evidence: `docs/catalogue-review-YYYY-MM-DD.md`
+- Production: short lowercase noun for the concern — `guard.go`, `transaction.go`, `commit.go`, `verdict.go`, `toast.go`. A package's orchestrator often carries the package name (`installer.go`, `catalog.go`, `platform.go`) while siblings name the concern.
+- Tests: `<file>_test.go` in the same package (internal tests, not `_test` packages), except `internal/appstore/test_helpers_test.go` for shared helpers.
+- Shell: lowercase-hyphenated verbs — `device-build.sh`, `package-device.sh`, `desktop-walk.sh`.
+- Docs: lowercase-hyphenated with a date when the content is a snapshot — `catalogue-review-2026-09-15.md`, `catalogue-review-2026-09-17.md`.
+- ADRs: `NNNN-title-in-kebab-case.md`.
 
 **Directories:**
-- lowercase product nouns (`installer`, `catalog`, `safefs`, `sdlui`)
-- Device packaging folders use device ids: `trimui-smart-pro`, `magicx-zero-28`
-- `internal/` for everything not meant to be imported elsewhere
+- Go packages: single lowercase word, never pluralized, never abbreviated — `internal/safefs`, `internal/gamelist`, `internal/diagnostics`.
+- Manifests: reverse-domain id as the filename, so the file and the `id` field cannot disagree.
+- Exceptions: `cmd/knulli-app` and `cmd/knulli-app-ui` use hyphens because they are binary names.
 
-**Go identifiers:**
-- Exported verbs for the pipeline: `Load`, `Validate`, `Build`, `Verify`, `Extract`, `Resolve`, `Check`, `Apply`, `Stage`, `Commit`
-- Unexported helpers stay local and short: `assess`, `plan`, `wrap`, `blend`, `shorten`
-- String-typed enums: `manifest.Package.Review.Status`, `appstore.Action`, `appstore.State`, `installer.Op`, `input.Action`, `ui.Tab`, `sdlui.Key`
+**Identifiers (from `CONTEXT.md`, normative):**
+- Domain vocabulary is capitalized consistently: Adopt / Manage existing, external installation, managed / preserved / unmanaged file, installed state, outcome, notice, menu ownership, game list refresh, semantic action, binding, footer hint, fixture root, walkthrough.
+- Schema constants are `org.knulli.app-store/<thing>/v1` strings, each declared next to the type it versions (`manifest.SchemaV1`, `catalog.IndexSchemaV1`, `catalog.SignatureSchemaV1`, `installer.lifecycleSchemaV1`, `input.Schema`, `safefs.journalSchemaV1`).
+- Operation names are lowercase strings used both as `installer.Op` values and as the `operation` parameter threaded through `stage`/`commit`/`rollback`.
 
 ## Where to Add New Code
 
-**New lifecycle behavior:**
-- Implementation: `internal/installer/installer.go` plus the smallest helper file that owns it
-- Required: a temporary-root integration test in `internal/installer/installer_test.go` (`CONTRIBUTING.md`)
+**New package manifest (the most common contribution):**
+- Add one file: `catalogue/packages/<reverse-domain-id>.json`
+- Follow `docs/how-to-add-a-package.md`; start at `review.status: "candidate"` with no `release`/`compatibility`/`install` fields (the validator rejects candidate files that carry them)
+- Regenerate the index and confirm it is unchanged-clean: `make catalogue && git diff --exit-code -- build/catalog-index.json`
 
-**New archive or filesystem behavior:**
-- Implementation: `internal/archive` or `internal/safefs`
-- Required: an adversarial fixture where an unsafe implementation would produce a different result
+**New lifecycle operation:**
+- Primary code: a new `installer.Op` in `internal/installer/installer.go`, a branch in `Apply`, reconciliation in `internal/installer/stage.go`, and the committed effect in `internal/installer/commit.go`
+- Expose it in: `internal/appstore/service.go` (`Action`, `Execute` switch), then `internal/appstore/verdict.go` (`assess` + `validRetryAction`) so the UI can offer it
+- Tests: `internal/installer/installer_test.go` over a temp root, plus `internal/appstore/service_test.go` for the action gating
 
-**New catalogue policy:**
-- Implementation: `internal/manifest/manifest.go` plus the matching rule in `schema/package-manifest-v1.schema.json`; the two must agree
-- Visible effect: `internal/appstore/verdict.go` `assess` is the single place a new state or action is surfaced
+**New compatibility field:**
+- Contract: `internal/manifest/manifest.go` (`Compatibility` struct + `validateInstallable`)
+- Schema: `schema/package-manifest-v1.schema.json`
+- Enforcement: `internal/platform/platform.go` (`Check`)
+- Expose to UI: the reason text flows through `appstore.assess` automatically
 
-**New GUI screen or control:**
-- Model behavior: `internal/ui` (pure Go, testable with a fake backend)
-- Input semantics: `internal/input` (actions, mappings, footer verbs)
-- Rendering: `internal/sdlui/draw.go` plus geometry tokens in `internal/sdlui/layout.go`
-- Evidence: add a flow to `scripts/desktop-walk.sh` and a case in `internal/sdlui/draw_test.go`
+**New GUI screen:**
+- State machine: `internal/ui/model.go` (`Focus` + `Select`/`Back`) or a new mode in `internal/input/session.go`
+- Layout tokens: `internal/sdlui/layout.go` (never hardcode pixel numbers in `draw.go`)
+- Rendering: `internal/sdlui/draw.go`
+- Footer: hints in `internal/sdlui/hints.go` using `input.Hint`/`Verb`
+- Screen label: `internal/sdlui/walk.go` (`WalkState`) so the walkthrough can assert it
+- Tests: `internal/sdlui/layout_test.go`, `draw_test.go`, `walk_test.go`
 
-**New package in the store:**
-- One file in `catalogue/packages/` plus review evidence in the pull request (`docs/how-to-add-a-package.md`, `CONTRIBUTING.md`)
-- Then regenerate the index and keep `git diff --exit-code -- build/catalog-index.json` clean
+**New outbound network call:**
+- Put the client, timeout, redirect policy, and any size limit next to the caller (`internal/installer/download.go`, `internal/installer/refresh.go`, `internal/updatecheck/check.go`)
+- Injectable for tests via a `*http.Client` field on the owning struct (`Manager.Client`, `Manager.RefreshClient`, `Checker.Client`) or a base URL override (`Manager.RefreshURL`, `Checker.BaseURL`)
+
+**New persisted record:**
+- Declare its own `<name>SchemaV1` constant, write it atomically through `safefs.AtomicWrite`, and validate the schema and owner id on load — see `internal/installer/lifecycle.go` for the smallest complete example.
 
 **Utilities:**
-- Shared helpers stay in the owning package. There is no global `utils` package.
+- Path and file helpers: `internal/safefs/files.go`
+- Version ordering: `internal/version/version.go` (do not add a second comparison)
+- Do not create a generic `internal/util` package; each helper goes to the package that owns the concern.
 
 ## Special Directories
 
-**.planning/codebase:**
-- Purpose: generated stack/architecture/quality map
-- Generated: Yes (by the `codemap` skill)
-- Committed: Yes (`.gitignore` lists only `/build/`, `/dist/`, `/.amp/`)
-
-**build/ and dist/:**
-- Purpose: local binaries, the catalogue index, walkthrough evidence, and device ZIPs
+**`build/`:**
+- Purpose: compiled binaries, `catalog-index.json`, scratch fixture roots, walkthrough evidence
 - Generated: Yes
-- Committed: No
+- Committed: No (`.gitignore`)
 
-**catalogue/:**
-- Purpose: reviewed source of truth for packages and providers
+**`dist/`:**
+- Purpose: device release zips and `SHA256SUMS.txt`
+- Generated: Yes
+- Committed: No (`.gitignore`)
+
+**`.planning/codebase/`:**
+- Purpose: this codebase map
+- Generated: Yes
+- Committed: Yes (tracked in git)
+
+**`internal/installer/testdata/`:**
+- Purpose: the committed `gamelist.xml` fixture
 - Generated: No
 - Committed: Yes
-
-**internal/installer/testdata/:**
-- Purpose: XML fixture for menu ownership tests
-- Generated: No
-- Committed: Yes
-
-**docs/adr/:**
-- Purpose: accepted architecture decisions in Context / Decision / Consequences form
-- Generated: No
-- Committed: Yes; the index lives in `docs/adr/README.md`
 
 ---
 
-*Structure analysis: 2026-09-19*
+*Structure analysis: 2026-09-21*
