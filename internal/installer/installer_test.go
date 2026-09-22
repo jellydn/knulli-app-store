@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -264,6 +265,61 @@ func TestChecksumFailureWritesNoPackageFiles(t *testing.T) {
 		t.Fatalf("expected checksum failure, got %v", err)
 	}
 	assertMissing(t, root, "userdata/roms/tools/demo/launch.sh")
+}
+
+// An operation cancelled while a release is extracting has to stop there rather
+// than at the end of the archive: the user asked to interrupt a large install,
+// so the staging work is discarded and the destination is left exactly as it
+// was found. The staging directory is the trigger, which is what proves the
+// cancellation landed inside extraction — a cancellation that fired during the
+// download or the free-space check would make this test pass without
+// exercising the behaviour it is named for.
+func TestCancelledExtractionLeavesNoPartialInstall(t *testing.T) {
+	root := t.TempDir()
+	asset := zipBytes(t, map[string]string{"launch.sh": "managed", "tool": "binary"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+
+	cancelled := &stagingContext{
+		Context: context.Background(),
+		pattern: filepath.Join(root, filepath.FromSlash(managerPath), "work-*", "staging", "*"),
+	}
+	if _, err := manager.Apply(cancelled, OpInstall, pkg); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected the cancelled extraction to be reported, got %v", err)
+	}
+	if !cancelled.reachedExtraction {
+		t.Fatal("the context was cancelled before extraction began, so no interrupted extraction was exercised")
+	}
+	assertMissing(t, root, "userdata/roms/tools/demo/launch.sh")
+	assertMissing(t, root, "userdata/roms/tools/demo/tool")
+	assertMissing(t, root, "userdata/system/knulli-app-store/installed/org.example.demo.json")
+	staging, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(managerPath), "work-*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(staging) != 0 {
+		t.Fatalf("a cancelled extraction left %d staging directories behind: %v", len(staging), staging)
+	}
+}
+
+// stagingContext reports cancellation once extraction has written into the
+// staging tree, and records that it did so. A cancellation that fired earlier
+// cannot make the test above pass for the wrong reason.
+type stagingContext struct {
+	context.Context
+	pattern           string
+	reachedExtraction bool
+}
+
+func (c *stagingContext) Err() error {
+	matches, err := filepath.Glob(c.pattern)
+	if err == nil && len(matches) > 0 {
+		c.reachedExtraction = true
+		return context.Canceled
+	}
+	return nil
 }
 
 func TestDeclarativeExecutablesAreRestoredAndRepaired(t *testing.T) {

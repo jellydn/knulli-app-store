@@ -153,7 +153,7 @@ func (m Manager) stage(ctx context.Context, operation string, pkg manifest.Packa
 		return nil, fmt.Errorf("download release: %w", err)
 	}
 	m.event("download_verified", "package", pkg.ID, "bytes", fmt.Sprint(pkg.Release.Size), "sha256", pkg.Release.SHA256)
-	files, err := storearchive.Extract(archivePath, pkg.Release.Format, filepath.Join(work, "staging"), pkg.Install.StripComponents, pkg.Release.InstalledSize)
+	files, err := storearchive.Extract(ctx, archivePath, pkg.Release.Format, filepath.Join(work, "staging"), pkg.Install.StripComponents, pkg.Release.InstalledSize)
 	if err != nil {
 		return nil, fmt.Errorf("extract release: %w", err)
 	}
