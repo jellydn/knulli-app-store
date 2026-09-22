@@ -8,7 +8,7 @@ Go 1.27 module `github.com/jellydn/knulli-app-store`. Safe package manager for K
 make check      # fmt + vet (both tag sets) + go test -race ./... — fast local loop
 make build      # CGO-free CLI -> build/knulli-app
 make catalogue  # deterministic index -> build/catalog-index.json
-git diff --exit-code -- build/catalog-index.json  # required after catalogue-affecting changes
+make catalogue-check  # required after catalogue-affecting changes: two builds must match byte for byte
 make cover      # coverage gate: every prod-Go package needs a test file AND total >= 70%
 go test -tags sdl ./...  # SDL GUI compile + layout tests; needs libsdl2-dev (brew install sdl2 / apt install libsdl2-dev)
 make gui        # desktop GUI with keyboard input + scratch fixture root (no device)
@@ -16,7 +16,7 @@ make walkthrough            # offline GUI evidence; add WALK_FLAGS=--install for
 ```
 
 - Local-only `prek.toml` mirrors CI (`check.yml`): fast hooks on pre-commit, `go test -race` + `staticcheck` (both tag sets) on pre-push. Run the pre-push set before opening a PR.
-- `build/` is gitignored — never commit it; review the generated index locally instead. Device CI signs `catalog-index.json` and bakes the public key into that build.
+- `build/` is gitignored — never commit it; review the generated index locally instead. Because an ignored path is always reported clean, `git diff` cannot verify the index: `make catalogue-check` is the gate that can fail. Device CI signs `catalog-index.json` and bakes the public key into that build.
 - Device cross-compile: `GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o build/knulli-app-aarch64 ./cmd/knulli-app`. Full per-device path is `scripts/device-build.sh <target> <version> dist`.
 
 ## Architecture

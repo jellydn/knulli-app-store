@@ -148,10 +148,12 @@ Every green push to `main` publishes a dated experimental pre-release with the d
 make check
 make build
 make catalogue
-git diff --exit-code -- build/catalog-index.json
+make catalogue-check
 ```
 
 `make check` formats, vets, and runs tests. SDL GUI compile and layout tests need `libsdl2-dev` and `go test -tags sdl ./...`.
+
+`make catalogue-check` builds the index twice and requires the two builds to be byte-identical. `build/` is gitignored, so a `git diff` on the generated index reports nothing whether or not it changed; this target is the check that can actually fail.
 
 `make cover` runs the coverage gate: every package holding production Go files must have a test file, and the total must stay above `COVER_MIN` (70%). It is a separate target so `make check` stays the fast local loop; CI runs the gate on every pull request.
 

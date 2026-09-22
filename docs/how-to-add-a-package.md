@@ -26,9 +26,11 @@ Package code runs with access to user files. A complete review protects ROMs, sa
    go vet -tags sdl ./...
    go test -race ./...
    go test -tags sdl ./...
-   go run ./cmd/knulli-app catalogue -output build/catalog-index.json
-   git diff --exit-code -- build/catalog-index.json
+   make catalogue
+   make catalogue-check
    ```
+
+   `make catalogue-check` builds the index twice and requires the two builds to be byte-identical. Use it instead of a `git diff` on the generated index: `build/` is gitignored, so git reports that path as clean whatever it contains.
 
 10. Open a pull request with the security review, archive inventory, exact commands, checksums, dependency output, screenshots at each target size, and this checklist.
 11. Use `experimental` only for a clear, user-authorized hardware test after all mandatory release and path controls pass. Record tester, date, firmware, device, architecture, resolution, package version, and exact lifecycle results. Use `verified` only for the exact matrix proven on real hardware.

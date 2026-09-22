@@ -37,4 +37,4 @@ The weekly [catalogue update check](https://github.com/jellydn/knulli-app-store/
 
 `catalogue/packages/io.github.jellydn.retsend.json` is the reviewed entry. The catalogue tests now expect five packages, and an installer lifecycle test covers this package specifically: install, rejected repeated install, destination modes, the owned menu entry, health with the launcher's runtime files present, corruption, repair, and uninstall that removes managed files and the owned entry while leaving the identity, history, and inbox in place. Both declared Knulli targets are exercised.
 
-The index is regenerated with `go run ./cmd/knulli-app catalogue -output build/catalog-index.json`, and a clean `git diff --exit-code` on that file is part of the package review. Device artifacts sign the index at build time as usual.
+The index is regenerated with `go run ./cmd/knulli-app catalogue -output build/catalog-index.json`, and `make catalogue-check` — two builds of the same manifests, compared byte for byte — is part of the package review. Device artifacts sign the index at build time as usual.
