@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -51,6 +52,38 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 	}
 	if experimental != 4 || verified != 0 {
 		t.Fatalf("expected four broad experimental packages and no current device-verified release, got %d and %d", experimental, verified)
+	}
+}
+
+func TestCoverPlayerOwnsOnlyItsPortsDirectory(t *testing.T) {
+	index, err := Build(filepath.Join("..", "..", "catalogue", "packages"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, entry := range index.Packages {
+		if entry.ID != "io.github.heilmic.coverplayer" {
+			continue
+		}
+		found = true
+		install := entry.Package.Install
+		if install == nil || install.Destination != "/userdata/roms/ports/CoverPlayer" {
+			t.Fatalf("destination = %#v", install)
+		}
+		if install.Menu == nil || install.Menu.Gamelist != "/userdata/roms/ports/gamelist.xml" || install.Menu.Path != "./CoverPlayer/CoverPlayer.sh" {
+			t.Fatalf("menu = %#v", install.Menu)
+		}
+		for _, allowed := range install.AllowedWritePaths {
+			if allowed == "/userdata/roms/ports" || allowed == "/userdata/system/logs" {
+				t.Fatalf("shared directory is writable: %s", allowed)
+			}
+		}
+		if len(install.BinaryPatches) != 1 || install.BinaryPatches[0].Path != "CoverPlayer.sh" || !strings.Contains(install.BinaryPatches[0].BeforeHex, "2f746d70") {
+			t.Fatalf("launcher patch = %#v", install.BinaryPatches)
+		}
+	}
+	if !found {
+		t.Fatal("CoverPlayer is not in the catalogue")
 	}
 }
 

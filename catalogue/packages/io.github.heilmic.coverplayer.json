@@ -14,8 +14,9 @@
     },
     "notes": [
       "User-authorized experimental Knulli package for detected aarch64 glibc systems with a 640x480 through 1280x720 display; no real-device validation is recorded yet.",
-      "The reviewed upstream Knulli archive contains the launcher, AArch64 binary, bundled runtime libraries, license files, and an upstream MANIFEST.sha256. The Store verifies the pinned asset size and SHA-256 before extraction.",
-      "CoverPlayer stores progress, collections, bookmarks, language, and cache data under the configured SDL preference directory /userdata/system/configs/coverplayer and writes its launcher log under /userdata/system/logs.",
+      "The reviewed upstream Knulli archive contains the launcher, AArch64 binary, bundled runtime libraries, license files, and an upstream MANIFEST.sha256. GitHub reports release v0.1.0-rc.4 as not immutable. The Store treats the URL as a locator and pins the accepted bytes with the exact size and SHA-256, so a replaced asset cannot install.",
+      "The Store owns only /userdata/roms/ports/CoverPlayer and one Ports gamelist entry. It does not adopt or back up other ports in the shared Ports directory.",
+      "CoverPlayer stores progress, collections, bookmarks, language, and cache data under /userdata/system/configs/coverplayer. The launcher log is /userdata/system/logs/coverplayer.log. Staging replaces the launcher's /tmp fallback with a same-length fail-closed exit.",
       "The application browses user-selected media under /userdata and does not download remote code. Media directories remain outside the managed package destination."
     ],
     "evidence": [
@@ -41,7 +42,7 @@
       {
         "kind": "filesystem-and-network-review",
         "url": "https://github.com/heilmic/CoverPlayer/blob/3c8fb4fb42e91edd65cae241e7fe3e4ceb203b86/packaging/knulli/CoverPlayer.sh",
-        "note": "The launcher installs its bundled library path, sets the SDL preference directory to /userdata/system/configs/coverplayer, writes /userdata/system/logs/coverplayer.log, and launches the reviewed local binary."
+        "note": "The launcher installs its bundled library path, sets the SDL preference directory to /userdata/system/configs/coverplayer, and writes /userdata/system/logs/coverplayer.log. Its published fallback to /tmp/coverplayer.log is removed by the declared same-length patch, which exits instead of leaving /userdata."
       },
       {
         "kind": "binary-review",
@@ -73,17 +74,33 @@
     }
   },
   "install": {
-    "destination": "/userdata/roms/ports",
+    "destination": "/userdata/roms/ports/CoverPlayer",
     "strip_components": 2,
     "launcher": "CoverPlayer.sh",
     "executables": ["CoverPlayer.sh", "CoverPlayer/bin/coverplayer"],
-    "warning": "Experimental package: Knulli installation and launch are not yet validated on a real device. Existing files are backed up; install updates through the Store.",
+    "warning": "Experimental package: Knulli installation and launch are not yet validated on a real device. The Store owns only this package directory and one Ports menu entry. Other ports are not adopted. Progress stays in /userdata/system/configs/coverplayer.",
+    "menu": {
+      "gamelist": "/userdata/roms/ports/gamelist.xml",
+      "path": "./CoverPlayer/CoverPlayer.sh",
+      "name": "CoverPlayer",
+      "description": "Offline cover-first audio player for audiobooks, podcasts, radio plays, and music."
+    },
     "preserve": [],
     "network": false,
     "allowed_write_paths": [
-      "/userdata/roms/ports",
+      "/userdata/roms/ports/CoverPlayer",
+      "/userdata/roms/ports/gamelist.xml",
       "/userdata/system/configs/coverplayer",
-      "/userdata/system/logs"
+      "/userdata/system/logs/coverplayer.log"
+    ],
+    "binary_patches": [
+      {
+        "path": "CoverPlayer.sh",
+        "offset": 147,
+        "before_hex": "7c7c204c4f474449523d222f746d7022",
+        "after_hex": "7c7c2065786974203120202020202020",
+        "sha256": "d04606b7f19b00a1d7a7aab906dd042173208df97b5f2f727c2d6ad45e2ff912"
+      }
     ]
   }
 }
