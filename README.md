@@ -104,17 +104,18 @@ The installer never runs remote install scripts. It only copies regular files fr
 
 ## Catalogue status
 
-The catalogue has five packages. Recorded approval provenance stays separate from technical and real-device status.
+The catalogue has six packages. CoverPlayer, Grout, PlayTime, and RetSend are broad experimental: the Store can install them when detection passes. PocketCurator and RAOfflineProxy are approved for review but blocked, so they offer no install action. Recorded approval provenance stays separate from technical and real-device status. PortMaster is a featured external provider and is not installed from this catalogue.
 
-| Package | Status | Remaining blocker |
-| --- | --- | --- |
-| [PlayTime 1.0.0](https://github.com/unitreign/playtime) | Broad experimental Knulli | Exact 1.0.0 Smart Pro evidence only; other matching devices are experimental |
-| [Grout 5.2.0.0](https://github.com/rommapp/grout) | Broad experimental Knulli | No 5.2.0.0 device test; Store staging disables the self-updater with a verified binary patch |
-| [RetSend 0.9.1](https://github.com/jellydn/retsend) | Broad experimental Knulli | No device test; bytes are pinned by size and SHA-256 because the maintainer fork's `prerelease` tag is mutable, and its own tracker still lists TLS pinning, key mode, receive containment, overwrite default, quotas, and signed provenance as open |
-| [RAOfflineProxy](https://github.com/misantronic/RAOfflineProxy) v1.13.0-alpha1 | Approved; blocked | The Knulli asset is a self-extracting script; supported archive, extracted size, dependencies, narrow writes, and updater safety are unresolved |
-| [PocketCurator](https://github.com/tomtombombadil/PocketCurator) v1.1.2 | Approved; blocked | The release is mutable; extracted inventory/size, narrow ROM and game-list writes, updater safety, and exact Knulli evidence are unresolved |
+| Package | What it does | Status | Remaining blocker |
+| --- | --- | --- | --- |
+| [CoverPlayer 0.1.0-rc.4](https://github.com/heilmic/CoverPlayer) | Offline, cover-first audio player for audiobooks, podcasts, radio plays, and music | Broad experimental Knulli | No real-device validation recorded |
+| [Grout 5.2.0.0](https://github.com/rommapp/grout) | Connects a Linux retro handheld to a RomM server | Broad experimental Knulli | No 5.2.0.0 device test; Store staging disables the self-updater with a verified binary patch |
+| [PlayTime 1.0.0](https://github.com/unitreign/playtime) | Tracks game play time on Knulli | Broad experimental Knulli | Exact 1.0.0 Smart Pro evidence only; other matching devices are experimental |
+| [RetSend 0.9.1](https://github.com/jellydn/retsend) | Sends and receives files over local Wi-Fi with any LocalSend peer | Broad experimental Knulli | No device test; bytes are pinned by size and SHA-256 because the maintainer fork's `prerelease` tag is mutable, and its own tracker still lists TLS pinning, key mode, receive containment, overwrite default, quotas, and signed provenance as open |
+| [PocketCurator](https://github.com/tomtombombadil/PocketCurator) v1.1.2 | Manages a user's own ROM collection from an EmulationStation-style interface | Approved; blocked | The release is mutable; extracted inventory/size, narrow ROM and game-list writes, updater safety, and exact Knulli evidence are unresolved |
+| [RAOfflineProxy](https://github.com/misantronic/RAOfflineProxy) v1.13.0-alpha1 | Provides an offline RetroAchievements proxy for supported emulators | Approved; blocked | The Knulli asset is a self-extracting script; supported archive, extracted size, dependencies, narrow writes, and updater safety are unresolved |
 
-These notes record evidence reviewed on 2026-09-15 and 2026-09-17. Upstream facts can change. The weekly [catalogue update check](https://github.com/jellydn/knulli-app-store/actions/workflows/catalogue-updates.yml) reports metadata changes for manual review; it never edits or approves a package.
+The notes for PlayTime, Grout, RetSend, RAOfflineProxy, and PocketCurator record evidence reviewed on 2026-09-15 and 2026-09-17. CoverPlayer has no real-device report. Upstream facts can change. The weekly [catalogue update check](https://github.com/jellydn/knulli-app-store/actions/workflows/catalogue-updates.yml) reports metadata changes for manual review; it never edits or approves a package.
 
 ## Current scope
 
@@ -124,7 +125,7 @@ These notes record evidence reviewed on 2026-09-15 and 2026-09-17. Upstream fact
 - ZIP and `tar.gz` release archives, up to 512 MiB compressed and installed
 - Writes below `/userdata` only
 
-The GUI is functional on one community-tested TrimUI Smart Pro. A real MagicX diagnostic confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController `magicx-input`; full GUI testing is still incomplete. PlayTime, Grout, and RetSend are available for experimental tests on any detected device that satisfies their exact architecture, ABI, dependency, and display bounds. A matching device is not verified unless the manifest has evidence for that exact package version and matrix.
+The GUI is functional on one community-tested TrimUI Smart Pro. A real MagicX diagnostic confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController `magicx-input`; full GUI testing is still incomplete. CoverPlayer, Grout, PlayTime, and RetSend are available for experimental tests on any detected device that satisfies their exact architecture, ABI, dependency, and display bounds. A matching device is not verified unless the manifest has evidence for that exact package version and matrix.
 
 ROM-download sources are outside the official catalogue policy.
 
