@@ -1,0 +1,89 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "io.github.heilmic.coverplayer",
+  "name": "CoverPlayer",
+  "version": "0.1.0-rc.4",
+  "type": "utility",
+  "summary": "Offline, cover-first audio player for audiobooks, podcasts, radio plays, and music on Knulli.",
+  "repository": "https://github.com/heilmic/CoverPlayer",
+  "license": "Apache-2.0",
+  "review": {
+    "status": "experimental",
+    "approval": {
+      "provenance": "community"
+    },
+    "notes": [
+      "User-authorized experimental Knulli package for detected aarch64 glibc systems with a 640x480 through 1280x720 display; no real-device validation is recorded yet.",
+      "The reviewed upstream Knulli archive contains the launcher, AArch64 binary, bundled runtime libraries, license files, and an upstream MANIFEST.sha256. The Store verifies the pinned asset size and SHA-256 before extraction.",
+      "CoverPlayer stores progress, collections, bookmarks, language, and cache data under the configured SDL preference directory /userdata/system/configs/coverplayer and writes its launcher log under /userdata/system/logs.",
+      "The application browses user-selected media under /userdata and does not download remote code. Media directories remain outside the managed package destination."
+    ],
+    "evidence": [
+      {
+        "kind": "repository",
+        "url": "https://github.com/heilmic/CoverPlayer"
+      },
+      {
+        "kind": "release-asset",
+        "url": "https://github.com/heilmic/CoverPlayer/releases/download/v0.1.0-rc.4/CoverPlayer-Knulli.zip",
+        "note": "Version-pinned Knulli ZIP; 3,039,732 bytes compressed, 7,056,515 bytes across extracted regular files, SHA-256 70131f9544ebdcdcde094d2a5d42e394fb00124654bfc7d7dc487572cfa53bb9. Upstream package verification passed for 60 files and 2 manifests."
+      },
+      {
+        "kind": "license",
+        "url": "https://github.com/heilmic/CoverPlayer/blob/3c8fb4fb42e91edd65cae241e7fe3e4ceb203b86/LICENSE",
+        "note": "Apache-2.0 project license reviewed at the tagged release commit; bundled dependency notices are included in the archive."
+      },
+      {
+        "kind": "compatibility-claim",
+        "url": "https://github.com/heilmic/CoverPlayer/blob/3c8fb4fb42e91edd65cae241e7fe3e4ceb203b86/README.md",
+        "note": "Upstream identifies Knulli as the primary target and documents Knulli background playback. This catalogue entry does not claim a verified device or firmware matrix."
+      },
+      {
+        "kind": "filesystem-and-network-review",
+        "url": "https://github.com/heilmic/CoverPlayer/blob/3c8fb4fb42e91edd65cae241e7fe3e4ceb203b86/packaging/knulli/CoverPlayer.sh",
+        "note": "The launcher installs its bundled library path, sets the SDL preference directory to /userdata/system/configs/coverplayer, writes /userdata/system/logs/coverplayer.log, and launches the reviewed local binary."
+      },
+      {
+        "kind": "binary-review",
+        "url": "https://github.com/heilmic/CoverPlayer/blob/3c8fb4fb42e91edd65cae241e7fe3e4ceb203b86/CMakeLists.txt",
+        "note": "The release binary is ELF64 AArch64 and requires system SDL2 plus libc/libm/libgcc_s/libstdc++; SDL2_image, SDL2_ttf, mpg123, and their supporting libraries are bundled. Highest observed GLIBC symbol requirement is 2.27."
+      }
+    ]
+  },
+  "release": {
+    "url": "https://github.com/heilmic/CoverPlayer/releases/download/v0.1.0-rc.4/CoverPlayer-Knulli.zip",
+    "sha256": "70131f9544ebdcdcde094d2a5d42e394fb00124654bfc7d7dc487572cfa53bb9",
+    "size": 3039732,
+    "installed_size": 7056515,
+    "format": "zip",
+    "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "minimum_glibc": "2.27",
+    "dependencies": ["sdl2", "libc", "libpthread"],
+    "device_scope": "any",
+    "display_bounds": {
+      "minimum_width": 640,
+      "minimum_height": 480,
+      "maximum_width": 1280,
+      "maximum_height": 720
+    }
+  },
+  "install": {
+    "destination": "/userdata/roms/ports",
+    "strip_components": 2,
+    "launcher": "CoverPlayer.sh",
+    "executables": ["CoverPlayer.sh", "CoverPlayer/bin/coverplayer"],
+    "warning": "Experimental package: Knulli installation and launch are not yet validated on a real device. Existing files are backed up; install updates through the Store.",
+    "preserve": [],
+    "network": false,
+    "allowed_write_paths": [
+      "/userdata/roms/ports",
+      "/userdata/system/configs/coverplayer",
+      "/userdata/system/logs"
+    ]
+  }
+}
