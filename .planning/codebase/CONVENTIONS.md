@@ -1,123 +1,153 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-09-19
+**Analysis Date:** 2026-09-21
 
 ## Naming Patterns
 
 **Files:**
-- Go files are named for the concept they own: `guard.go`, `download.go`, `refresh.go`, `tabs.go`, `toast.go`, `repeat.go`, `verdict.go`
-- Tests are named for the invariant, not the function: `TestChecksumFailureWritesNoPackageFiles`, `TestRuntimeCodeDoesNotBypassSemanticControllerActions`
-- One audit file exists for a source-level rule: `internal/input/physical_button_audit_test.go`
-- Device docs and packaging folders use Knulli board ids: `trimui-smart-pro`, `magicx-zero-28`
+- One concern per file, named for that concern: `guard.go`, `transaction.go`, `commit.go`, `stage.go`, `verdict.go`, `toast.go`, `footer.go`.
+- The package's primary type/orchestrator typically lives in a file named after the package (`installer.go`, `catalog.go`, `platform.go`, `manifest.go`, `archive.go`), with siblings split by sub-concern.
+- Tests are `<file>_test.go` in the *same* package (internal tests), so unexported behavior is testable. Shared helpers go in a `test_helpers_test.go`.
 
 **Functions:**
-- Exported verbs describe the pipeline step: `Load`, `Validate`, `Build`, `Verify`, `Extract`, `Resolve`, `Check`, `Apply`, `Sign`/`SignFile`
-- Installer stages are named for what they do: `checkPreconditions`, `acquireManager`, `stage`, `commit`, `rollback`
-- Unexported helpers stay short and local: `assess`, `plan`, `wrap`, `blend`, `shorten`, `owns`
+- Exported: full words, no abbreviations. `NewGuard`, `Resolve`, `PendingForPath`, `PreExisting`, `RefreshGameList`'s public `outcome`, `AssessResolutions`, `DisplayHeader`.
+- Design-reason suffixes exist for a purpose: a method returning a copy of a value type is named `With<Thing>` (`WithPlatform`, `WithStatusCache`, `WithCandidates`).
+- Method receivers are short and consistent per type: `m` for `Manager`, `s` for `Service`, `g` for `Guard`, `tx` for `Transaction`, `tab`/`tabs` for tabs, `store` for `Store`.
+- Predicates read as assertions: `allows`, `bindable`, `optional`, `coveredBy`, `under`, `containsAction`, `comparableVersions`, `retryable`.
 
 **Variables:**
-- Short local names: `pkg`, `m`, `tx`, `err`, `index`
-- Domain terms come from `CONTEXT.md` and are used verbatim in code: `Destination`, `Preserved`, `Managed`, `Originals`, `PreExisting`, `Outcome`, `Verdict`
+- SHOUTING_CASE is reserved for exported constants (`SchemaV1`, `OpInstall`, `StateExternal`, `VerbNavigate`, `managerPath` is exported-as-lowercase since it is package-private).
+- Schema strings are declared as a constant next to the type they version, e.g. `const lifecycleSchemaV1 = "org.knulli.app-store/lifecycle-state/v1"`.
+- Loop indices over byte/slice arithmetic are `index`/`position`, not `i`.
+- Boolean locals read as predicates: `managed`, `preserved`, `found`, `comparable`, `skip`, `due`.
 
 **Types:**
-- Structs for records: `manifest.Package`, `installer.Manager`, `installer.Installed`, `safefs.Transaction`, `appstore.Item`
-- String-typed enums for closed sets: `manifest` review status, `appstore.Action`, `appstore.State`, `installer.Op`, `input.Action`, `sdlui.Key`, `sdlui.EventKind`
-- Reason/evidence results are explicit structs, not formatted strings: `appstore.Reason`, `platform.Source`, `installer.HealthIssue`
+- Exported domain types are singular nouns: `Package`, `Release`, `Compatibility`, `Install`, `Menu`, `Verdict`, `Item`, `Status`, `Guard`, `Transaction`, `Info`, `Source`, `Mapping`, `Session`, `Hint`.
+- Enumerations are a named string or int type plus constants: `type Op string`, `type Action string`, `type State string`, `type ReasonKind string`, `type Focus int`, `type Mode string`, `type StepKind string`.
+- Structured error types are `<Thing>Error` with a pointer receiver and an `Error()` returning an actionable message: `AdoptionConflictError`, `corruptFileError`.
+- Interfaces are minimal and named for the capability: `appstore.Backend` (4 methods).
 
 ## Code Style
 
 **Formatting:**
-- `gofmt` is the only formatter; CI fails when `gofmt -l .` prints anything, and `make fmt` rewrites offenders in place
-- Tabs for indentation, no alignment ceremony
-- Import groups: standard library, then `github.com/jellydn/knulli-app-store/internal/...`, then the rare third-party module (`golang.org/x/image`)
+- `gofmt` is the only formatter; there is no formatter config file. CI fails on `test -z "$(gofmt -l .)"`, and `prek.toml` runs `gofmt -w` on staged Go files.
+- Tabs for indentation; struct fields aligned by gofmt.
+- `.gitignore` and `prek.toml` enforce `mixed-line-ending --fix=lf` and `end-of-file-fixer`.
 
 **Linting:**
-- `go vet ./...` and `go vet -tags sdl ./...`
-- `staticcheck` v0.8.1 in CI, run both with and without the `sdl` tag
-- Both tag variants must stay clean, so a GUI-only change cannot break the CGO-free build
+- `go vet ./...` **and** `go vet -tags sdl ./...` — both tag sets, always. `make vet` runs exactly that pair.
+- `staticcheck@v0.8.1` via `go run` (never installed globally), on both tag sets, in `make check`'s CI counterpart and on pre-push.
+- Unused layout constants in `internal/sdlui/layout.go` are suppressed with a reason comment rather than deleted:
+  ```go
+  //lint:ignore U1000 used by the sdl-tagged draw code in this package
+  canvasWidth = 640
+  ```
+  This is the only suppression idiom in the repo (13 occurrences, all in `layout.go`).
 
 ## Import Organization
 
 **Order:**
-1. Standard library
-2. `github.com/jellydn/knulli-app-store/internal/...`
-3. `golang.org/x/image/...` in SDL packages
+1. Standard library (alphabetical within the group)
+2. Third-party (`golang.org/x/image/draw`)
+3. This module (`github.com/jellydn/knulli-app-store/internal/...`)
 
-**Path Aliases:**
-- The module aliases its own packages wherever a name would collide: `storearchive`, `storeinput`, `storeui` (see `internal/sdlui/run.go`, `internal/installer/installer.go`, `internal/sdlui/draw.go`)
-- Standard library collisions are aliased too: `xdraw "golang.org/x/image/draw"` and `imagedraw "image/draw"` in `internal/sdlui/draw.go`
-- No aliases are used just for brevity
+gofmt does not reorder groups, so the separation is maintained by hand and matches the rest of the codebase.
+
+**Aliases:**
+- Aliases are used only to disambiguate a package name from a local concept:
+  - `storearchive "github.com/jellydn/knulli-app-store/internal/archive"` in `internal/installer/commit.go` and `stage.go`
+  - `storeinput`, `storeui`, `xdraw` in `internal/sdlui/run.go` and `walk.go`
+- No path-alias mechanism exists beyond the module path.
 
 ## Error Handling
 
 **Patterns:**
-- Return `error`; never panic in product code. `t.Fatal` panics are limited to tests.
-- Wrap at the boundary that adds context: `fmt.Errorf("open diagnostics log: %w", err)` (47 `%w` wraps in product code)
-- Error text is a lowercase clause with no trailing punctuation, except when it begins with a proper noun: `"GitHub release metadata returned HTTP %d"`, `"SHA-256 mismatch: got %s"`, `"EmulationStation did not accept reload: %w"`
-- The CLI prints `fmt.Fprintln(os.Stderr, "error:", err)` and exits 1
-- Structured evidence, not prose, for user-facing failures: compatibility errors carry raw value, normalized value, source, and the full detected matrix (`internal/platform/platform.go`); health issues carry path, check, expected, actual (`internal/installer/status.go`)
-- Typed errors exist where the UI must branch on the cause: `installer.AdoptionConflictError`, `input.corruptFileError`
-- Validation collects all problems and reports them together (`manifest.Validate` builds a `problems []string`)
+- `fmt.Errorf` with `%w` for wrapping so `errors.As`/`errors.Is` keep working; `errors.As` is used for typed failures (`appstore.recoverableAdoptionFailure`).
+- Sentinel-free: failures are descriptive strings, not exported error variables.
+- Validation collects *all* problems, sorts them, and joins with `"; "`:
+  ```go
+  if len(problems) > 0 {
+      sort.Strings(problems)
+      return errors.New(strings.Join(problems, "; "))
+  }
+  ```
+  A manifest review must not hide a second problem behind the first.
+- Fail closed before mutating: `checkPreconditions` runs `Validate` + `Installable` + `platform.Check` + `validateDownloadURL` before any filesystem work.
+- Report provenance in failures: `platform.compatibilityError` embeds the detected raw value, normalized value, source, and the full matrix; `HealthIssue` carries `Path`, `Check`, `Expected`, `Actual`.
+- Never lose a rollback failure: `commit.go`'s `rollback` folds it into the original error (`"%w; rollback also failed: %v"`).
+- Distinguish "operation failed" from "operation committed, follow-up refused": a failed loopback reload sets `RestartRequired` and returns a nil error.
+- Deferred cleanup with a named result: `apply`, `commit`, `uninstall` use `defer` + `result error` so logging and rollback see the final error.
 
 ## Logging
 
-**Framework:** the standard `log` package behind `internal/diagnostics.Log`
+**Framework:** `internal/diagnostics.Log` — no third-party logger.
 
 **Patterns:**
-- Event name first, then alternating key/value pairs: `m.event("operation_start", "package", pkg.ID, "action", operation)`
-- Event names are `snake_case` verbs describing the transition: `startup`, `platform_detected`, `compatibility_rejected`, `adoption_inventory`, `action_selected`, `operation_error`
-- `Log.Event` redacts before writing: URL credentials, query strings, fragments, common secret fields, and terminal control sequences (`sensitiveValue`, `webURL`, `terminalControl` in `internal/diagnostics/log.go`)
-- Never log a package's file contents, credentials, or ROM data. Exports are user-triggered and redacted.
-- The active log is capped at 512 KiB with exactly one rotated copy (`boundedWriter`)
+- Call as `log.Event(name, "key", value, ...)`, producing `event=name key="value"` lines.
+- `Manager.event(name, fields...)` no-ops when `Diagnostics` is nil, so tests run without I/O. Every production module takes an optional `*diagnostics.Log`.
+- Event names are lowercase snake_case and name the state transition: `operation_start`, `compatibility_allowed`, `compatibility_rejected`, `transaction_begin`, `backup_complete`, `operation_complete`, `rollback_complete`, `package_health_checked`, `gamelist_refresh_accepted`, `resolution_candidate`, `controller_source`.
+- Log *decisions*, not just steps: `compatibility_decision` records `allowed` and the rendered message; `lifecycle_state` records the retry target beside the failure.
+- Never log a raw URL, token, or path containing one — `Redact` runs at write time and again on export.
 
 ## Comments
 
 **When to Comment:**
-- `CONTRIBUTING.md` is explicit: comments must explain a design reason the code cannot make clear by itself
-- That rule is followed closely in the newer packages, where exported types carry multi-line rationale: `internal/ui/tabs.go` explains why `TabAll` leads and why `TabOrder` is a slice rather than a switch; `internal/appstore/verdict.go` explains that `assess` only combines policy owned elsewhere; `internal/sdlui/run.go` documents each `Options` field
-- The cgo preamble in `internal/sdlui/run.go` documents which SDL functions the wrappers exist for
-- Build-tag files carry `//go:build sdl` and nothing else on that line
-- Total comment volume is modest (about 647 lines) and concentrated where a decision is non-obvious
+This is the strongest convention in the repo. Comments explain *why*, and specifically record a decision the code cannot show by itself. They are long, prose, and reference the failure they prevent.
 
-**Doc Comments:**
-- Go doc comments on exported types and non-obvious functions; no JSDoc/TSDoc anywhere
-- Sparse on obvious exported helpers (`Load`, `Build`), present on policy decisions
+Examples that define the house style:
+```go
+// AskPaging opens the paging question. It is one screen for every setup path,
+// because the answer belongs to the mapping rather than to the path that builds
+// it.
+```
+```go
+// modeIssue reports a permission regression. The destination filesystem owns
+// the mode bits and a Knulli SD card can report 0777 for a file the installer
+// requested as 0755 or 0644, so wider bits are not an issue.
+```
+```go
+// What this changes is when the check runs, not how.
+```
+
+Guidelines observed:
+- A comment on a non-obvious field, branch, or constant explains the alternative that was rejected or the bug it prevents (`internal/input/mapping.go`'s `Action(button)` comment explains the zero-value map-read trap).
+- File-level package docs exist where the file is the orchestrator: `internal/installer/installer.go` opens with a map of the whole package and why the files are split the way they are; `internal/version/version.go` explains why two comparison functions exist.
+- `AGENTS.md` restates the rule: "Comments explain design reasons the code cannot show, not what the code does."
+- No `TODO`/`FIXME`/`HACK` comments exist anywhere in the tree.
+- Doc comments on exported identifiers are the norm but not universal; they are most consistent on exported types and functions in `manifest`, `platform`, `input`, `ui`, and `safefs`.
+
+**Parameterized test naming carries meaning:**
+- Table tests use `name` fields that read as sentences: `"skipped pair saves no paging binding"`, `"repair requires the installed release"`.
 
 ## Function Design
 
-**Size:**
-- CLI `run` and `runApply` stay as command switches plus flag setup
-- `installer.Manager.apply` is the orchestrator and delegates to three named stages; helper files own download, XML, state, status, and refresh
-- Long test files are accepted: `internal/installer/installer_test.go` is 1,421 lines and still one package suite
+**Size:** Small and single-purpose. The largest functions are the ones that must be exhaustive by nature — `manifest.validateInstallable`, `platform.Check`, `run.Run`, `draw.draw`. Helpers are extracted aggressively (e.g. `installer.go` keeps only `Apply`, `apply`, `checkPreconditions`, `event`, `root` and delegates the rest).
 
 **Parameters:**
-- `context.Context` is the first parameter on anything that downloads, refreshes, or can block (`Apply`, `Execute`, `Items`, `Check`, `Uninstall`)
-- `Manager` is a value struct with injectable seams: `Client`, `RefreshClient`, `RefreshURL`, `Now`, `AvailableBytes`
-- Options are functional: `platform.Resolve(root, platform.WithFirmware(...), ...)`
+- Value receivers for immutable-ish config carriers (`func (m Manager)`) so `WithX` returns a copy and no hidden mutation is possible.
+- Pointer receivers only where mutation is the point: `*Transaction`, `*Session`, `*Model`, `*Tabs`, `*Status`, error types.
+- Functional options for detection: `platform.Resolve(root, platform.WithFirmware(...), ...)` with `Option func(*request)`.
+- Injectable seams are struct fields, not globals: `Manager.Client`, `Manager.RefreshClient`, `Manager.RefreshURL`, `Manager.Now`, `Manager.AvailableBytes`, `Checker.Client`, `Checker.BaseURL`, `Checker.Sleep`, `Checker.MaxRetries`.
 
 **Return Values:**
-- `(T, error)` or `error`
-- A committed operation returns `installer.OperationOutcome` describing refresh acceptance rather than an error
-- Tests use `t.Fatal` on setup failure and `t.Fatalf` with the actual value
+- `(T, error)`; a lookup that can legitimately miss returns `(T, bool)` instead (`tabs.Remembered`, `mapping.Action`, `containsArchiveFile`).
+- Outcome structs are filled through a pointer parameter (`commit(ctx, op, pkg, staged, &outcome)`) so the returned error stays the sole failure signal.
+- `Copy()`/`Clone()` methods exist on slice-backed values that must not be shared (`Info.Clone`, `Mapping.Clone`, `Status.clone`, `ResolutionCandidates`).
 
 ## Module Design
 
 **Exports:**
-- Small public surface per package; `internal/` prevents any external importer
-- UI depends on `appstore.Backend`, never on installer internals
-- `internal/gamelist` depends on `safefs` and `manifest` but is called only by `installer`
-- `internal/input` and `internal/ui` never import `internal/sdlui`, so the model and mapping logic stay testable without SDL
+- Exports are limited to what a consumer needs. Many helpers stay unexported even in heavily used packages (`manifest.safeRelative`, `installer.installFiles`, `input.actionName`).
+- No package exposes a mutable global. `catalog.embeddedPublicKeyHex` is an unexported `string` set only via `-ldflags`.
+- `internal/` is used for every package except `main`, so nothing is importable outside the module by construction.
 
 **Barrel Files:**
-- None. No `doc.go`, no re-export shims, no `utils` package
+- None. There are no `doc.go` or re-export files; each file holds real code.
 
-**Policy placement:**
-- Each rule lives in the package that owns the data: installability and manifest rules in `manifest`, compatibility in `platform`, health and ownership in `installer`, combination only in `appstore/verdict.go`. A new state or action is added once, in `assess`.
-
-**Prose:**
-- User and contributor docs follow What / Why / How with short ASD-STE100-style sentences (`README.md`, `docs/`, `CONTRIBUTING.md`)
-- `CONTEXT.md` is the shared glossary; a new concept gets a term there, and the term is then used in code, docs, and review
+**Dependency direction (enforced by review, see `CONTRIBUTING.md`):**
+- `internal/installer` must stay independent of presentation code. The GUI depends on `appstore.Backend`, and GUI tests use an in-memory fake.
+- `internal/ui` and `internal/input` depend on stdlib only (plus the `appstore` interface for `ui`), which is why they compile and test without CGO or SDL.
 
 ---
 
-*Convention analysis: 2026-09-19*
+*Convention analysis: 2026-09-21*

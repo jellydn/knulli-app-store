@@ -46,6 +46,8 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Outcome** — What an operation reports after committing: whether the game list refresh was accepted, or a restart is required. The operation is committed either way.
 
+**Interruptible** — A step that honours the caller's context, so cancelling stops it where it stands instead of at the end. Extraction is interruptible between archive entries and partway through a single entry's transfer, so a large release stops promptly. Only the staging directory has been written when it stops, so an interrupted operation needs no rollback: the staging work is discarded and the destination is left exactly as it was found.
+
 **Notice** — A transient line reporting a finished operation, shown in the notice bar and cleared after three seconds. A failure is not a notice: it stays in the status block until it is answered.
 
 **Originals** — Backups of files the installer replaced, kept so a failed operation can be reversed and an uninstall can restore what was there before.

@@ -1,240 +1,293 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-09-19
+**Analysis Date:** 2026-09-21
 
 ## Tech Debt
 
-**Per-build catalogue signing key:**
-- Issue: device artifacts generate a throwaway ed25519 key per build, sign `catalog-index.json`, and compile the matching public key in with `-X ...internal/catalog.embeddedPublicKeyHex`. Every signed index therefore requires a matching new binary.
-- Files: `internal/catalog/sign.go` (`embeddedPublicKeyHex`, `EmbeddedPublicKey`), `.github/workflows/check.yml` (device-artifact job, `KEY_DIR=$(mktemp -d)` with an exit trap), `.github/workflows/release.yml` (tag-build job)
-- Impact: a catalogue refresh cannot ship independently of an app build; rotation policy does not exist yet
-- Fix approach: introduce a long-lived production key plus a documented rotation path once the index is distributed apart from the binary (`docs/security-model.md` already names this as required)
+**`make check` silently rewrites instead of failing:**
+- Issue: `check: fmt vet test` and `fmt` runs `gofmt -w` on whatever `gofmt -l` lists. A local `make check` therefore fixes formatting rather than reporting it, while CI fails on `test -z "$(gofmt -l .)"`.
+- Files: `Makefile`, `.github/workflows/check.yml`
+- Impact: Contributors on `make check` can still push formatting CI rejects; conversely a `make check` run mutates the working tree unexpectedly. Intentional for speed, but the divergence is a trap.
+- Fix approach: Split a `fmt-check` target for the `check` dependency and keep `fmt` as the auto-fixer.
 
-**Duplicated version comparison:**
-- Issue: two independent implementations compare versions, one for platform compatibility and one for the update checker. `normalizeVersion` also exists in both packages with different behavior.
-- Files: `internal/platform/platform.go` (`comparableVersions`, `compareVersions`, `versionPart`, `numericVersion`) and `internal/updatecheck/check.go` (`compareVersions`, `versionParts`, `normalizeVersion`, `versionParts`)
-- Impact: a fix in one comparison can silently diverge from the other, so a package could be compatible but reported as out of date, or vice versa
-- Fix approach: extract one version-ordering helper both callers share, then keep only the caller-specific policy on top
+**Three functions named `wrap` / `actionName` doing ad-hoc ASCII work:**
+- Issue: `wrap` is defined separately in `internal/ui/model.go` and `internal/input/session.go`; `internal/ui/model.go`'s `actionName` does byte arithmetic (`string(value[0]-'a'+'A')`).
+- Files: `internal/ui/model.go`, `internal/input/session.go`
+- Impact: Low — both copies are correct. But `actionName` panics-adjacent if an action string were ever empty or non-lowercase ASCII (it is guarded by an empty check, not by a case check).
+- Fix approach: Nothing urgent; if a shared helper package ever appears, move `wrap` there.
 
-**Duplicated device build block across workflows:**
-- Issue: the signed-catalogue build, the cross-compile, and the ABI verification (`file`, `readelf` for `libSDL2-2.0.so.0`, exactly two `NEEDED` entries, `GLIBC_2.34`) are copy-pasted between the `device-artifact` job in `check.yml` and the `tag-build` job in `release.yml`
-- Impact: relaxation of an ABI gate or a new link flag can land in one path and not the other, so a tag release could ship something CI never validated
-- Fix approach: move the block into one reusable workflow (or a script under `scripts/`) and call it from both jobs
+**Time-sensitive status tables committed as prose:**
+- Issue: `README.md` ("The catalogue has five packages", a per-package blocker table), `docs/catalogue-review-2026-09-15.md`, `docs/catalogue-review-2026-09-17.md`, and both `packaging/*/README.txt` files restate review status by hand.
+- Files: `README.md`, `docs/catalogue-review-*.md`, `packaging/trimui-smart-pro/README.txt`, `packaging/magicx-zero-28/README.txt`
+- Impact: The catalogue is the source of truth and can drift from all six documents silently; the weekly `catalogue-updates.yml` report is read-only and will not correct them.
+- Fix approach: Generate the table from the index in a docs check, or reduce the prose to a link plus a date.
 
-**Mixed GitHub Action pinning:**
-- Issue: `catalogue-updates.yml` pins every action to a full commit SHA, while `check.yml` and `release.yml` use floating major tags (`actions/checkout@v7`, `actions/upload-artifact@v7`)
-- Impact: the highest-trust workflow is the least pinned one; a compromised major tag would execute in the release path
-- Fix approach: pin all workflows by SHA and let Renovate keep the comments current
+**Superseded ADR still marked accepted:**
+- Issue: ADR-0006 is titled "Target Go 1.19, a static aarch64 CLI, and Knulli-owned firmware files" and ADR-0007 raises the baseline to Go 1.27. Both are listed as `accepted` in `docs/adr/README.md` with no supersession marker.
+- Files: `docs/adr/0006-go119-static-cli-knulli-detection.md`, `docs/adr/0007-go127-language-baseline.md`, `docs/adr/README.md`
+- Impact: A reader following ADR-0006 alone would target the wrong language version. The README even notes "New records use the next number and keep the Context / Decision / Consequences shape" but defines no status vocabulary beyond `accepted`.
+- Fix approach: Add a `superseded by NNNN` status column value and mark 0006 accordingly.
 
-**Installer orchestrator size:**
-- Issue: `internal/installer/installer.go` is 819 lines and holds the whole commit path plus `installFiles`, `adoptFiles`, `inventoryExisting`, `applyExecutableModes`, `applyBinaryPatches`, and `recoveryBackup`
-- Impact: the file is the hardest place to review, and it is the file where a mistake is most expensive
-- Fix approach: the stage split (`checkPreconditions` / `stage` / `commit`) is already named; move commit helpers into sibling files by concern (files, adoption, recovery, patches) before adding new behavior
+**Thirteen `//lint:ignore U1000` suppressions in one file:**
+- Issue: `internal/sdlui/layout.go` constants are only referenced by sdl-tagged draw code, so `staticcheck` on the untagged build reports them unused and each is suppressed by hand.
+- Files: `internal/sdlui/layout.go` (lines 15, 17, 34, 38, 43, 45, 47, 49, 51, 53, 57, 59, 181)
+- Impact: A new constant used only by tagged code needs a matching suppression or the untagged gate fails — a papercut, and one that could mask a genuinely dead constant if a suppression were ever added wrongly.
+- Fix approach: Move the tagged-only tokens into a file that is itself sdl-tagged, or tag the constants block.
 
-**Manager carries lifecycle methods:**
-- Issue: `LifecycleState`, `RecordLifecycle`, `ClearLifecycle`, and `LifecycleEvent` hang off `installer.Manager` although lifecycle/retry provenance is a separate schema (`org.knulli.app-store/lifecycle-state/v1`) with its own path
-- Files: `internal/installer/lifecycle.go`
-- Impact: the manager surface grows with each retry rule, and lifecycle storage cannot be tested or replaced independently
-- Fix approach: give lifecycle its own small type with a path and keep the manager as a caller
+## Known Gaps
 
-**Unbounded notice queue:**
-- Issue: `ui.Toasts.Push` appends without a cap, and only `Live` (called each rendered frame) drops expired entries; rendering truncates to `toastMaxLines = 2`
-- Files: `internal/ui/toast.go`, `internal/sdlui/layout.go` (`toastMaxLines`), `internal/sdlui/draw.go` (`drawToast`)
-- Impact: a fast burst of completed operations grows the slice until the next read; harmless today, a slow leak if the frame loop ever stops reading
-- Fix approach: cap the queue at push time (keep the newest N) so the bound does not depend on the render loop
+**A killed process leaves its staging directory behind:**
+- Problem: `installer.stage` creates `work-*` under the manager directory, and only `stagedRelease.release` removes it. Nothing sweeps a stale `work-*` at startup, so a process that dies mid-install — killed, power lost, or quit before the cleanup runs — leaves the downloaded archive and its extracted tree on the card.
+- Files: `internal/installer/stage.go` (`stage`, `stagedRelease.release`), `internal/installer/installer.go` (`apply`)
+- Trigger: `sdlui.Run` cancels its context when the run returns, so quitting the GUI during a busy operation now stops extraction promptly — and can exit the process before the deferred cleanup runs.
+- Impact: Up to 512 MiB of stale staging per interrupted install, on a handheld where that is a large share of internal storage. Correctness is unaffected: nothing outside `work-*` was written, so the destination and the installed state are untouched.
+- Fix approach: `acquireManager` already holds the exclusive lock, so no live operation can own a `work-*` directory while it runs. Sweep stale `work-*` directories there, beside the existing `safefs.Recover` call.
 
-## Known Bugs
+**Whole-file XML rewrite drops anything the parser does not model:**
+- Problem: `encodeGamelist` serializes the entire parsed tree with a fresh `xml.Header`, 2-space indentation, and no preservation of comments, processing instructions, DTD, CDATA boundaries, or original whitespace. `decodeNode` ignores `xml.Comment` outright.
+- Files: `internal/gamelist/xml.go` (`parseGamelist`, `decodeNode`, `encodeGamelist`)
+- Trigger: any add, replace, or remove touching a gamelist file — one entry added to a large hand-curated `gamelist.xml` reflows the whole document and loses its comments.
+- Impact: The semantics of the XML are preserved (element names, attributes, text), but the file's original formatting and non-element content are not. EmulationStation tolerates this; a user comparing a backup would not.
+- Fix approach: Surgical text-level edit for the entry, or at minimum preserve comments by capturing `xml.Comment` tokens in `decodeNode` and re-emitting them.
 
-**No tracked TODO/FIXME/HACK/XXX in source:**
-- Symptoms: none filed in code comments
-- Files: scanned `cmd/`, `internal/`, `catalogue/`, `schema/`, `scripts/`, `packaging/` — zero matches
-- Trigger: n/a
-- Workaround: product limitations are recorded in `docs/security-model.md`, `docs/real-device-tests.md`, and the dated catalogue reviews instead of in code
+**Unguarded zero-value map read for the quit chord:**
+- Problem: `Session.HandleButton` tests `button == session.activeMapping()[Diagnostics]` directly. A Go map read of an absent key yields `0`, which is SDL's south face button.
+- Files: `internal/input/session.go`, `internal/input/mapping.go`
+- Impact: Latent. `Mapping.Validate` requires `Diagnostics` for every saved mapping, so in practice the key is always present. But `Mapping.Action` in the same package carries an explicit comment warning about exactly this trap and guards it with `ok`; this site does not.
+- Fix approach: Mirror `Action`'s guard: read the button with `, ok` and bail when absent.
 
-**MagicX GUI coverage incomplete:**
-- Symptoms: a real MagicX diagnostic confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController `magicx-input`, but full GUI and package lifecycle testing is not done
-- Files: `docs/magicx-zero-28.md`, `docs/real-device-tests.md`, `catalogue/packages/io.github.unitreign.playtime.json` (notes)
-- Trigger: a run on a MagicX Zero 28
-- Workaround: treat MagicX as experimental; only screenshot and layout evidence exists at 640×480
+**Reviewed fallback mapping exists for only one device:**
+- Problem: `input.Profile` returns a populated `Fallback: AutoMapping()` for `trimui-smart-pro`, but for `magicx-zero-28` it returns a profile with no `Fallback` at all (the `Evidence` string says "raw controls unavailable"). `platform.DisplayName` likewise hardcodes exactly two device names.
+- Files: `internal/input/mapping.go`, `internal/platform/platform.go`
+- Impact: A MagicX install carries no reviewed layout. Runtime handling is unaffected — `NewSession` gives every session SDL's canonical logical layout as its detected mapping and first launch walks the user through it — but the reviewed record the Smart Pro has does not exist here, and `TestDeviceProfilesDoNotInventMagicXFallback` fails if one is claimed without a report behind it.
+- Fix approach: `docs/magicx-zero-28.md` (Recording a reviewed controller layout) now names the required evidence and the four files it must land in. Note that the confirmed MagicX diagnostic establishes the controller GUID and name, not the button layout — and `Detected` is never populated from SDL's own mapping, so `AutoMapping()` is the canonical layout rather than a per-device reading. A report must therefore confirm that this pad's buttons land where a user expects before the profile gains a `Fallback`.
 
-**Grout device evidence is one version behind:**
-- Symptoms: the recorded Smart Pro test covers Grout 5.1.0.0, not the current 5.2.0.0 release
-- Files: `docs/real-device-tests.md`, `docs/security-model.md` (residual risks), `catalogue/packages/app.romm.grout.json`
-- Trigger: reviewing Grout 5.2.0.0
-- Workaround: Grout stays broad-experimental; the Store stages a verified binary patch to disable the self-updater
-
-**RetSend ships with open upstream blockers:**
-- Symptoms: the reviewed build's own tracker lists eight open admission blockers (TLS pinning, key-file mode, symlink-safe writes, overwrite default, quotas, signed releases, provenance attestation, SBOM), and the release tag `prerelease` is mutable so the manifest pins bytes and not the tag
-- Files: `docs/catalogue-review-2026-09-17.md`, `catalogue/packages/io.github.jellydn.retsend.json`, `internal/installer/installer_test.go` (RetSend lifecycle test)
-- Trigger: installing or reviewing RetSend
-- Workaround: the manifest disables the self-updater, pins size and SHA-256, keeps identity and history outside the package tree, and stays `experimental` with no device test
+**Chunked downloads skip the `Content-Length` check:**
+- Problem: `download` only compares `response.ContentLength` when it is `>= 0`.
+- Files: `internal/installer/download.go`
+- Impact: Low — the written byte count is compared to `release.Size` and the SHA-256 is verified afterwards, so integrity is not weakened; the early check is simply unavailable for chunked responses.
+- Fix approach: None required; worth a comment stating that the byte-count and hash checks are the real gate.
 
 ## Security Considerations
 
-**No package runtime sandbox:**
-- Risk: after install, upstream binaries run with the user's access to `/userdata`
-- Files: `docs/security-model.md`, `internal/installer/installer.go`
-- Current mitigation: catalogue review, pinned SHA-256, one declared destination, backups, a disclosure-only `network` field
-- Recommendations: keep documenting that `network` is a disclosure and not an OS grant; do not present it as enforcement
+**The manager-state write rule has to stay symmetric:**
+- Risk: `manifest.validateInstallable` rejects any package `allowed_write_paths` entry that overlaps manager state. That check used to read `under(ManagerStatePath, allowed)`, which caught a write path equal to or *above* manager state but let a path *inside* it pass — so a manifest could declare its destination as `/userdata/system/knulli-app-store/installed/<id>.json` and have the installer copy a release over a record it owns. Writing the coverage case is what surfaced it.
+- Files: `internal/manifest/manifest.go` (`overlaps`, `ManagerStatePath`), `internal/manifest/manifest_test.go` (`TestOverlapsCoversBothDirections`)
+- Current mitigation: The rule is now bidirectional (`overlaps`), the path has one definition shared with the installer (`installer.managerPath` reads `manifest.ManagerStatePath`), and both directions plus the shared-prefix neighbour case are pinned by tests. No manifest in `catalogue/packages/` overlaps manager state either way, so tightening broke nothing.
+- Recommendations: Keep the check symmetric. A future rule that narrows it to one direction reopens the same hole, and the manager-state constant must not be re-duplicated into the installer.
 
-**Symlink TOCTOU on local paths:**
-- Risk: a hostile local process can race a checked directory into a symlink between the check and the write
-- Files: `internal/safefs/guard.go` (`rejectSymlinkParents`, `allows`), `internal/installer/installer.go`
-- Current mitigation: every existing component of a write path is rejected if it is a symlink
-- Recommendations: keep the operator-trust statement prominent — never point `-root` at an untrusted tree, and `scripts/desktop-fixture.sh` must refuse non-fixture directories (it does, via its `.desktop-fixture` marker)
+**Catalogue trust is per-build, not per-project:**
+- Risk: `scripts/device-build.sh` generates a new ed25519 key for every build and compiles the matching public key into the binaries. As the script's own comment states, "a signed index cannot outlive the binary that embeds its key until a long-lived production key exists."
+- Files: `scripts/device-build.sh`, `internal/catalog/sign.go` (`embeddedPublicKeyHex`)
+- Current mitigation: The index, the signature, and both binaries ship in one zip built in one step, so the triple is internally consistent. `device-build.sh` fails the build if the derived public key is not 64 hex characters.
+- Recommendations: Introduce a long-lived production signing key (stored outside the build, e.g. an Actions secret or an offline key) so a catalogue update could be shipped without rebuilding and re-signing the binaries. Until then, a user cannot verify that two releases were produced by the same project key.
 
-**Blast radius of root:**
-- Risk: root can change files below approved paths regardless of installer checks
-- Files: `docs/security-model.md`, `internal/safefs/transaction.go`
-- Current mitigation: manager state lives outside package write policy, ownership is recorded, pre-existing files are backed up, uninstall restores originals
-- Recommendations: keep state and write policy separate; do not add a write path under manager state
+**Unsigned fallback is silent on a device build:**
+- Risk: `catalog.Load` calls `EmbeddedPublicKey()` and, when it returns `nil`, skips signature verification entirely with no warning.
+- Files: `internal/catalog/catalog.go`, `internal/catalog/sign.go`
+- Current mitigation: Correct and intentional for the desktop/local path where no key is injected. On device the key comes from `-ldflags` in `scripts/device-build.sh`, and the length check there guards the injection.
+- Recommendations: Log an explicit `catalogue_unsigned` diagnostic event when no key is embedded, so a device build that lost its ldflags is visible in the log rather than indistinguishable from a healthy unsigned desktop run.
 
-**Recovery from a corrupt journal is manual:**
-- Risk: a corrupt transaction journal blocks the next locked operation until the leftover directory is inspected
-- Files: `internal/safefs/transaction.go` (`Recover`, `readJournal`, `rollbackSnapshots`), `internal/installer/installer.go` (`rollback`)
-- Current mitigation: `Recover` runs on the next locked start and refuses to guess at a damaged record
-- Recommendations: surface the exact leftover path in the errors the GUI shows, so an operator does not have to read the journal by hand
+**`binary_patches` is a powerful primitive:**
+- Risk: `applyBinaryPatches` rewrites bytes in a downloaded binary at a manifest-declared offset before commit. The result is verified against a manifest-declared final SHA-256, so the *output* is pinned — but the pinned value is authored by the same review that authors the patch.
+- Files: `internal/installer/files.go` (`applyBinaryPatches`), `internal/manifest/manifest.go` (`BinaryPatch` validation)
+- Current mitigation: Validation requires a safe relative path, a non-negative offset, equal-length non-empty `before`/`after` hex, and a 64-hex `sha256`; the patcher requires the `before` bytes to actually match at that offset; `catalogue/packages/app.romm.grout.json` uses it to disable Grout's self-updater, and the README states the transformed binary is verified.
+- Recommendations: Treat any new `binary_patches` entry as equal in risk to a remote install script — the review checklist should require the reviewer to reproduce the patch independently. Consider requiring a `note`/evidence URL alongside each patch.
 
-**Diagnostic export surface:**
-- Risk: exported logs could leak URLs, tokens, or paths
-- Files: `internal/diagnostics/log.go` (`Redact`, `sensitiveValue`, `webURL`, `terminalControl`, `Export`)
-- Current mitigation: redaction before write, 512 KiB cap with one rotation, export triggered by the user and limited to log lines
-- Recommendations: keep `GITHUB_TOKEN` out of the update reports (`internal/updatecheck/report.go` writes only compared metadata) and keep adding a redaction case whenever a new URL shape is logged
+**Redactor is not a general secret scrubber:**
+- Risk: `diagnostics.Redact` strips terminal control sequences, masks `token|password|passwd|secret|api[-_]?key|authorization` values, and removes userinfo, query, and fragment **only** from URLs that have one. A credential embedded in a URL path, or a bare opaque secret not preceded by one of those key names, passes through.
+- Files: `internal/diagnostics/log.go`
+- Current mitigation: All URLs the code logs are release URLs with no credentials; `Redact` runs at write time, again on export, and again over the existing log file at `diagnostics.Open`, so a format change cannot leak a token an older build wrote. Export bundles are written `0600`.
+- Recommendations: Also redact long high-entropy path segments, or whitelist the known release-URL shape and redact everything else.
 
-**Download URL policy:**
-- Risk: a manifest could point at a mutable or non-HTTPS asset
-- Files: `internal/installer/download.go` (`validateDownloadURL`, `maximumReleaseBytes`), `internal/manifest/manifest.go` (`immutableReleaseURL`, `isHTTPS`)
-- Current mitigation: HTTPS-only, version-pinned URLs, exact size and SHA-256 verified before extraction
-- Recommendations: keep the mutable-release treatment (pin bytes, refuse the tag) as the standard for any fork-published asset
+**POSIX-only syscalls bound the contributor matrix:**
+- Risk: `syscall.Flock` (`internal/installer/stage.go`) and `syscall.Statfs` (`internal/safefs/files.go`) do not exist on Windows, and `syscall.Flock` semantics depend on the filesystem honouring advisory locks.
+- Files: `internal/installer/stage.go`, `internal/safefs/files.go`
+- Current mitigation: The target is Linux `aarch64`; macOS development works; CI runs `ubuntu-latest`. The `-root` flag is the documented way to run on another tree.
+- Recommendations: State the POSIX requirement explicitly in `README.md` prerequisites (it currently says only Go and `libsdl2-dev`), and consider documenting that flock is advisory and assumes a single-writer card.
+
+**`-root` points the policy engine at an arbitrary tree:**
+- Risk: `-root` redirects every device path, which is what makes temp-root testing possible but also lets a user point the installer at an untrusted tree. `AGENTS.md` and the README both warn that it "must not point at an untrusted tree with symlinked path components."
+- Files: `internal/safefs/guard.go`, `cmd/knulli-app/main.go`, `cmd/knulli-app-ui/main.go`
+- Current mitigation: `NewGuard` calls `filepath.EvalSymlinks` on the root so the root itself is resolved once; `rejectSymlinkParents` then rejects a symlink at any component *below* the root before resolving a target. Package `allowed_write_paths` are validated to live under `/userdata` and to exclude `/userdata/system/knulli-app-store`.
+- Recommendations: None required beyond the existing warnings; this is a documented developer flag.
 
 ## Performance Bottlenecks
 
-**Full archive stage before any write:**
-- Problem: up to 512 MiB compressed and installed must be downloaded, hashed, and extracted into a temp tree before a destination changes
-- Files: `internal/installer/download.go` (`maximumReleaseBytes`), `internal/installer/installer.go` (`maximumAdoptionBytes`, `stage`), `internal/archive/archive.go`
-- Cause: safety requires a complete hash and inventory before mutation, and there is no cache
-- Improvement path: keep the design; free-space is already checked before download. Do not stream-install, because it would move the checksum after the first write
+**Whole-catalogue health verification:**
+- Problem: `Manager.Status` hashes every immutable managed file of a package and compares permission bits. `Service.Items` calls it for every catalogue entry on every load.
+- Files: `internal/installer/status.go`, `internal/installer/cache.go`, `internal/appstore/service.go`
+- Cause: Content hashes are deliberately trusted over size and mtime, which is what `TestHealthCheckHashesContentWhenSizeAndTimeMatch` pins down.
+- Improvement path: Already mitigated by `StatusCache`, keyed on the SHA-256 of the canonical installed-state encoding, plus explicit `Invalidate` on every mutation. The remaining cost is one full re-hash of the operated package per operation, plus a first-read re-hash after any state change. A per-file mtime fast path would weaken the guarantee and should be avoided.
 
-**SDL software raster and CPU blit:**
-- Problem: the GUI renders a 640×360 canvas and scales it with `golang.org/x/image/draw` on every frame
-- Files: `internal/sdlui/run.go` (`renderOutput`, `outputRectangle`), `internal/sdlui/draw.go`
-- Cause: a portable raster UI avoids a GPU text stack and keeps one code path for both target resolutions
-- Improvement path: acceptable for a catalogue list; revisit only if a real-device frame time says otherwise
+**Free-space estimate is deliberately conservative:**
+- Problem: `stage` requires `release.Size + InstalledSize*3 + existingBytes*2`.
+- Files: `internal/installer/stage.go`
+- Cause: Staging needs the compressed archive, the extracted tree, the destination copy, and rollback snapshots simultaneously.
+- Improvement path: Correct as written. On a nearly-full SD card it will refuse an install that might technically fit — the error message reports both required and available bytes, which is the right behaviour for a safety-first installer.
 
-**Walkthrough cost grows with every flow:**
-- Problem: `make walkthrough` renders every screen state at both resolutions and replays each flow's keys through the real binary
-- Files: `scripts/desktop-walk.sh`, `internal/sdlui/walk.go`, `internal/sdlui/draw_test.go`, `.github/workflows/check.yml` (`timeout-minutes: 15`)
-- Cause: evidence is produced by driving the real GUI rather than by mocking it
-- Improvement path: the timeout is the tripwire; if it is ever raised, split the offline and `--install` flows into separate jobs instead
+**Sequential catalogue work:**
+- Problem: `Service.Items` iterates packages one at a time; downloads are single-stream.
+- Files: `internal/appstore/service.go`, `internal/installer/download.go`
+- Cause: Simplicity and deterministic logging; the catalogue is 5 packages.
+- Improvement path: Not worth parallelizing at this size. Revisit if the catalogue reaches the low hundreds.
+
+**State digest recomputed per status read:**
+- Problem: `stateIdentity` re-marshals the whole installed-state JSON on every `Status` call to key the cache.
+- Files: `internal/installer/cache.go`
+- Cause: The digest must cover the full record so a forgotten invalidation cannot serve a stale result.
+- Improvement path: Acceptable — the record is small (manifest plus file list). Only revisit if a package ever holds thousands of files.
 
 ## Fragile Areas
 
-**Installer lifecycle:**
-- Files: `internal/installer/installer.go`, `internal/installer/state.go`, `internal/installer/status.go`
-- Why fragile: ownership, preserved paths, menu ownership, recovery backups, and refresh outcomes interact, and installed state must be written last
-- Safe modification: add a temporary-root test that fails if the new write or rollback is wrong, and route every mutation through the transaction
-- Test coverage: strong (34 tests, 1,421 lines), including force reinstall and the RetSend package
+**`internal/installer` — every side effect in one package:**
+- Files: `internal/installer/*.go` (~1,400 production lines across 12 files)
+- Why fragile: It owns the lock, the transaction, the journal, downloads, extraction, adoption, health checks, retry records, and menu ownership. A change to any of those can affect all of them, and the ordering invariants (journal before mutation, installed state last, rollback in reverse) are load-bearing.
+- Safe modification: Keep the file-per-concern split; add behavior next to the concern it touches; re-read the package doc comment at the top of `installer.go` before restructuring. Never introduce a destination mutation outside a `safefs.Transaction`.
+- Test coverage: Good (79.4%, 46 test functions, plus a 1,421-line end-to-end test), but the rollback and journal-recovery *failure* branches are the thinnest.
 
-**Menu XML rewriting:**
-- Files: `internal/gamelist/xml.go`, `internal/gamelist/menu.go`
-- Why fragile: the rewrite must preserve unknown elements and attributes byte-for-byte in effect, and must touch only an entry the installer created and that is still unchanged
-- Safe modification: extend `internal/installer/testdata/gamelist.xml` with the new shape before changing the encoder, and keep `Derive`/`Apply` separate so plan and effect stay testable apart
-- Test coverage: good (11 tests) on ownership rules; encoder fidelity relies on round-trip cases
+**`internal/sdlui/draw.go` — largest file, least directly verifyable:**
+- Files: `internal/sdlui/draw.go` (730 lines), `internal/sdlui/layout.go` (204), `internal/sdlui/run.go` (498)
+- Why fragile: Rendering correctness cannot be asserted as easily as logic, and the whole file is sdl-tagged so it is outside the default `go test` run and outside `make cover`.
+- Safe modification: Change geometry in `layout.go` only, keep `draw.go` free of literals, and re-run `make walkthrough` so every screen state is re-rendered to PNG evidence.
+- Test coverage: `draw_test.go` (788 lines) and `layout_test.go`; 91.8% for the package under `-tags sdl`. Screens are additionally captured by CI's `gui-walkthrough` artifact.
 
-**Platform detection:**
-- Files: `internal/platform/platform.go`
-- Why fragile: Knulli still inherits `ID=buildroot`, so detection reads `OS_NAME` from `/etc/os-release`, then `/usr/share/knulli/knulli.version`, then a board file with three candidate locations; framebuffer and ABI files differ by image
-- Safe modification: add a detection fixture and keep the `WithX` override flags, so an unrecognized board is blocked rather than guessed
-- Test coverage: good unit fixtures (21 tests); real-image validation for H700 boards still needs evidence
+**`internal/safefs` journal recovery:**
+- Files: `internal/safefs/transaction.go`, `internal/safefs/guard.go`, `internal/safefs/files.go`
+- Why fragile: It is the code that runs when everything else has already gone wrong, on a card that may have been yanked mid-write. A bug here either loses user files or leaves the journal unparseable. Coverage rose from 64.1% to 84.3%, but what remains uncovered is still this kind of code: the `Sync`/`Close`/`RemoveAll` failure branches, which need an injected I/O fault to reach.
+- Safe modification: Any journal format change needs both a forward and a backward recovery test; `snapshotsFromRecord` already validates that every journal path stays inside the root and that backup names are single path components — preserve those checks.
+- Test coverage gaps: Rollback ordering across many snapshots, and the failure-of-failure paths (a rollback that itself cannot complete). The journal rejection paths are now pinned: an unknown status stops both `Recover` and `PendingForPath`, and a backup name containing a separator is refused.
 
-**SDL cgo adapter and ABI contract:**
-- Files: `internal/sdlui/run.go` (cgo preamble, `openController`, `connectController`), `internal/sdlui/events.go`
-- Why fragile: the hand-written wrappers may import only SDL symbols present on the oldest supported Knulli image, and the binary must link exactly `libSDL2-2.0.so.0` plus glibc no newer than 2.34
-- Safe modification: change imported symbols only together with the CI `readelf` checks and both target resolutions
-- Test coverage: compile plus layout and event tests, never real kernel SDL loading
+**`cmd/knulli-app` argument handling:**
+- Files: `cmd/knulli-app/main.go` (248 lines), `cmd/knulli-app/main_test.go` (780 lines)
+- Why fragile: The incomplete-detection gate is a four-condition disjunction — `Firmware`, `Device`, and `Resolution` empty, or a package naming a `MinimumVersion` with no detected version — and it is the only thing stopping an install against a half-detected platform. It sat at 4.7% coverage, so a dropped condition would have shipped silently.
+- Safe modification: Exercise the CLI through `run(arguments)` and `runApply(operation, arguments, applyDeps)` directly with a temp root rather than shelling out; both are separated from `main` for exactly that, and `applyDeps` lets a test point a download at a loopback release server and a refresh at a loopback port instead of editing the code under test.
+- Test coverage gaps: only `main`'s `os.Exit` shim, which needs a subprocess this repo does not otherwise use, and the two `writeNewFile` cleanup branches for a failing `Write`/`Close`, which need an injected I/O fault. Each of the four gate conditions now has its own case, verified by dropping each condition and watching its case fail.
 
-**Input setup state machine:**
-- Files: `internal/input/session.go` (520 lines, 20+ mode/effect transitions), `internal/input/calibration.go`, `internal/input/footer.go`
-- Why fragile: every mode must keep a reachable exit, and keyboard codes (`KeyEnter = 100` upward in `internal/input/keyboard.go`) must stay above every SDL GameController button number
-- Safe modification: add the flow to `scripts/desktop-walk.sh` and assert the screens it must reach; treat the keyboard offset block as fixed
-- Test coverage: broad (17 input tests plus paging, keyboard, review, and footer suites) and clamped by the source audit
+**`internal/manifest.Validate` — the single policy gate:**
+- Files: `internal/manifest/manifest.go` (414 lines), `internal/manifest/manifest_test.go` (608 lines)
+- Why fragile: Every rule that decides whether a package is actionable lives here, and it is 65.9% covered. `hasVerifiedMatrixEvidence` — the strictest rule, requiring real-device-test evidence for every declared device × resolution — has no `verified` package in the catalogue to exercise it, so its happy path is untested against real data.
+- Safe modification: Add a test table entry for every new rule; keep the accumulate-sort-join error shape so a reviewer sees all problems at once.
+- Test coverage gaps: `hasVerifiedMatrixEvidence`'s positive path, `immutableReleaseURL` corners (e.g. a path that is a prefix match but not a release download), and the `binary_patches` validation surface.
+
+**`cmd/knulli-app-ui` has no tests of its own:**
+- Files: `cmd/knulli-app-ui/main.go` (97 lines, entirely sdl-tagged)
+- Why fragile: Flag wiring, the default catalogue path next to the executable, and the `-shot-dir`-requires-`-keys` guard are untested. All real logic was deliberately pushed into `internal/sdlui`, so the untested surface is thin — but the `-shot-dir`/`-keys` invariant is only enforced there.
+- Safe modification: Keep the file to wiring only; move any new decision into `internal/sdlui`.
+
+**Exported injection seams on production types:**
+- Files: `internal/installer/installer.go` (`Client`, `RefreshClient`, `RefreshURL`, `Now`, `AvailableBytes`), `internal/updatecheck/check.go` (`BaseURL`, `Token`, `Sleep`, `MaxRetries`)
+- Why fragile: These exist only for tests, so they are public API that no production caller sets. A refactor could remove one and silently break a test's ability to simulate a failure mode.
+- Safe modification: Change them only alongside the tests that depend on them, and keep the zero-value behavior production-safe (nil client, nil clock, default URL) — which the current code does.
 
 ## Scaling Limits
 
 **Catalogue size:**
-- Current capacity: five package manifests plus one external provider
-- Limit: `catalog.Build` reads every `*.json`, re-encodes canonically, and hashes each; `appstore.Service.Items` calls `manager.Status` per package on every load, which hashes managed files for installed packages
-- Scaling path: fine for dozens. Before hundreds, cache status per package identity (hashes plus observed mode) rather than re-hashing on each `Items` call, and revisit list virtualization in `internal/sdlui/layout.go` (`listRows` is a compile-time row count)
+- Current capacity: 5 manifested packages; the index is a single JSON file parsed in full at every GUI start and on every `check-updates` run.
+- Limit: `Service.Items` is O(packages) with a `Status` read and a destination walk each, and `Model` renders a fixed window of 5 rows (`listRows = (listBottom - listTop) / rowHeight = 5`). Interface usability degrades well before the code does.
+- Scaling path: Tabs already narrow the list. The next lever is lazy per-row status, since `StatusCache` already keys on state identity.
 
-**Release and adoption size:**
-- Current capacity: 512 MiB compressed and 512 MiB installed (`maximumReleaseBytes`), with the same ceiling for `maximumAdoptionBytes`
-- Limit: handheld SD card space and temp staging
-- Scaling path: raise only with a documented device-storage review; the free-space check already runs before download
+**Size caps:**
+- Current capacity: 512 MiB compressed and 512 MiB installed per release; 512 MiB per adoption inventory.
+- Limit: Enforced independently in three places (see Tech Debt).
+- Scaling path: Centralize the constant, then raise it only with a matching free-space and staging-timeout review.
 
-**Footer and notice text:**
-- Current capacity: `footerCharacterLimit = 86` (`internal/sdlui/hints.go`), 2 notice lines, `toastCharacterLimit` derived from panel width
-- Limit: a long package name or a long reason must be shortened, and `internal/sdlui/draw.go` `shorten`/`wrapText` are the only tools
-- Scaling path: prefer shortening at the source (labels, verdict messages) over widening the geometry
+**Logs:**
+- Current capacity: 512 KiB active plus one 512 KiB rotation; diagnostic exports are unbounded text bundles written `0600`.
+- Limit: A long install on a chatty device rotates rather than grows, so growth is bounded — but old evidence is discarded one rotation back.
+- Scaling path: Already adequate. A second rotation would be a deliberate trade against SD-card churn.
 
 ## Dependencies at Risk
 
-**golang.org/x/image:**
-- Risk: used only for scaling and text in the GUI; Renovate keeps it current alongside the Go baseline
-- Impact: a GUI compile failure if the module is yanked or stops supporting the toolchain
-- Migration plan: the CLI is CGO-free and independent of this module, so the installer keeps working if the GUI cannot build
+**`golang.org/x/image v0.46.0` (the only direct module dependency):**
+- Risk: Low. It is a first-party Go module with a stable API; the project uses only `draw.NearestNeighbor` scaling and font raster drawing.
+- Impact: A breaking change or an unmaintained release would affect `internal/sdlui/run.go` (canvas scaling) and `internal/sdlui/draw.go` (text), i.e. the GUI only — the CLI, catalogue, and installer would be unaffected.
+- Migration plan: The scaling path is ~20 lines and could be replaced with `image/draw` or a hand-written nearest-neighbour scaler if needed. Renovate (`config:recommended`) tracks bumps.
 
-**SDL2 and glibc 2.34:**
-- Risk: Knulli publishes no compatibility contract for these; CI verifies against Debian Bookworm, so the check proves the build host, not the device
-- Impact: the GUI may fail to start on a different libc or SDL build
-- Migration plan: record `ldd`/`readelf` evidence per Knulli release in `docs/real-device-tests.md`
+**Device SDL2 ABI is not pinned by this repo:**
+- Risk: `scripts/device-build.sh` asserts the GUI needs exactly two shared libraries and no glibc symbol newer than `GLIBC_2.34`, and greps for `libSDL2-2.0.so.0`. It does not pin the SDL2 minor version the Knulli image ships.
+- Impact: A Knulli image that ships an SDL2 with a different controller-database version could change which `SDL_GAMECONTROLLERCONFIG` mappings are produced, altering detected bindings. `packaging/trimui-smart-pro/README.txt` explicitly warns users not to replace Knulli's SDL copy.
+- Migration plan: The reviewed fallback mapping plus the first-run setup flow already absorb an unexpected SDL mapping. Recording the SDL2 version in the diagnostic export would make a future report actionable.
 
-**GitHub API surface:**
-- Risk: `internal/updatecheck` depends on release-list shape, pagination, and rate-limit headers
-- Impact: the weekly report degrades to an error column, which is visible but easy to ignore
-- Migration plan: the checker is read-only and never edits a manifest, so a break costs a report, not a release
+**`staticcheck@v0.8.1` pinned via `go run`:**
+- Risk: None for reproducibility (it is pinned), but the pin lives in two places — `prek.toml` (two hooks) and `.github/workflows/check.yml` — and `go run` fetches on first use, so an offline pre-push fails.
+- Impact: A local/CI analyzer-version skew if only one is bumped.
+- Migration plan: Move the version into a `Makefile` variable and have both the workflow and the hook call it.
+
+**Catalogue manifests as an external contract:**
+- Risk: `schema/package-manifest-v1.schema.json` plus `manifest.Validate()` are versioned `v1`. Adding a required field breaks every existing manifest at load time.
+- Impact: `catalog.Load` re-validates every entry, so a tightened rule fails the whole index — which is the intended fail-closed behaviour, but it means a policy change is a breaking change.
+- Migration plan: `installer.migrateLegacyManifest` is the existing precedent for a backward-compatible field addition (it backfills `ABIs` and `Dependencies` when absent). Follow that pattern, or introduce `v2` with a dual-read path.
 
 ## Missing Critical Features
 
-**Package runtime sandbox:**
-- Problem: installed programs are not confined after launch
-- Blocks: running untrusted upstream code with any real containment
+**No long-lived catalogue signing key:**
+- Problem: Every device build mints a fresh ed25519 key (`scripts/device-build.sh`). There is no production key, no rotation policy, and no way to publish a catalogue update that an already-installed binary will accept.
+- Blocks: Shipping a new or corrected package without cutting a whole new release; a user cannot distinguish two releases as the same publisher.
 
-**Long-lived catalogue signing key:**
-- Problem: trust is rooted in a key that changes with every build
-- Blocks: shipping a catalogue index without a matching new binary
+**No way to resume an interrupted download:**
+- Problem: Extraction honours the operation context, but an interrupted download starts from zero and no partial archive is cached.
+- Files: `internal/installer/download.go`, `internal/installer/cache.go`
+- Blocks: Recovering partial progress across a network drop. An interrupted install still starts over. There is also no user-facing cancel affordance: cancellation is reachable only by quitting the GUI, whose run context cancels on return.
 
-**Actionable RAOfflineProxy and PocketCurator:**
-- Problem: RAOfflineProxy's Knulli asset is a self-extracting script, and PocketCurator's release is mutable; neither passes the supported-archive, inventory, narrow-write, or updater-safety policy
-- Blocks: installing those community-approved titles through this manager (both remain recorded as approved but blocked in `README.md`)
+**No GUI retry for a contended manager lock:**
+- Problem: `acquireLock` is `LOCK_EX|LOCK_NB` and returns the error string `"another package operation is active"` immediately. `RecoveryStatus` recognises that exact string to set `Active: true`, so the special case is handled — but only for the status path.
+- Blocks: Two concurrent callers (e.g. the CLI and the GUI) cannot wait for each other; the loser sees a raw error.
 
-**Coverage gate:**
-- Problem: no coverage threshold exists, and no coverage command is part of `make check`
-- Blocks: detecting a new package shipped with no tests
+**Catalogue is baked in at build time:**
+- Problem: `cmd/knulli-app-ui` defaults `-catalog` to `catalog-index.json` next to the executable; nothing fetches a newer index.
+- Blocks: Delivering a new catalogue package without a new release. This is partly by design (the index is signed together with the binary), but it is the practical consequence of the ephemeral-key decision above.
+
+**No automated device E2E:**
+- Problem: `CONTEXT.md` states plainly that a walkthrough "never exercises a real GameController, a real `/userdata` write, or the kernel's SDL loading."
+- Blocks: Automated verification of controller detection, on-device write semantics, and SDL loading. `docs/real-device-tests.md` and manifest `review.evidence` entries are the only record, and the README notes full MagicX GUI testing is still incomplete.
 
 ## Test Coverage Gaps
 
-**On-device controller and renderer:**
-- What's not tested: automated controller input, the accelerated SDL backend, and per-step Smart Pro/MagicX lifecycle results
-- Files: `docs/real-device-tests.md`, `internal/sdlui/`
-- Risk: layout, event, and walkthrough tests can all pass while a real GameController mapping or renderer fails
-- Priority: High for MagicX GUI, Medium for itemized Smart Pro evidence
+Measured 2026-09-21 with `go test -covermode=atomic ./...`; total 84.2% against a 70% floor. The three lowest packages were raised in one pass: `internal/safefs` from 64.1% to 84.3%, `internal/manifest` from 65.9% to 98.4%, and `cmd/knulli-app` from 4.7% to 83.8%.
 
-**H700 and other board detection:**
-- What's not tested: real Knulli image paths versus the fixtures in `internal/platform/platform_test.go`
-- Risk: operators must pass explicit flags when detection is incomplete, and an unknown board blocks rather than installs
+**`cmd/knulli-app` (83.8%, raised from 4.7%):**
+- What's not tested: `main` itself, a four-line `os.Exit` shim reachable only by spawning a subprocess, and the `writeNewFile` `Write`/`Close` cleanup branches, which need an injected I/O fault. The `run` dispatch, every subcommand's flag parsing, `printGameListOutcome`, and all four conditions of the platform-incomplete gate now have cases.
+- Files: `cmd/knulli-app/main.go`, `cmd/knulli-app/main_test.go`
+- Risk: Low. This was the highest-value gap in the repo before the pass: the gate is a four-way disjunction, and nothing asserted its conditions. Removing any single condition now fails a named subtest.
+- Priority: Low
+
+**`internal/manifest` (98.4%, raised from 65.9%):**
+- What's not tested: only the `json.Marshal` error returns in `Decode` and `Canonical`, which are unreachable for these types. Every validation rule, the symmetric manager-state check, `immutableReleaseURL`, `binary_patches`, `display_bounds`, `Canonical`, and `Load` now have cases.
+- Files: `internal/manifest/manifest.go`, `internal/manifest/manifest_test.go`
+- Risk: Low. This was the highest-value gap in the repo before the pass, because the rule gating the `verified` claim had no case for a second declared resolution or a mismatched evidence version.
+- Priority: Low
+
+**`internal/safefs` (84.3%, raised from 64.1%):**
+- What's not tested: the `Sync`/`Close`/`RemoveAll` error returns and the `AvailableBytes` "no existing parent" branch, all of which need an injected syscall fault. `SHA256`, `AvailableBytes`, `Virtual`, the transaction `Copy`/`Chmod`/`Remove`/`Commit` API, the closed-transaction guards, and both journal rejection paths are now covered.
+- Files: `internal/safefs/transaction.go`, `internal/safefs/files.go`, `internal/safefs/guard_test.go`, `internal/safefs/files_test.go`
+- Risk: Medium. This code runs after something else already failed, so what remains untested is the failure-of-failure surface: a rollback that cannot itself complete, and an unwritable journal parent.
 - Priority: Medium
 
-**Release workflow itself:**
-- What's not tested: `.github/workflows/release.yml` has no test and no dry run; the only exercise is an actual tag
-- Risk: the duplicated ABI block and the dated-tag derivation are validated in production
-- Priority: Medium, and it drops to Low once the device build block is shared with `check.yml`
+**`internal/catalog` (67.5%):**
+- What's not tested: `Write` error paths (temp-create, sync, rename), `writeSignature` failures, and `Load` rejection of an unsigned index when a key *is* embedded.
+- Files: `internal/catalog/catalog.go`, `internal/catalog/sign.go`
+- Risk: A broken signature-loading path would surface only on a device, where the key is embedded and the desktop tests never reach it.
+- Priority: Medium
 
-**Signing key rotation:**
-- What's not tested: any path where a signed index outlives the binary that embedded its key
-- Files: `internal/catalog/sign.go`, `.github/workflows/check.yml`
-- Risk: an operator could treat a per-build signature as a stable trust root
-- Priority: Medium until the index is distributed on its own
+**`cmd/knulli-app-ui` (0 test functions):**
+- What's not tested: flag wiring, the default catalogue path derivation, and the `-shot-dir` requires `-keys` guard.
+- Files: `cmd/knulli-app-ui/main.go`
+- Risk: Low — the file is deliberately wiring only, and `internal/sdlui` (91.8%) holds the logic. The `-shot-dir` guard is the one real invariant.
+- Priority: Low
+
+**SDL-tagged rendering paths:**
+- What's not tested in the default run: `internal/sdlui/draw.go` and `run.go` are outside `go test ./...` and outside `make cover` entirely; they run only under `go test -tags sdl ./...`. CI does run that, but the coverage gate never sees them.
+- Files: `internal/sdlui/draw.go`, `internal/sdlui/run.go`
+- Risk: A layout regression is caught by tests and by walkthrough evidence, so the practical risk is confined to on-device rendering differences.
+- Priority: Medium
+
+**Health-check and recovery failure branches:**
+- What's not tested: The "rollback also failed" composition path, some `recoveryBackupDirectory` failure paths, and the `AdoptionConflictError` trigger from an existing backup.
+- Files: `internal/installer/commit.go`, `internal/installer/recovery.go`, `internal/installer/installer_test.go`
+- Risk: These are the paths that must not themselves fail. They are partially covered by focused tests (`commit_test.go`, `cache_test.go`, `lifecycle_test.go`) but the failure-of-failure cases are the thinnest.
+- Priority: Medium
 
 ---
 
-*Concerns audit: 2026-09-19*
+*Concerns audit: 2026-09-21*

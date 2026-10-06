@@ -9,7 +9,10 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
 
-const managerPath = "/userdata/system/knulli-app-store"
+// managerPath is the directory this installer owns. It reads the path from the
+// manifest package rather than repeating the literal, because manifest policy
+// rejects any package write path that overlaps it and the two have to agree.
+const managerPath = manifest.ManagerStatePath
 
 type Installed struct {
 	Schema    string            `json:"schema"`

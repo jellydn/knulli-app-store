@@ -43,18 +43,15 @@ hooks = [
         files = "\\.go$",
         pass_filenames = false,
     },
+    # The hook calls the make target rather than repeating its shell, so the
+    # command a contributor is told to run and the check that actually runs
+    # cannot drift apart. They had drifted: the docs kept a git diff on an
+    # ignored path, which reports clean no matter what the index contains.
     {
         id = "catalogue-deterministic",
         name = "catalogue index is deterministic",
         language = "system",
-        entry = """
-            one=$(mktemp) two=$(mktemp)
-            trap 'rm -f "$one" "$two"' EXIT
-            go run ./cmd/knulli-app catalogue -output "$one"
-            go run ./cmd/knulli-app catalogue -output "$two"
-            cmp "$one" "$two"
-            """,
-        shell = "sh",
+        entry = "make catalogue-check",
         files = "^(catalogue/|internal/catalog/|internal/manifest/|schema/|cmd/knulli-app/)",
         pass_filenames = false,
     },

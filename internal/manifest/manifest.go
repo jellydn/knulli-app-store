@@ -13,6 +13,22 @@ import (
 
 const SchemaV1 = "org.knulli.app-store/package-manifest/v1"
 
+// MaxPackageBytes bounds every byte budget one package may occupy: the
+// compressed release, the installed tree it expands to, and a pre-existing
+// destination this installer will inventory before taking it over. It is
+// deliberately untyped, so the same constant composes with the int64 manifest
+// fields and the uint64 free-space arithmetic without a conversion at each
+// call site. It lives here rather than in the installer because a manifest that
+// validated against one copy of the cap and was rejected by another would turn
+// a policy limit into an inconsistency.
+const MaxPackageBytes = 512 << 20
+
+// ManagerStatePath is the installer's own state directory: the installed-state
+// records, original backups, journals, and recovery backups. It is exported
+// because the installer reads the same constant rather than keeping a copy, so
+// the policy here and the paths it protects cannot drift apart.
+const ManagerStatePath = "/userdata/system/knulli-app-store"
+
 var (
 	idPattern      = regexp.MustCompile(`^[a-z][a-z0-9]*(\.[a-z0-9][a-z0-9-]*){2,}$`)
 	sha256Pattern  = regexp.MustCompile(`^[a-f0-9]{64}$`)
@@ -198,11 +214,11 @@ func (p Package) validateInstallable() []string {
 		if !sha256Pattern.MatchString(p.Release.SHA256) {
 			problems = append(problems, "release SHA-256 must be 64 lowercase hexadecimal characters")
 		}
-		if p.Release.Size <= 0 || p.Release.Size > 512<<20 {
-			problems = append(problems, "release size must be between 1 byte and 512 MiB")
+		if p.Release.Size <= 0 || p.Release.Size > MaxPackageBytes {
+			problems = append(problems, fmt.Sprintf("release size must be between 1 byte and %d MiB", MaxPackageBytes>>20))
 		}
-		if p.Release.InstalledSize <= 0 || p.Release.InstalledSize > 512<<20 {
-			problems = append(problems, "installed size must be between 1 byte and 512 MiB")
+		if p.Release.InstalledSize <= 0 || p.Release.InstalledSize > MaxPackageBytes {
+			problems = append(problems, fmt.Sprintf("installed size must be between 1 byte and %d MiB", MaxPackageBytes>>20))
 		}
 		if !oneOf(p.Release.Format, "zip", "tar.gz") {
 			problems = append(problems, "release format must be zip or tar.gz")
@@ -294,8 +310,8 @@ func (p Package) validateInstallable() []string {
 		if !safeAbsolute(allowed) || !under(allowed, "/userdata") {
 			problems = append(problems, "allowed write paths must be clean paths under /userdata")
 		}
-		if under("/userdata/system/knulli-app-store", allowed) {
-			problems = append(problems, "package write paths must not include app-manager state")
+		if overlaps(allowed, ManagerStatePath) {
+			problems = append(problems, "package write paths must not overlap app-manager state")
 		}
 	}
 	if !coveredBy(p.Install.Destination, p.Install.AllowedWritePaths) {
@@ -345,6 +361,14 @@ func safeRelative(value string) bool {
 
 func under(value, parent string) bool {
 	return value == parent || strings.HasPrefix(value, parent+"/")
+}
+
+// overlaps reports whether either path contains the other. Package policy needs
+// both directions: a write path inside manager state could rewrite the
+// installer's own record of what it installed, and a write path above manager
+// state could reach the same files from the other side.
+func overlaps(left, right string) bool {
+	return under(left, right) || under(right, left)
 }
 
 func coveredBy(value string, allowed []string) bool {

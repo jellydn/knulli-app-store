@@ -1,4 +1,4 @@
-.PHONY: all build build-ui catalogue check clean cover cover-untested fmt gui test test-ui vet walkthrough
+.PHONY: all build build-ui catalogue catalogue-check check clean cover cover-untested fmt gui test test-ui vet walkthrough
 
 all: check build catalogue
 
@@ -36,6 +36,31 @@ build-ui:
 
 catalogue:
 	go run ./cmd/knulli-app catalogue -output build/catalog-index.json
+
+# Determinism gate for the catalogue. `build/` is gitignored, so a git diff on
+# the generated index can never notice one that drifted: git reports an ignored
+# path as clean whether or not its contents changed. The honest local check is
+# that two builds of the same manifests produce identical bytes, which is the
+# same comparison the pre-push hook and CI make. Both builds are kept when they
+# differ, because the pair is the evidence of what went non-deterministic.
+CATALOGUE_DIR ?= catalogue/packages
+
+catalogue-check:
+	@set -eu; \
+	one="$(CURDIR)/build/catalog-index.check.json"; \
+	two="$(CURDIR)/build/catalog-index.check-second.json"; \
+	mkdir -p "$(CURDIR)/build"; \
+	go run ./cmd/knulli-app catalogue -dir "$(CATALOGUE_DIR)" -output "$$one"; \
+	go run ./cmd/knulli-app catalogue -dir "$(CATALOGUE_DIR)" -output "$$two"; \
+	if ! cmp -s "$$one" "$$two"; then \
+	  echo "catalogue index is not deterministic: the two builds of $(CATALOGUE_DIR) differ" >&2; \
+	  diff "$$one" "$$two" | head -n 40 >&2; \
+	  echo "both builds kept: $$one $$two" >&2; \
+	  exit 1; \
+	fi; \
+	size="$$(wc -c <"$$one")"; \
+	rm -f "$$one" "$$two"; \
+	echo "catalogue index is deterministic ($$size bytes)"
 
 fmt:
 	@files="$$(gofmt -l .)"; [ -z "$$files" ] || gofmt -w $$files
