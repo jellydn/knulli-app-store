@@ -52,7 +52,6 @@ func TestModelShowsRestartRequiredCompletionAsANotice(t *testing.T) {
 	}
 	model.Select(context.Background())
 	model.Select(context.Background())
-	model.Select(context.Background())
 	waitForModel(t, model)
 	if model.Error != "" {
 		t.Fatalf("a successful uninstall reported %q", model.Error)
@@ -79,10 +78,6 @@ func TestModelWrapsNavigationAndRequiresConfirmation(t *testing.T) {
 		t.Fatalf("expected wrapped selection, got %d", model.Selected)
 	}
 	model.Select(context.Background())
-	if model.Focus != Actions {
-		t.Fatalf("expected action focus, got %d", model.Focus)
-	}
-	model.Select(context.Background())
 	if model.Focus != Confirm || model.Busy {
 		t.Fatal("action must wait for explicit confirmation")
 	}
@@ -102,7 +97,6 @@ func TestModelShowsOperationFailure(t *testing.T) {
 	if err := model.Load(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	model.Select(context.Background())
 	model.Select(context.Background())
 	model.Select(context.Background())
 	waitForModel(t, model)
@@ -140,7 +134,7 @@ func TestForceReinstallRequiresTwoConfirmationSteps(t *testing.T) {
 	if err := model.Load(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	model.Select(context.Background())
+	model.More()
 	model.Move(1)
 	model.Select(context.Background())
 	if model.Focus != Confirm || model.Busy {
@@ -166,6 +160,39 @@ func TestModelDoesNotOfferCandidateAction(t *testing.T) {
 	model.Select(context.Background())
 	if model.Focus != Browse || model.Message != "No safe action is available" {
 		t.Fatal("candidate should remain read-only")
+	}
+	model.More()
+	model.Select(context.Background())
+	if model.Focus != Actions || model.Busy {
+		t.Fatal("read-only details must not open a confirmation")
+	}
+}
+
+func TestCardAndMoreReturnToTheirOwnScreenWithoutExecuting(t *testing.T) {
+	model := loadedModel(t, tabItem("org.example.alpha", appstore.StateInstalled, appstore.Repair, appstore.Uninstall))
+	ctx := context.Background()
+	model.Select(ctx)
+	model.Move(1)
+	if model.Focus != Confirm || model.Action != 0 || model.Busy {
+		t.Fatal("direct confirmation changed the operation or executed it")
+	}
+	model.Back()
+	if model.Focus != Browse {
+		t.Fatal("cancel must return directly to the card")
+	}
+	model.More()
+	model.Move(1)
+	model.Select(ctx)
+	if model.Focus != Confirm || model.Action != 1 || model.Busy {
+		t.Fatal("More lost the secondary operation or executed it")
+	}
+	model.Back()
+	if model.Focus != Actions || model.Action != 1 {
+		t.Fatal("cancel from a secondary operation must return to More")
+	}
+	model.Back()
+	if model.Focus != Browse {
+		t.Fatal("More must return to the card")
 	}
 }
 
@@ -203,48 +230,6 @@ func TestWindowFollowsTheSelectionAndStopsAtTheEndOfTheList(t *testing.T) {
 	}
 	if start, end := model.Window(0); start != 0 || end != 0 {
 		t.Fatalf("window without rows = %d-%d", start, end)
-	}
-}
-
-// A page is a screenful, and it clamps instead of wrapping: holding the key at
-// the end of the list stays on the last row rather than flying back to the top.
-func TestPageMovesByAScreenfulAndClampsAtBothEnds(t *testing.T) {
-	model := &Model{Items: make([]appstore.Item, 12), Focus: Browse}
-	model.Page(1, 5)
-	if model.Selected != 5 {
-		t.Fatalf("one page down selected %d, want 5", model.Selected)
-	}
-	model.Page(1, 5)
-	model.Page(1, 5)
-	if model.Selected != 11 {
-		t.Fatalf("paging past the end selected %d, want the last row", model.Selected)
-	}
-	model.Page(-1, 5)
-	if model.Selected != 6 {
-		t.Fatalf("one page up selected %d, want 6", model.Selected)
-	}
-	model.Page(-1, 5)
-	model.Page(-1, 5)
-	if model.Selected != 0 {
-		t.Fatalf("paging past the start selected %d, want the first row", model.Selected)
-	}
-	// Paging belongs to the catalogue. There is no second screenful of action
-	// buttons, and a busy model is not accepting navigation at all.
-	model.Focus = Actions
-	model.Page(1, 5)
-	if model.Selected != 0 {
-		t.Fatalf("paging moved a non-catalogue screen to %d", model.Selected)
-	}
-	model.Focus = Browse
-	model.Busy = true
-	model.Page(1, 5)
-	if model.Selected != 0 {
-		t.Fatalf("paging moved a busy model to %d", model.Selected)
-	}
-	model.Busy = false
-	model.Page(1, 0)
-	if model.Selected != 0 {
-		t.Fatalf("paging by no rows moved the selection to %d", model.Selected)
 	}
 }
 

@@ -80,9 +80,8 @@ func TestTabsMatchPackagesByVerdictState(t *testing.T) {
 	}
 }
 
-// Sideways on the catalogue walks the tab bar: the whole list stays the default
-// view, and each step narrows it without reloading the index.
-func TestHorizontalStepsTabsOnTheCatalogue(t *testing.T) {
+// Filter cycling narrows the catalogue without reloading its index.
+func TestCycleStepsTabsOnTheCatalogue(t *testing.T) {
 	model := loadedModel(t,
 		tabItem("org.example.ready", appstore.StateAvailable),
 		tabItem("org.example.installed", appstore.StateInstalled),
@@ -92,7 +91,7 @@ func TestHorizontalStepsTabsOnTheCatalogue(t *testing.T) {
 		t.Fatalf("the whole catalogue shows %d packages, want 3", got)
 	}
 
-	model.Horizontal(1)
+	model.CycleTab(1)
 	if model.Tab() != TabReady {
 		t.Fatalf("right landed on %q, want Ready", model.Tab().Label())
 	}
@@ -100,7 +99,7 @@ func TestHorizontalStepsTabsOnTheCatalogue(t *testing.T) {
 		t.Fatalf("Ready tab shows %v", got)
 	}
 
-	model.Horizontal(1)
+	model.CycleTab(1)
 	if model.Tab() != TabInstalled {
 		t.Fatalf("right landed on %q, want Installed", model.Tab().Label())
 	}
@@ -108,11 +107,11 @@ func TestHorizontalStepsTabsOnTheCatalogue(t *testing.T) {
 		t.Fatalf("Installed tab shows %v", got)
 	}
 
-	model.Horizontal(1)
+	model.CycleTab(1)
 	if model.Tab() != TabAll || len(model.Items) != 3 {
 		t.Fatalf("the bar did not wrap: %q shows %d", model.Tab().Label(), len(model.Items))
 	}
-	model.Horizontal(-1)
+	model.CycleTab(-1)
 	if model.Tab() != TabInstalled {
 		t.Fatalf("left landed on %q, want the last tab", model.Tab().Label())
 	}
@@ -128,7 +127,7 @@ func TestTabSwitchKeepsTheSelectedPackageOrLandsOnTheFirstRow(t *testing.T) {
 		tabItem("org.example.ready-b", appstore.StateAvailable),
 	)
 	model.Selected = 2
-	model.Horizontal(1)
+	model.CycleTab(1)
 	if items := visibleIDs(model); model.Selected != 1 || items[model.Selected] != "org.example.ready-b" {
 		t.Fatalf("the tab switch lost the selected package: %v at %d", items, model.Selected)
 	}
@@ -140,7 +139,7 @@ func TestTabSwitchKeepsTheSelectedPackageOrLandsOnTheFirstRow(t *testing.T) {
 		tabItem("org.example.installed", appstore.StateInstalled),
 	)
 	model.Selected = 1
-	model.Horizontal(1)
+	model.CycleTab(1)
 	if items := visibleIDs(model); model.Selected != 0 || items[0] != "org.example.ready" {
 		t.Fatalf("a package the tab hides left the selection at %d of %v", model.Selected, items)
 	}
@@ -155,19 +154,19 @@ func TestATabRemembersTheRowItWasLeftOn(t *testing.T) {
 		tabItem("org.example.installed", appstore.StateInstalled),
 	)
 	model.Selected = 1 // ready-b, in the whole list
-	model.Horizontal(1)
+	model.CycleTab(1)
 	// The Ready tab has never been open, so it carries the package the user was
 	// already reading.
 	if got := model.Items[model.Selected].Package.ID; got != "org.example.ready-b" {
 		t.Fatalf("a tab that was never open landed on %q", got)
 	}
-	model.Horizontal(1)
+	model.CycleTab(1)
 	if got := model.Items[model.Selected].Package.ID; got != "org.example.installed" {
 		t.Fatalf("stepping to the installed tab landed on %q", got)
 	}
 	// Ready was left on ready-b, which is not the first row, so landing there
 	// again is the memory rather than the fallback.
-	model.Horizontal(-1)
+	model.CycleTab(-1)
 	if got := model.Items[model.Selected].Package.ID; got != "org.example.ready-b" {
 		t.Fatalf("Ready did not remember the row it was left on: %q", got)
 	}
@@ -183,27 +182,27 @@ func TestATabFallsBackWhenItsRememberedPackageIsGone(t *testing.T) {
 		tabItem("org.example.installed", appstore.StateInstalled),
 	)
 	model.Selected = 1
-	model.Horizontal(1) // Ready, carrying ready-b
-	model.Horizontal(1) // Installed, remembering Ready on ready-b
+	model.CycleTab(1) // Ready, carrying ready-b
+	model.CycleTab(1) // Installed, remembering Ready on ready-b
 	model.setCatalogue([]appstore.Item{
 		tabItem("org.example.ready-a", appstore.StateAvailable),
 		tabItem("org.example.installed", appstore.StateInstalled),
 	})
-	model.Horizontal(-1)
+	model.CycleTab(-1)
 	if got := model.Items[model.Selected].Package.ID; got != "org.example.ready-a" {
 		t.Fatalf("Ready landed on %q after its remembered package left", got)
 	}
 }
 
-// A tab with nothing in it is still a tab: sideways steps out of it, which is
+// A tab with nothing in it is still a tab: filter cycling steps out of it, which is
 // the only way back to a list the user can act on.
-func TestAnEmptyTabStillStepsSideways(t *testing.T) {
+func TestAnEmptyTabStillAllowsFiltering(t *testing.T) {
 	model := loadedModel(t, tabItem("org.example.candidate", appstore.StateCandidate))
-	model.Horizontal(1)
+	model.CycleTab(1)
 	if model.Tab() != TabReady || len(model.Items) != 0 {
 		t.Fatalf("Ready tab shows %v", visibleIDs(model))
 	}
-	model.Horizontal(-1)
+	model.CycleTab(-1)
 	if model.Tab() != TabAll || len(model.Items) != 1 {
 		t.Fatalf("stepping out of the empty tab shows %v", visibleIDs(model))
 	}
@@ -254,7 +253,7 @@ func TestRefreshKeepsTheSelectedPackage(t *testing.T) {
 func TestBusyModelDoesNotSwitchTabs(t *testing.T) {
 	model := loadedModel(t, tabItem("org.example.alpha", appstore.StateAvailable))
 	model.Busy = true
-	model.Horizontal(1)
+	model.CycleTab(1)
 	if model.Tab() != TabAll {
 		t.Fatalf("a tab switched during an operation: %q", model.Tab().Label())
 	}

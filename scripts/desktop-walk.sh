@@ -146,22 +146,22 @@ walk() {
   return 0
 }
 
-# First launch goes straight to the catalogue, with paging already available.
+# First launch goes straight to an app card; shoulders filter the catalogue.
 walk automatic-first-run keyboard \
   "down,up,pgdown,pgup" \
   "catalogue"
 
-# Catalogue, package details, the action list, and the confirmation dialog.
+# Direct confirmation and cancellation, then More and its confirmation.
 walk catalogue-walk keyboard \
-  "down,up,enter,enter,esc,esc,tab,y" \
+  "right,left,enter,esc,y,enter,esc,esc,tab,y" \
   "catalogue,actions,confirm"
 
-# The tab bar: the whole list leads, right walks onto Ready and then the
-# installed tab, and left walks back. Nothing is installed in a fresh fixture,
+# The tab bar: the whole list leads, R1 walks onto Ready and then the
+# installed tab, and L1 walks back. Nothing is installed in a fresh fixture,
 # so the installed tab is empty and the same key steps out of it. The record's
 # tab column names the view each key reached.
 walk catalogue-tabs keyboard \
-  "right,right,left" \
+  "pgdown,pgdown,pgup" \
   "catalogue" \
   "installed"
 
@@ -178,10 +178,10 @@ walk quit-chord keyboard \
   "esc,tab,y" \
   "catalogue"
 
-# Y exports diagnostics directly, without a controller customization menu.
+# Y opens More; Y there exports diagnostics, without controller setup.
 walk export-diagnostics keyboard \
-  "y" \
-  "catalogue" \
+  "y,y" \
+  "catalogue,actions" \
   "Diagnostics saved to"
 
 # No controller at all: the blocked screen still exports and still leaves
@@ -208,8 +208,8 @@ if [ "$INSTALL_FLOWS" = yes ]; then
   # Downloads, verifies, and applies a package, then walks the lifecycle the
   # installed package exposes: the health check, repair, and uninstall.
   walk install-package keyboard \
-    "enter,enter,enter" \
-    "catalogue,actions,confirm,progress" \
+    "enter,enter" \
+    "catalogue,confirm,progress" \
     "Install completed"
 
   tamper install-package
@@ -220,7 +220,7 @@ if [ "$INSTALL_FLOWS" = yes ]; then
     reuse install-package
 
   walk installed-uninstall keyboard \
-    "enter,enter,enter,enter" \
+    "y,enter,enter" \
     "catalogue,actions,confirm,progress" \
     "Uninstall completed" \
     reuse install-package

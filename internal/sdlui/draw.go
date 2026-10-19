@@ -12,6 +12,7 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/appstore"
 	storeinput "github.com/jellydn/knulli-app-store/internal/input"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
+	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
@@ -53,6 +54,18 @@ func draw(model *storeui.Model, platformName string, controls *storeinput.Sessio
 		drawFooter(frame, model, controls)
 		return frame
 	}
+	if model.Focus == storeui.Confirm || model.Focus == storeui.ForceConfirm {
+		drawConfirmation(frame, model)
+		drawFooter(frame, model, controls)
+		return frame
+	}
+	if model.Focus == storeui.Browse {
+		drawCard(frame, model, controls)
+		drawStatus(frame, model)
+		drawToast(frame, model)
+		drawFooter(frame, model, controls)
+		return frame
+	}
 	fill(frame, image.Rect(panelLeft, panelTop, listPanelRight, panelBottom), palette.panel)
 	fill(frame, image.Rect(detailPanelLeft, panelTop, panelRight, panelBottom), palette.panel)
 	if len(model.Items) == 0 {
@@ -70,6 +83,76 @@ func draw(model *storeui.Model, platformName string, controls *storeinput.Sessio
 	drawToast(frame, model)
 	drawFooter(frame, model, controls)
 	return frame
+}
+
+func drawConfirmation(frame *image.RGBA, model *storeui.Model) {
+	fill(frame, image.Rect(panelLeft, panelTop, panelRight, panelBottom), palette.panel)
+	item := model.Items[model.Selected]
+	action := item.Actions[model.Action]
+	text(frame, 32, 68, palette.text, shorten(strings.ToUpper(item.Package.Name), 80))
+	text(frame, 32, 90, palette.muted, "VERSION "+item.Package.Version)
+	drawBadge(frame, 32, 104, trustLabel(item), trustColor(item))
+	heading := "CONFIRM " + strings.ToUpper(actionLabel(action)) + "?"
+	notice := ""
+	if item.Package.Install != nil {
+		notice = item.Package.Install.Warning
+	}
+	if action == appstore.ForceReinstall {
+		heading = "STEP 1 OF 2 - REVIEW RECOVERY"
+		if model.Focus == storeui.ForceConfirm {
+			heading = "STEP 2 OF 2 - CONFIRM REINSTALL"
+		}
+		notice = item.RecoverySummary
+		text(frame, 32, 310, palette.muted, "BACKUP: /USERDATA/SYSTEM/KNULLI-APP-STORE/RECOVERY-BACKUPS/")
+	}
+	text(frame, 32, 154, palette.warning, heading)
+	drawWrapped(frame, 32, 180, palette.warning, notice, 80, 8)
+}
+
+func drawCard(frame *image.RGBA, model *storeui.Model, controls *storeinput.Session) {
+	fill(frame, image.Rect(panelLeft, panelTop, panelRight, panelBottom), palette.panel)
+	drawTabs(frame, model)
+	filter := storeinput.Hint{Action: storeinput.PageUp, With: storeinput.PageDown, Verb: "Filter"}
+	text(frame, 390, 64, palette.muted, storeinput.Footer(footerMapping(controls), []storeinput.Hint{filter}, ""))
+	if len(model.Items) == 0 {
+		text(frame, 40, 150, palette.text, emptyCatalogueMessage(model.Total(), 0))
+		return
+	}
+	item := model.Items[model.Selected]
+	drawBrandMark(frame, 58, 124, 96)
+	title := image.NewRGBA(image.Rect(0, 0, 196, 15))
+	text(title, 0, 12, palette.text, shorten(strings.ToUpper(item.Package.Name), 28))
+	xdraw.NearestNeighbor.Scale(frame, image.Rect(200, 98, 592, 128), title, title.Bounds(), imagedraw.Over, nil)
+	metadata := strings.ToUpper(item.Package.Type)
+	if item.Package.Version != "" {
+		metadata = "VERSION " + item.Package.Version + "  |  " + metadata
+	}
+	text(frame, 200, 146, palette.muted, shorten(metadata, 56))
+	next := drawBadge(frame, 200, 159, trustLabel(item), trustColor(item))
+	drawBadge(frame, next+8, 159, installState(item), statusColor(item))
+	if model.Error == "" && model.Message == "" {
+		drawWrapped(frame, 200, 208, palette.text, item.Package.Summary, 55, 2)
+	}
+	label := "REVIEW REQUIRED"
+	if len(item.Actions) > 0 {
+		label = strings.ToUpper(actionLabel(item.Actions[0]))
+		if item.RetryAction == item.Actions[0] {
+			label = "RETRY " + label
+		}
+		if item.HealthReason != "" {
+			label = "REVIEW HEALTH ISSUE"
+		}
+	} else if item.Verdict.HasReason(appstore.ReasonPlatform) {
+		label = "INCOMPATIBLE - SEE MORE"
+	}
+	if model.Busy {
+		label = "WORKING..."
+	}
+	fill(frame, image.Rect(200, 260, 608, 289), palette.selected)
+	text(frame, 216, 279, statusColor(item), label)
+	text(frame, 40, 318, palette.muted, "< PREVIOUS")
+	text(frame, 282, 318, palette.muted, fmt.Sprintf("%d OF %d", model.Selected+1, len(model.Items)))
+	text(frame, 558, 318, palette.muted, "NEXT >")
 }
 
 // drawFooter paints the one hint line every screen shares. The text comes from
@@ -151,10 +234,9 @@ func drawList(frame *image.RGBA, model *storeui.Model) {
 		text(frame, row.Min.X+rowTextInset, listRowTitleBaseline(row), palette.text, shorten(name, rowTitleCharacters))
 		text(frame, row.Min.X+rowTextInset, listRowDetailBaseline(row), statusColor(item), shorten(rowTrustLabel(item)+"  |  "+rowInstallState(item), rowDetailCharacters))
 	}
-	if paged(model) {
-		// The range is worth showing exactly when the list is longer than the
-		// window — the same condition the footer uses to offer paging — because
-		// a list that fits would only repeat its own count. It sits under the
+	if len(model.Items) > listRows {
+		// More retains the list as context for the selected package. Report its
+		// visible range only when the list is longer than the window. It sits under the
 		// rows it describes, right-aligned, so the strip above them holds only
 		// tabs.
 		caption := listRangeCaption(start, end, len(model.Items))
@@ -471,40 +553,6 @@ func drawActions(frame *image.RGBA, model *storeui.Model, item appstore.Item) {
 		fill(frame, image.Rect(x, y, x+width, y+22), background)
 		text(frame, x+4, y+15, palette.text, label)
 		x += width + 8
-	}
-	if model.Focus == storeui.Confirm || model.Focus == storeui.ForceConfirm {
-		action := item.Actions[model.Action]
-		if action == appstore.ForceReinstall {
-			fill(frame, image.Rect(250, 94, 616, 318), color.RGBA{R: 74, G: 31, B: 39, A: 255})
-			step := "STEP 1 OF 2 - REVIEW RECOVERY"
-			instruction := "CONFIRM AGAIN TO CONTINUE"
-			if model.Focus == storeui.ForceConfirm {
-				step = "STEP 2 OF 2 - CONFIRM REINSTALL"
-				instruction = "CONFIRM TO REPLACE REVIEWED APP FILES"
-			}
-			text(frame, 266, 120, palette.error, step)
-			text(frame, 266, 143, palette.text, instruction)
-			drawWrapped(frame, 266, 165, palette.warning, item.RecoverySummary, 44, 4)
-			text(frame, 266, 258, palette.muted, "BACKUP: /USERDATA/SYSTEM/KNULLI-APP-STORE/")
-			text(frame, 266, 273, palette.muted, "RECOVERY-BACKUPS/<PACKAGE>/<TIMESTAMP>/")
-			return
-		}
-		if item.Package.Install != nil && item.Package.Install.Warning != "" && (action == appstore.Install || action == appstore.Adopt) {
-			fill(frame, image.Rect(250, 108, 616, 318), color.RGBA{R: 35, G: 46, B: 64, A: 255})
-			text(frame, 266, 132, trustColor(item), "PACKAGE NOTICE  |  "+trustLabel(item))
-			text(frame, 266, 151, palette.text, strings.ToUpper(actionLabel(action))+" "+shorten(strings.ToUpper(item.Package.Name), 24)+"?")
-			warning := strings.ToUpper(item.Package.Install.Warning)
-			for index, line := range wrapText(warning, 40) {
-				if index == 2 {
-					break
-				}
-				text(frame, 266, 171+index*15, palette.warning, line)
-			}
-		} else {
-			fill(frame, image.Rect(286, 126, 580, 214), color.RGBA{R: 35, G: 46, B: 64, A: 255})
-			text(frame, 304, 153, palette.warning, "CONFIRM PACKAGE CHANGE")
-			text(frame, 304, 176, palette.text, strings.ToUpper(actionLabel(action))+" "+shorten(strings.ToUpper(item.Package.Name), 24)+"?")
-		}
 	}
 }
 

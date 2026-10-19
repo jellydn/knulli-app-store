@@ -23,17 +23,18 @@ type Model struct {
 	// Items is the list the catalogue shows: the packages the active tab
 	// matches. catalogue keeps everything the index listed, so switching tabs
 	// never reloads the index and never reorders what is already known.
-	Items     []appstore.Item
-	catalogue []appstore.Item
-	Tabs      Tabs
-	Toasts    Toasts
-	Selected  int
-	Action    int
-	Focus     Focus
-	Busy      bool
-	Message   string
-	Error     string
-	events    chan operationEvent
+	Items       []appstore.Item
+	catalogue   []appstore.Item
+	Tabs        Tabs
+	Toasts      Toasts
+	Selected    int
+	Action      int
+	Focus       Focus
+	Busy        bool
+	Message     string
+	Error       string
+	events      chan operationEvent
+	confirmFrom Focus
 }
 
 type operationEvent struct {
@@ -123,17 +124,14 @@ func (m *Model) Window(rows int) (int, int) {
 	return start, start + rows
 }
 
-// Horizontal moves sideways on the current screen. On the catalogue, sideways
-// steps to the previous or next tab: the bar is the row under the header, and
-// left and right walk it while up and down walk the rows, so a direction key
-// never means two things at once. Inside a panel sideways still steps that
-// panel's own buttons, because there is no tab bar there to walk.
+// Horizontal browses app cards or moves between a package's action buttons.
 func (m *Model) Horizontal(delta int) {
-	if m.Busy {
-		return
-	}
-	if m.Focus != Browse {
-		m.Move(delta)
+	m.Move(delta)
+}
+
+// CycleTab keeps filtering separate from browsing individual app cards.
+func (m *Model) CycleTab(delta int) {
+	if m.Busy || m.Focus != Browse {
 		return
 	}
 	// Leaving a tab stores where the reader stopped; entering one prefers that
@@ -189,27 +187,6 @@ func indexOfPackage(items []appstore.Item, id string) int {
 	return -1
 }
 
-// Page moves the selection by a screenful and clamps at both ends: a page past
-// the end of the list stops on the last row rather than wrapping to the first,
-// because a reader who holds a shoulder button expects to arrive at the end.
-// Paging is defined in the catalogue only; there is no second screenful of
-// action buttons to move through.
-func (m *Model) Page(delta, rows int) {
-	if m.Busy || len(m.Items) == 0 || m.Focus != Browse || rows < 1 {
-		return
-	}
-	next := m.Selected + delta*rows
-	if next < 0 {
-		next = 0
-	}
-	if next > len(m.Items)-1 {
-		next = len(m.Items) - 1
-	}
-	m.Selected = next
-	m.Action = 0
-	m.Error = ""
-}
-
 func (m *Model) Select(ctx context.Context) {
 	if m.Busy || len(m.Items) == 0 {
 		return
@@ -224,13 +201,19 @@ func (m *Model) Select(ctx context.Context) {
 			m.Message = "No safe action is available"
 			return
 		}
-		m.Focus = Actions
+		m.Action = 0
+		m.confirmFrom = Browse
+		m.Focus = Confirm
 	case Health:
 		if len(m.current().Actions) == 0 {
 			return
 		}
 		m.Focus = Actions
 	case Actions:
+		if len(m.current().Actions) == 0 {
+			return
+		}
+		m.confirmFrom = Actions
 		m.Focus = Confirm
 	case Confirm:
 		if m.selectedAction() == appstore.ForceReinstall {
@@ -251,7 +234,7 @@ func (m *Model) Back() bool {
 	case ForceConfirm:
 		m.Focus = Confirm
 	case Confirm:
-		m.Focus = Actions
+		m.Focus = m.confirmFrom
 	case Actions:
 		m.Focus = Browse
 	case Health:
@@ -264,6 +247,14 @@ func (m *Model) Back() bool {
 	m.Message = ""
 	m.Error = ""
 	return false
+}
+
+func (m *Model) More() {
+	if m.Busy || m.Focus != Browse || len(m.Items) == 0 {
+		return
+	}
+	m.Action = 0
+	m.Focus = Actions
 }
 
 func (m *Model) ExportDiagnostics(ctx context.Context) {

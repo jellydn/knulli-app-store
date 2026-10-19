@@ -15,19 +15,19 @@ No checked-in Knulli controller profile establishes the MagicX button indices. T
 
 Download the `knulli-app-store-magicx-zero-28-experimental` Actions artifact. Verify `SHA256SUMS.txt`, shut down Knulli, then extract the inner ZIP into `/userdata/roms/ports`. Replace the old App Store files only when updating. Confirm `/userdata/roms/ports/images/Knulli App Store.png` is present; the Ports list uses it after a game list refresh.
 
-Every launch opens the catalogue immediately with automatic SDL/KNULLI controls: **ES A confirms, B backs out, Y exports diagnostics**, D-pad navigates, **L1/R1** page, and **Select+Y** quits. There is no setup, calibration, mapping editor, or saved-assignment override.
+Every launch opens one app card immediately: **left/right** browse (up/down also work), **A** opens confirmation for its first allowed action, **B** cancels back, and **Y** opens More. More retains all permitted actions and details; Y there exports diagnostics. **L1/R1** filter All, Ready and Installed. **Select+Y** quits. There is no setup, calibration, mapping editor, or saved-assignment override.
 
 If no SDL GameController exists, a blocked screen shows the log and diagnostic paths. Reconnecting resumes normal controls immediately and clears held chord state. Old `/userdata/system/configs/knulli-app-store/controller-mappings.json` files are ignored and left untouched, even when malformed.
 
-The footer names available controls with ES letters: `Confirm (A)  Diagnostics (Y)  Quit (SELECT + Y)`. The launcher selects `STORE_CONTROLLER_LAYOUT=knulli` normally or `xbox` when `/var/run/ports_xbox_layout.flag` exists. Knulli maps ES a/b/x/y → SDL b/a/y/x normally and uses direct letters in Xbox mode. Bindings compensate once; SDL events are unchanged. Update the binary and launcher together. No guessed raw indices or system mapping writes are used. On the blocked screen, Confirm also exports diagnostics and Select+Y still quits.
+The card footer names available controls with ES letters: `Browse (DPAD LEFT/DPAD RIGHT)  Confirm (A)  More (Y)  Quit (SELECT + Y)`. The launcher selects `STORE_CONTROLLER_LAYOUT=knulli` normally or `xbox` when `/var/run/ports_xbox_layout.flag` exists. Knulli maps ES a/b/x/y → SDL b/a/y/x normally and uses direct letters in Xbox mode. Bindings compensate once; SDL events are unchanged. Update the binary and launcher together. No guessed raw indices or system mapping writes are used. On the blocked screen, Confirm also exports diagnostics and Select+Y still quits.
 
-The catalogue opens on its whole list and carries a tab bar above the rows: **ALL**, **READY**, and **INSTALLED**, with the active view marked in the accent colour. Left and right step the bar, up and down step the rows, and the shoulders page a list longer than its window. A finished operation reports in a notice bar over the bottom of the panel and clears itself after three seconds; a failure is not a notice and keeps the status block until it is answered.
+The catalogue opens on **ALL**, showing one app, version, technical/test status, install state, summary and primary action. Its counter shows the position in the active filter. Shoulders switch **ALL**, **READY**, and **INSTALLED**, including leaving an empty filter. A finished operation reports in a notice bar and clears after three seconds; failures remain until answered. Candidates remain read-only and issues still open the health check before actions.
 
 Every screen can be checked on a development machine first, with no handheld and no controller: `make gui GUI_DEVICE=magicx-zero-28 GUI_RESOLUTION=640x480` opens the interactive GUI from the keyboard against a scratch fixture root. `make walkthrough WALK_DEVICE=magicx-zero-28 WALK_RESOLUTION=640x480` replays the offline flows and records the opening, post-key, and operation-completion frames. Add `WALK_FLAGS=--install` for the network-backed package lifecycle flows. Neither run exercises a real GameController or touches a real `/userdata`. See [Desktop GUI verification](desktop-verification.md).
 
 ## Recording a device control report
 
-Automatic defaults follow Knulli's logical SDL contract, not a device-specific raw fallback. A desktop walkthrough does not prove physical navigation. Record the firmware, hardware revision, controller name/GUID, selected Ports layout mode, footer, and the actual ES buttons used for confirm, back, diagnostics, navigation, paging, and Select+Y quit. Repeat in default and Xbox modes, noting any mismatch. Export diagnostics with Y, inspect it for private data, and cite it in `docs/real-device-tests.md`. Do not add guessed raw button indices from a board file or device tree.
+Automatic defaults follow Knulli's logical SDL contract, not a device-specific raw fallback. A desktop walkthrough does not prove physical navigation. Record firmware, hardware revision, controller name/GUID, Ports layout mode, footer, and actual ES buttons for confirm, back, More, navigation, filtering and Select+Y quit. Repeat in default and Xbox modes. Export diagnostics with Y inside More, inspect for private data, and cite it in `docs/real-device-tests.md`. Do not add guessed raw button indices.
 
 ## Package status
 
@@ -43,10 +43,10 @@ Successful App Store navigation does not prove a package. Grout, PlayTime, and R
 1. Record Knulli version, hardware revision, and SDL controller name/GUID. Follow [Recording a device control report](#recording-a-device-control-report).
 2. Confirm the header says `MagicX Zero 28 / 640x480`, with readable letterboxed content and no clipping.
 3. Confirm the first launch opens the catalogue with no setup.
-4. Check ES A confirm, B back, Y diagnostics, D-pad, L1/R1 and Select+Y in both default Knulli and Ports Xbox modes. X has no new feature.
+4. Check left/right card browsing, A review/confirm, B cancel, Y More, L1/R1 filtering and Select+Y in both default Knulli and Ports Xbox modes. X has no new feature. First A must not write files. B from direct confirmation must return to the card; secondary actions inside More still require confirmation.
 5. Restart with an old custom mapping file present. Confirm defaults remain active and the file stays unchanged.
 6. Disconnect and reconnect the controller if the runtime permits it. Confirm the correct identity and mapping return.
-7. Press Y to export diagnostics. Confirm controller identity, mapping source, and semantic events are present without private data.
+7. Press Y for More, then Y to export diagnostics. Confirm controller identity, mapping source, and semantic events are present without private data.
 8. Confirm Grout, PlayTime, and RetSend show **Install** or **Manage existing** with an experimental warning only when ABI, libraries, and display checks pass. Remove one test dependency only in a disposable test root and confirm installation is blocked with its exact name.
 9. Install PlayTime, refresh game lists or reboot, and launch it. Track a game, close it, and relaunch it.
 10. Confirm the App Store reports PlayTime healthy. Damage only a disposable managed test copy if you test Repair; confirm Repair restores it and keeps `/userdata/system/configs/playtime/`.

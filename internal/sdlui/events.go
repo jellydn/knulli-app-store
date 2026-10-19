@@ -174,9 +174,13 @@ func processButton(ctx context.Context, model *storeui.Model, controls *storeinp
 	}
 	effects := Effects{Action: action}
 	if effect == storeinput.ExportDiagnostics {
-		logger.Event("controller_action", "action", "export-diagnostics")
-		model.ExportDiagnostics(ctx)
-		effects.ExportedDiagnostics = true
+		if controls.Mode == storeinput.Normal && model.Focus == storeui.Browse && len(model.Items) > 0 {
+			model.More()
+		} else {
+			logger.Event("controller_action", "action", "export-diagnostics")
+			model.ExportDiagnostics(ctx)
+			effects.ExportedDiagnostics = !model.Busy
+		}
 	}
 	effects.Exit = dispatchAction(ctx, model, action)
 	return effects
@@ -195,15 +199,13 @@ func dispatchAction(ctx context.Context, model *storeui.Model, action storeinput
 	case storeinput.Down:
 		model.Move(1)
 	case storeinput.Left:
-		// Sideways is the tab bar on the catalogue and the button row inside a
-		// panel; the model owns which, so the router stays a dispatcher.
 		model.Horizontal(-1)
 	case storeinput.Right:
 		model.Horizontal(1)
 	case storeinput.PageUp:
-		model.Page(-1, listRows)
+		model.CycleTab(-1)
 	case storeinput.PageDown:
-		model.Page(1, listRows)
+		model.CycleTab(1)
 	case storeinput.Confirm:
 		model.Select(ctx)
 	case storeinput.Back:

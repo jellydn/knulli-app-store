@@ -22,7 +22,9 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Tab** — One view of the catalogue: the whole list, the packages with something to act on, or the packages installed on this device. A tab filters on a package's typed state, never on its rendered state label.
 
-**Paging** — Moving a long catalogue one screenful with L1/R1 (Page Up/Page Down on a keyboard). D-pad navigation always moves one row at a time.
+**Card browsing** — Moving one app at a time with left/right (up/down also work). The default view shows all apps and a position counter. Y opens More for details and secondary actions. A opens confirmation for the first permitted action; an issue opens its health check first.
+
+**Filtering** — Switching All, Ready and Installed with L1/R1 (Page Up/Page Down on a keyboard). Each view remembers the selected package. An empty filter still permits switching to another view.
 
 ## Install lifecycle
 
@@ -82,7 +84,7 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Semantic action** — One of the nine controls the GUI exposes: up, down, left, right, page up, page down, confirm, back, and diagnostics. An action is named independently of any physical button, so a device layout never changes what an action means. Exit is not one of them: quitting is the Select chord, so no single press carries it.
 
-**Binding** — The logical SDL GameController button carrying a semantic action. Automatic defaults use ES A for confirm, B for back, Y for diagnostics, D-pad navigation, and L1/R1 paging. No custom assignments are loaded or saved.
+**Binding** — The logical SDL GameController button carrying a semantic action. Automatic defaults use ES A for confirm, B for back, Y for More on a card and diagnostics inside More, D-pad navigation, and L1/R1 filtering. Empty catalogues and blocked-controller screens still export diagnostics directly. No custom assignments are loaded or saved.
 
 **Controller layout** — The launcher-selected letter policy: `STORE_CONTROLLER_LAYOUT=knulli` accounts for Knulli's ES a/b/x/y → SDL b/a/y/x mapping; `xbox` accounts for Ports' Xbox-layout flag and uses direct SDL letters. An unset value uses normal desktop SDL. Events are never swapped again. Footer letters follow the selected ES layout, not guessed raw indices.
 
@@ -90,7 +92,7 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Footer hint** — The single line below every screen's panel naming available actions beside their bindings, for example `Confirm (A)  Diagnostics (Y)  Quit (SELECT + Y)`. Face labels use the selected ES letters. Quit is always Select+Y, never a lone face button.
 
-**Keyboard binding** — A fixed desktop key: arrows navigate, Page Up/Page Down page, Enter confirms, Escape backs out, Y exports diagnostics, and held Tab (or F5) plus Y quits. Keyboard input requires no setup or persistence.
+**Keyboard binding** — A fixed desktop key: arrows browse, Page Up/Page Down filter, Enter confirms, Escape backs out, Y opens More (Y there exports diagnostics), and held Tab (or F5) plus Y quits. Keyboard input requires no setup or persistence.
 
 ## Verification
 

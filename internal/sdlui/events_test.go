@@ -158,9 +158,8 @@ func TestHandleKeyUsesNonDefaultActiveMapping(t *testing.T) {
 	}
 }
 
-// Sideways walks the tab bar and vertically walks the rows, so one direction key
-// never means two things at once. Paging stays on its own two buttons.
-func TestHandleStepsTabsSidewaysAndRowsVertically(t *testing.T) {
+// Browsing wraps between cards; shoulder keys filter without losing selection.
+func TestHandleFiltersAndBrowsesCards(t *testing.T) {
 	model, controls, logger, backend := newRouterHarness(t)
 	backend.items = []appstore.Item{
 		{Package: manifest.Package{ID: "org.example.alpha"}, Verdict: appstore.Verdict{State: appstore.StateAvailable}},
@@ -179,10 +178,18 @@ func TestHandleStepsTabsSidewaysAndRowsVertically(t *testing.T) {
 	if model.Selected != 1 {
 		t.Fatalf("down selected row %d", model.Selected)
 	}
-
-	// Right steps onto the Ready tab, where both packages still have a row, so
-	// the selection follows the package the user was reading.
 	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyRight})
+	if model.Selected != 0 || model.Tab() != storeui.TabAll {
+		t.Fatal("right must wrap to the first card, not change its filter")
+	}
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyLeft})
+	if model.Selected != 1 {
+		t.Fatal("left must wrap to the last card")
+	}
+
+	// R1 steps onto the Ready tab, where both packages still have a row, so
+	// the selection follows the package the user was reading.
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown})
 	if model.Tab() != storeui.TabReady {
 		t.Fatalf("right landed on %q", model.Tab().Label())
 	}
@@ -190,48 +197,33 @@ func TestHandleStepsTabsSidewaysAndRowsVertically(t *testing.T) {
 		t.Fatalf("the tab step lost the selected package: %d of %d rows", model.Selected, len(model.Items))
 	}
 
-	// Left walks the bar back the way it came. One more left wraps past the
+	// L1 walks the bar back the way it came. One more L1 wraps past the
 	// front to the last tab: nothing is installed in this fixture, so that tab
 	// is empty, and the way out of it is the same key that got in.
-	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyLeft})
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageUp})
 	if model.Tab() != storeui.TabAll || len(model.Items) != 2 {
 		t.Fatalf("left landed on %q with %d rows", model.Tab().Label(), len(model.Items))
 	}
-	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyLeft})
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageUp})
 	if model.Tab() != storeui.TabInstalled || len(model.Items) != 0 {
 		t.Fatalf("left wrapped onto %q with %d rows", model.Tab().Label(), len(model.Items))
 	}
-	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyRight})
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown})
 	if model.Tab() != storeui.TabAll || len(model.Items) != 2 {
 		t.Fatalf("stepping out of the empty tab landed on %q with %d rows", model.Tab().Label(), len(model.Items))
 	}
 }
 
-// A list that outgrows its window is crossed a screenful at a time, and the
-// page stops at the end rather than flying back to the top.
-func TestHandlePagesTheCatalogueByKey(t *testing.T) {
+// Filtering cannot change the package or operation awaiting confirmation.
+func TestFiltersDoNotChangeInsideConfirmation(t *testing.T) {
 	model, controls, logger, _ := newRouterHarness(t)
 	model.Items = make([]appstore.Item, listRows*2+1)
+	model.Focus = storeui.Confirm
 	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown})
-	if model.Selected != listRows {
-		t.Fatalf("page down selected %d, want %d", model.Selected, listRows)
-	}
-	if start, end := model.Window(listRows); model.Selected < start || model.Selected >= end {
-		t.Fatalf("paging left the selection outside the window %d-%d", start, end)
-	}
-	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown})
-	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown})
-	if model.Selected != len(model.Items)-1 {
-		t.Fatalf("paging past the end selected %d, want the last row", model.Selected)
-	}
 	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageUp})
-	if want := len(model.Items) - 1 - listRows; model.Selected != want {
-		t.Fatalf("page up selected %d, want %d", model.Selected, want)
-	}
-	// A held page key is navigation like any other, so it keeps paging.
 	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown, Repeat: true})
-	if model.Selected != len(model.Items)-1 {
-		t.Fatalf("a repeated page key selected %d, want the last row", model.Selected)
+	if model.Selected != 0 || model.Tab() != storeui.TabAll || model.Focus != storeui.Confirm {
+		t.Fatal("filter keys changed the package under confirmation")
 	}
 }
 
@@ -294,24 +286,24 @@ func TestAutomaticFaceActionsAndLifecycleSafety(t *testing.T) {
 				t.Fatal("ES X gained an action")
 			}
 			press(a)
-			if model.Focus != storeui.Actions {
-				t.Fatal("ES A did not open actions")
-			}
-			press(a)
 			if model.Focus != storeui.Confirm {
 				t.Fatal("ES A did not open confirmation")
 			}
 			press(b)
-			if model.Focus != storeui.Actions || model.Busy {
+			if model.Focus != storeui.Browse || model.Busy {
 				t.Fatal("ES B did not cancel safely")
 			}
 			press(b)
 			if model.Focus != storeui.Browse {
 				t.Fatal("ES B did not return to catalogue")
 			}
-			if effect := press(y); !effect.ExportedDiagnostics || backend.exports != 1 || controls.Mode != storeinput.Normal {
-				t.Fatal("ES Y did not export directly")
+			if effect := press(y); effect.ExportedDiagnostics || backend.exports != 0 || model.Focus != storeui.Actions {
+				t.Fatal("ES Y did not open More without exporting")
 			}
+			if effect := press(y); !effect.ExportedDiagnostics || backend.exports != 1 {
+				t.Fatal("Y inside More did not export diagnostics")
+			}
+			press(b)
 			model.Busy = true
 			press(a)
 			press(b)
@@ -327,7 +319,7 @@ func TestAutomaticFaceActionsAndLifecycleSafety(t *testing.T) {
 				t.Fatal("disconnected input reached catalogue")
 			}
 			Handle(context.Background(), model, controls, logger, Event{Kind: EventControllerConnected, Identity: storeinput.Identity{Name: "Replacement"}})
-			if effect := press(y); effect.Exit || !effect.ExportedDiagnostics {
+			if effect := press(y); effect.Exit || effect.ExportedDiagnostics || model.Focus != storeui.Actions {
 				t.Fatal("hotplug kept stale chord or lost Y")
 			}
 			Handle(context.Background(), model, controls, logger, Event{Kind: EventChordAnchor, Held: true})

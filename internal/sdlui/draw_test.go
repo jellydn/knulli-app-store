@@ -415,10 +415,6 @@ func TestAutomaticKnulliControlsCatalogueAndConfirmation(t *testing.T) {
 			}}}
 
 			processButton(context.Background(), model, controls, controls.Mapping[storeinput.Confirm], logger)
-			if model.Focus != storeui.Actions {
-				t.Fatalf("automatic A did not open package actions: %v", model.Focus)
-			}
-			processButton(context.Background(), model, controls, controls.Mapping[storeinput.Confirm], logger)
 			if model.Focus != storeui.Confirm {
 				t.Fatalf("automatic A did not open package confirmation: %v", model.Focus)
 			}
@@ -440,7 +436,7 @@ func TestAutomaticKnulliControlsCatalogueAndConfirmation(t *testing.T) {
 				}
 			}
 			processButton(context.Background(), model, controls, controls.Mapping[storeinput.Back], logger)
-			if model.Focus != storeui.Actions {
+			if model.Focus != storeui.Browse {
 				t.Fatalf("automatic B did not cancel package confirmation: %v", model.Focus)
 			}
 		})
@@ -465,7 +461,7 @@ func countMutedRange(frame *image.RGBA) int {
 // selected row with a solid accent ring around an accent wash, and reports where
 // the window sits under the rows it describes.
 func TestLongCatalogueShowsOneWindowOfRows(t *testing.T) {
-	model := &storeui.Model{}
+	model := &storeui.Model{Focus: storeui.Actions}
 	for index := 0; index < listRows+3; index++ {
 		model.Items = append(model.Items, catalogueItem())
 	}
@@ -507,7 +503,7 @@ func TestLongCatalogueShowsOneWindowOfRows(t *testing.T) {
 // A list that fits is fully shown, so a range would only repeat the count and
 // the list leaves its foot clear.
 func TestShortCatalogueReportsNoRange(t *testing.T) {
-	model := &storeui.Model{Items: []appstore.Item{catalogueItem()}}
+	model := &storeui.Model{Items: []appstore.Item{catalogueItem()}, Focus: storeui.Actions}
 	frame := draw(model, platformHeader("trimui-smart-pro"), nil)
 	if muted := countMutedRange(frame); muted != 0 {
 		t.Fatalf("a catalogue that fits reported a range (%d pixels)", muted)

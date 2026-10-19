@@ -35,15 +35,17 @@ one real SDL frame and exit.
 
 | Action | Desktop key | KNULLI ES button |
 | --- | --- | --- |
-| Navigate rows / tabs | Arrow keys | D-pad |
-| Page a long list | Page Up / Page Down | L1 / R1 |
+| Browse app cards / action buttons | Arrow keys | D-pad |
+| Filter All / Ready / Installed | Page Up / Page Down | L1 / R1 |
 | Confirm | Enter | A |
 | Back | Escape | B |
-| Export diagnostics directly | Y | Y |
+| More; export diagnostics inside More | Y | Y |
 | Quit | Hold Tab (or F5), then Y | Hold Select, then Y |
 
-The desktop footer reads `Confirm (ENTER)  Diagnostics (Y)  Quit (TAB + Y)`.
-Paging appears only when the list outgrows its window. Confirmation panels show
+The desktop card footer reads `Browse (LEFT/RIGHT)  Confirm (ENTER)  More (Y)  Quit (TAB + Y)`.
+The card opens confirmation directly for the first allowed action. More keeps
+the full action list and details; Y there exports diagnostics. Empty catalogues
+and blocked-controller screens still export directly. Confirmation panels show
 Confirm and Back; a busy operation advertises no unavailable actions. Keyboard
 repeat navigates only, so holding Enter cannot accept multiple confirmations.
 
@@ -74,12 +76,12 @@ evidence when checks fail. Screenshots are not checked in.
 
 | Flow | Covers |
 | --- | --- |
-| `automatic-first-run` | Immediate catalogue, navigation and paging |
-| `catalogue-walk` | Details, actions, confirmation, cancel and quit |
+| `automatic-first-run` | Immediate app card, navigation and filtering |
+| `catalogue-walk` | Direct confirmation, cancel, More, secondary confirmation and quit |
 | `catalogue-tabs` | All, Ready, Installed and stepping out of an empty tab |
 | `catalogue-read-only` | A package with no safe action |
 | `quit-chord` | Escape does not quit; held Tab plus Y does |
-| `export-diagnostics` | Direct Y export without a settings detour |
+| `export-diagnostics` | Y for More, Y there to export |
 | `blocked-export-diagnostics` | No-controller diagnostics and quit |
 | `install-package` | Download, verify, apply (`--install`) |
 | `install-package-health` | Tamper, health check, repair (`--install`) |
@@ -90,7 +92,7 @@ For a custom sequence:
 ```sh
 ./build/knulli-app-ui -input keyboard -root "$PWD/build/scratch-root" \
   -arch aarch64 -resolution 1280x720 -catalog build/catalog-index.json \
-  -keys "down,up,enter,enter,esc,esc,y,tab,y" \
+  -keys "right,left,enter,esc,y,y,esc,tab,y" \
   -shot-dir /tmp/store-walk -walk-timeout 60s
 ```
 
@@ -112,8 +114,9 @@ runtime-library, and framebuffer evidence below a throwaway root. Its
 relative paths, and unmarked non-empty directories. Installs, logs, recovery
 backups and diagnostics remain below the fixture root.
 
-The catalogue starts on All; left/right step All, Ready and Installed while
-up/down move rows. Tabs remember selection. Operation notices clear after three
+The catalogue starts on All; left/right browse one app card at a time, while
+L1/R1 (Page Up/Down) step All, Ready and Installed. Up/down also browse cards.
+Tabs remember selection. Operation notices clear after three
 seconds; failures remain until answered.
 
 Renderer and router tests cover automatic controls in both letter modes,
