@@ -54,12 +54,12 @@ func draw(model *storeui.Model, platformName string, controls *storeinput.Sessio
 		drawFooter(frame, model, controls)
 		return frame
 	}
-	if model.Focus == storeui.Confirm || model.Focus == storeui.ForceConfirm {
+	if !model.Busy && (model.Focus == storeui.Confirm || model.Focus == storeui.ForceConfirm) {
 		drawConfirmation(frame, model)
 		drawFooter(frame, model, controls)
 		return frame
 	}
-	if model.Focus == storeui.Browse {
+	if model.Focus == storeui.Browse || model.Busy {
 		drawCard(frame, model, controls)
 		drawStatus(frame, model)
 		drawToast(frame, model)
@@ -570,7 +570,7 @@ func actionLabel(action appstore.Action) string {
 // message replaces it in the same place with its own colour, so a status never
 // moves and never covers the action buttons.
 func drawStatus(frame *image.RGBA, model *storeui.Model) {
-	if model.Focus == storeui.Health || model.Focus == storeui.Confirm || model.Focus == storeui.ForceConfirm {
+	if !model.Busy && (model.Focus == storeui.Health || model.Focus == storeui.Confirm || model.Focus == storeui.ForceConfirm) {
 		return
 	}
 	if model.Error != "" {

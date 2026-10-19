@@ -89,7 +89,7 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		"verified-confirm":    {Items: []appstore.Item{{Package: verified.Package, Compatible: true, Actions: []appstore.Action{appstore.Install}}}, Focus: storeui.Confirm},
 		"diagnostics":         {Items: []appstore.Item{experimental}, Message: "Diagnostics saved to /userdata/system/knulli-app-store/diagnostics/knulli-app-store-diagnostics-20260915T073500Z.txt"},
 		"error":               {Items: []appstore.Item{issue}, Error: "SHA-256 mismatch; package files were not changed"},
-		"progress":            {Items: []appstore.Item{experimental}, Busy: true, Message: "Downloading, verifying, and applying Grout"},
+		"progress":            {Items: []appstore.Item{experimental}, Focus: storeui.Confirm, Busy: true, Message: "Downloading, verifying, and applying Grout"},
 	}
 	directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR")
 	for _, device := range []string{"trimui-smart-pro", "magicx-zero-28"} {
@@ -166,6 +166,7 @@ func TestStatusBlockNeverCoversTheActionRow(t *testing.T) {
 	states := map[string]*storeui.Model{
 		"error":    {Items: []appstore.Item{catalogueItem()}, Error: "Install failed: checksum mismatch on /userdata/roms/tools/Grout/grout"},
 		"message":  {Items: []appstore.Item{catalogueItem()}, Message: "Diagnostics saved to /userdata/system/knulli-app-store/diagnostics/knulli-app-store-diagnostics-20260915T073500Z.txt"},
+		"progress": {Items: []appstore.Item{catalogueItem()}, Focus: storeui.Confirm, Busy: true, Message: "Downloading and verifying"},
 		"recovery": {Items: []appstore.Item{recovery}, Focus: storeui.Actions, Error: recovery.RecoveryReason},
 	}
 	for name, model := range states {
