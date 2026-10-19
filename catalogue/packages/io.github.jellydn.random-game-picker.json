@@ -2,16 +2,16 @@
   "schema": "org.knulli.app-store/package-manifest/v1",
   "id": "io.github.jellydn.random-game-picker",
   "name": "Random Game Picker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "utility",
-  "summary": "Pick a random game from the existing EmulationStation library with filters and scraped artwork.",
+  "summary": "Pick an existing ES game with saved filters and scraped art.",
   "repository": "https://github.com/jellydn/knulli-random-game-picker",
   "license": "MIT",
   "review": {
     "status": "experimental",
     "approval": {"provenance": "maintainer"},
     "notes": [
-      "First stable upstream release of the current feature set, following the owner's successful alpha.2 TSP retest. The exact firmware and full launch/return matrix were not supplied; MagicX and performance remain unverified, so Store review status remains experimental.",
+      "Stable 0.1.1 opens directly on a selected game using saved filters; A plays, X rerolls, Y opens settings and Y inside settings rescans. It fixes premature saved-system reset. The owner's earlier alpha.2 TSP report does not verify this version; both handhelds need retesting, so Store review status remains experimental.",
       "The picker reads effective ES system configuration, gamelists and the live ES catalogue; no game ROM directory or emulator command is hardcoded. Ports, collections, missing/hidden games and ambiguous launch paths are excluded.",
       "The only network use is bounded HTTP to 127.0.0.1:1234. Play closes SDL, sends one exact raw-path POST to ES and exits. HTTP acceptance does not confirm play; there is no retry or nested configgen fallback.",
       "The Store owns only its package directory and one Ports menu entry. Runtime settings and the per-session log remain under state and survive repair, update and uninstall. A nonstandard configured Ports root needs manual installation in that root instead.",
@@ -25,32 +25,32 @@
       },
       {
         "kind": "release-asset",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.1.0/random-game-picker-0.1.0-knulli-aarch64.zip",
-        "note": "Version-pinned stable ZIP: 1,088,560 compressed bytes, 2,820,305 regular-file bytes; SHA-256 ab7e8fb9da6702fca8befd1fff7df60f32fb0ac6a5ca6439181e0d86bd30a5e2. Exact size and digest reject replacement bytes even if GitHub permits release asset replacement."
+        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.1.1/random-game-picker-0.1.1-knulli-aarch64.zip",
+        "note": "Version-pinned stable ZIP: 1,089,242 compressed bytes, 2,821,654 regular-file bytes; SHA-256 2e71a068eed7c2f1cdecef95ccd2ec3342c98d57e7b94c14edcd6415182abbb3. Exact size and digest reject replacement bytes even if GitHub permits release asset replacement."
       },
       {
         "kind": "publisher-checksum",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.1.0/SHA256SUMS.txt"
+        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.1.1/SHA256SUMS.txt"
       },
       {
         "kind": "license",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/blob/b77416c7d6a3a8ea41c4653f4dd0943ccf106e0a/LICENSE",
+        "url": "https://github.com/jellydn/knulli-random-game-picker/blob/8c5e600a1f54dec3044781a25049b1189b155dfc/LICENSE",
         "note": "MIT project license; archive includes notices for the font, static pugixml, JSON headers and libstdc++ runtime exception. SDL libraries remain system dependencies."
       },
       {
         "kind": "runtime-dependency-review",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.1.0/abi.txt",
+        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.1.1/abi.txt",
         "note": "ELF64 AArch64, interpreter /lib/ld-linux-aarch64.so.1; highest GLIBC symbol 2.36. NEEDED: libSDL2_image-2.0.so.0, libSDL2_ttf-2.0.so.0, libSDL2-2.0.so.0, libm.so.6, libc.so.6, ld-linux-aarch64.so.1. libstdc++, libgcc and pugixml are static."
       },
       {
         "kind": "filesystem-and-network-review",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/blob/b77416c7d6a3a8ea41c4653f4dd0943ccf106e0a/docs/testing.md",
+        "url": "https://github.com/jellydn/knulli-random-game-picker/blob/8c5e600a1f54dec3044781a25049b1189b155dfc/docs/testing.md",
         "note": "Launcher sets package-local state and reads /var/run/ports_xbox_layout.flag without writing it. Source has no shell command construction, download or self-update. Settings JSON and last-run.log are the runtime writes. ES config, ROMs, art and saves are read-only to the picker; the launched emulator can make its normal writes."
       },
       {
         "kind": "desktop-test",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/actions/runs/39197423071",
-        "note": "Host contracts, SDL controller-event regression for all four actions in default KNULLI and Xbox modes, real SDL fixture at 1280x720 and 640x480, 100 rerolls per size, filters, PNG/JPEG preview, corrupt-art fallback, empty recent pool/reset, window teardown before exactly one fake-ES raw-path POST; cross-package ABI gate. Regression failed on alpha.1. This is not a physical-controller or emulator launch test."
+        "url": "https://github.com/jellydn/knulli-random-game-picker/actions/runs/39218814428",
+        "note": "Host contracts and both controller-layout regressions cover first-A Play, Y settings/rescan, B back/quit, Start quit and X reroll. Real SDL fixtures at 1280x720 and 640x480 cover 100 rerolls, saved-filter persistence, empty/failed/delayed discovery, PNG/JPEG and fallback art, and SDL teardown before exactly one fake-ES POST. AArch64 package ABI checks passed. This is not physical-controller or emulator execution evidence."
       },
       {
         "kind": "owner-report",
@@ -60,10 +60,10 @@
     ]
   },
   "release": {
-    "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.1.0/random-game-picker-0.1.0-knulli-aarch64.zip",
-    "sha256": "ab7e8fb9da6702fca8befd1fff7df60f32fb0ac6a5ca6439181e0d86bd30a5e2",
-    "size": 1088560,
-    "installed_size": 2820305,
+    "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.1.1/random-game-picker-0.1.1-knulli-aarch64.zip",
+    "sha256": "2e71a068eed7c2f1cdecef95ccd2ec3342c98d57e7b94c14edcd6415182abbb3",
+    "size": 1089242,
+    "installed_size": 2821654,
     "format": "zip",
     "immutable": true
   },
@@ -81,7 +81,7 @@
     "strip_components": 0,
     "launcher": "RandomGamePicker.sh",
     "executables": ["RandomGamePicker.sh", "random-game-picker"],
-    "warning": "Stable upstream release; Store review remains experimental. Owner tested TSP; MagicX and the full launch/performance matrix remain unverified. Requires glibc 2.36+, SDL2/image/ttf and local ES API. Submit Play once; inspect state/last-run.log before retrying. Standard Ports location only. Settings/logs stay after uninstall.",
+    "warning": "Experimental: not device-tested on either handheld. Retest before use. Requires glibc 2.36+, SDL2/image/ttf and local ES API. Submit Play once; inspect state/last-run.log before retrying. Standard Ports location only. Settings/logs stay after uninstall.",
     "menu": {
       "gamelist": "/userdata/roms/ports/gamelist.xml",
       "path": "./RandomGamePicker/RandomGamePicker.sh",
