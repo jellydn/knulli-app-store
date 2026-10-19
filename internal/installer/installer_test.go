@@ -585,6 +585,86 @@ func TestRetSendInstallMenuHealthRepairAndUninstallPreserveIdentityAndInbox(t *t
 	}
 }
 
+func TestRandomPickerLifecyclePreservesStateAndOtherPorts(t *testing.T) {
+	asset := zipBytesWithModes(t, map[string]zipFixture{
+		"RandomGamePicker.sh": {body: "reviewed launcher", mode: 0755},
+		"random-game-picker":  {body: "reviewed aarch64 binary", mode: 0755},
+	})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg, err := manifest.Load("../../catalogue/packages/io.github.jellydn.random-game-picker.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(asset)
+	pkg.Release.SHA256 = hex.EncodeToString(digest[:])
+	pkg.Release.Size = int64(len(asset))
+	pkg.Release.InstalledSize = int64(len("reviewed launcher") + len("reviewed aarch64 binary"))
+	for _, device := range []struct{ name, resolution string }{
+		{"trimui-smart-pro", "1280x720"}, {"magicx-zero-28", "640x480"},
+	} {
+		t.Run(device.name, func(t *testing.T) {
+			root := t.TempDir()
+			current := platform.Info{Firmware: "knulli", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.36", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc"}, Device: device.name, Resolution: device.resolution}
+			manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(current)
+			const base = "userdata/roms/ports/RandomGamePicker/"
+			const menu = "userdata/roms/ports/gamelist.xml"
+			writeRootFile(t, root, "userdata/roms/ports/Other/Other.sh", "other port")
+			writeRootFile(t, root, menu, `<gameList><game><path>./Other/Other.sh</path><name>Other</name></game></gameList>`)
+			older := current
+			older.GLIBCVersion = "2.35"
+			if _, err := manager.WithPlatform(older).Apply(context.Background(), OpInstall, pkg); err == nil {
+				t.Fatal("older glibc was accepted")
+			}
+			assertMissing(t, root, base+"random-game-picker")
+			if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := manager.Apply(context.Background(), OpInstall, pkg); err == nil {
+				t.Fatal("repeated install was accepted")
+			}
+			writeRootFile(t, root, base+"state/settings.json", `{"favorites":true}`)
+			writeRootFile(t, root, base+"state/last-run.log", "one session")
+			writeRootFile(t, root, base+"random-game-picker", "damaged")
+			if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
+				t.Fatal(err)
+			}
+			assertRootFile(t, root, base+"random-game-picker", "reviewed aarch64 binary")
+			assertContains(t, root, menu, "./RandomGamePicker/RandomGamePicker.sh")
+			if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
+				t.Fatalf("repair health: %#v, %v", status, err)
+			}
+			updated := pkg
+			updated.Version = "0.1.0-alpha.3"
+			if _, err := manager.Apply(context.Background(), OpUpdate, updated); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+				t.Fatal(err)
+			}
+			assertMissing(t, root, base+"random-game-picker")
+			assertMissing(t, root, base+"RandomGamePicker.sh")
+			assertNotContains(t, root, menu, "./RandomGamePicker/RandomGamePicker.sh")
+			assertContains(t, root, menu, "./Other/Other.sh")
+			assertRootFile(t, root, "userdata/roms/ports/Other/Other.sh", "other port")
+			assertRootFile(t, root, base+"state/settings.json", `{"favorites":true}`)
+			assertRootFile(t, root, base+"state/last-run.log", "one session")
+		})
+	}
+	t.Run("menu-failure-rolls-back", func(t *testing.T) {
+		root := t.TempDir()
+		writeRootFile(t, root, "userdata/roms/ports/gamelist.xml", "<gameList><broken></gameList>")
+		current := platform.Info{Firmware: "knulli", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.36", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc"}, Device: "trimui-smart-pro", Resolution: "1280x720"}
+		manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(current)
+		if _, err := manager.Apply(context.Background(), OpInstall, pkg); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
+			t.Fatalf("expected menu parsing failure, got %v", err)
+		}
+		assertMissing(t, root, "userdata/roms/ports/RandomGamePicker/random-game-picker")
+		assertMissing(t, root, "userdata/system/knulli-app-store/installed/io.github.jellydn.random-game-picker.json")
+		assertRootFile(t, root, "userdata/roms/ports/gamelist.xml", "<gameList><broken></gameList>")
+	})
+}
+
 func TestGroutPreviousVersionUpdateRepairRollbackAndUninstallPreserveState(t *testing.T) {
 	root := t.TempDir()
 	v51 := zipBytes(t, map[string]string{"Grout.sh": "launcher 5.1", "grout": "binary 5.1"})
