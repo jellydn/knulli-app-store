@@ -18,14 +18,15 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first.Packages) != 6 || len(second.Packages) != 6 {
-		t.Fatalf("expected six packages, got %d and %d", len(first.Packages), len(second.Packages))
+	if len(first.Packages) != 7 || len(second.Packages) != 7 {
+		t.Fatalf("expected seven packages, got %d and %d", len(first.Packages), len(second.Packages))
 	}
 	// RetSend is published by the App Store maintainer's own fork, so its
 	// recorded provenance is the maintainer rather than the community.
 	provenance := map[string]string{
 		"app.romm.grout":                         "community",
 		"io.github.heilmic.coverplayer":          "community",
+		"io.github.jellydn.random-game-picker":   "maintainer",
 		"io.github.jellydn.retsend":              "maintainer",
 		"io.github.misantronic.raofflineproxy":   "community",
 		"io.github.tomtombombadil.pocketcurator": "community",
@@ -50,8 +51,8 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 			t.Fatalf("unexpected approval state: %s", first.Packages[index].ID)
 		}
 	}
-	if experimental != 4 || verified != 0 {
-		t.Fatalf("expected four broad experimental packages and no current device-verified release, got %d and %d", experimental, verified)
+	if experimental != 5 || verified != 0 {
+		t.Fatalf("expected five experimental packages and no current device-verified release, got %d and %d", experimental, verified)
 	}
 }
 
