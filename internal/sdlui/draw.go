@@ -112,8 +112,10 @@ func drawConfirmation(frame *image.RGBA, model *storeui.Model) {
 func drawCard(frame *image.RGBA, model *storeui.Model, controls *storeinput.Session) {
 	fill(frame, image.Rect(panelLeft, panelTop, panelRight, panelBottom), palette.panel)
 	drawTabs(frame, model)
-	filter := storeinput.Hint{Action: storeinput.PageUp, With: storeinput.PageDown, Verb: "Filter"}
-	text(frame, 390, 64, palette.muted, storeinput.Footer(footerMapping(controls), []storeinput.Hint{filter}, ""))
+	if !model.Busy {
+		filter := storeinput.Hint{Action: storeinput.PageUp, With: storeinput.PageDown, Verb: "Filter"}
+		text(frame, 390, 64, palette.muted, storeinput.Footer(footerMapping(controls), []storeinput.Hint{filter}, ""))
+	}
 	if len(model.Items) == 0 {
 		text(frame, 40, 150, palette.text, emptyCatalogueMessage(model.Total(), 0))
 		return
@@ -150,9 +152,11 @@ func drawCard(frame *image.RGBA, model *storeui.Model, controls *storeinput.Sess
 	}
 	fill(frame, image.Rect(200, 260, 608, 289), palette.selected)
 	text(frame, 216, 279, statusColor(item), label)
-	text(frame, 40, 318, palette.muted, "< PREVIOUS")
 	text(frame, 282, 318, palette.muted, fmt.Sprintf("%d OF %d", model.Selected+1, len(model.Items)))
-	text(frame, 558, 318, palette.muted, "NEXT >")
+	if !model.Busy {
+		text(frame, 40, 318, palette.muted, "< PREVIOUS")
+		text(frame, 558, 318, palette.muted, "NEXT >")
+	}
 }
 
 // drawFooter paints the one hint line every screen shares. The text comes from
