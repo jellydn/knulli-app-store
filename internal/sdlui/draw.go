@@ -93,12 +93,7 @@ func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName 
 	}
 	text(frame, 32, 103, palette.text, "CONTROLLER  "+shorten(strings.ToUpper(controllerName), 60))
 	text(frame, 32, 120, palette.muted, "IDENTITY  "+controllerIdentityStatus(controls))
-	mappingSource := controls.Source
-	if controls.Mode == storeinput.Setup {
-		mappingSource = controls.AutoSource
-	}
-	text(frame, 32, 137, palette.muted, "SOURCE  "+shorten(strings.ToUpper(mappingSource), 64))
-	text(frame, 32, 150, palette.muted, controllerSetupProgress(controls))
+	text(frame, 32, 137, palette.muted, "SOURCE  "+shorten(strings.ToUpper(controls.Source), 64))
 	switch controls.Mode {
 	case storeinput.Blocked:
 		text(frame, 32, modeHeadingBaseline, palette.warning, "RECONNECT A CONTROLLER TO CONTINUE.")
@@ -113,121 +108,16 @@ func drawControllerScreen(frame *image.RGBA, model *storeui.Model, platformName 
 		if diagnosticStatus != "" {
 			text(frame, 32, 259, statusColor, shorten(strings.ToUpper(diagnosticStatus), 78))
 		}
-	case storeinput.Setup:
-		text(frame, 32, modeHeadingBaseline, palette.warning, "SETUP IS REQUIRED FOR SAFE CONTROLS")
-		for index, item := range storeinput.SetupItems {
-			prefix := "  "
-			shade := palette.text
-			if index == controls.SetupIndex {
-				prefix = "> "
-				shade = palette.accent
-			}
-			text(frame, 48, 205+index*25, shade, prefix+item)
-		}
-		text(frame, 344, 205, palette.muted, "DETECTED CONTROLS")
-		drawMappingSummary(frame, controls.DetectedMapping(), nil, 344, 225, 140, 20)
-	case storeinput.Settings:
-		text(frame, 32, modeHeadingBaseline, palette.warning, "MAPPING AND DIAGNOSTICS ARE MANAGED HERE")
-		for index, item := range storeinput.SettingsItems {
-			prefix := "  "
-			shade := palette.text
-			if index == controls.SettingsIndex {
-				prefix = "> "
-				shade = palette.accent
-			}
-			text(frame, 48, 205+index*25, shade, prefix+item)
-		}
-		text(frame, 344, 205, palette.muted, "ACTIVE CONTROLS")
-		drawMappingSummary(frame, controls.Mapping, nil, 344, 225, 140, 20)
-	case storeinput.Calibrating:
-		action, _ := controls.Calibration.Current()
-		text(frame, 32, modeHeadingBaseline, palette.warning, "ASSIGN A BUTTON TO")
-		text(frame, 32, 205, palette.text, storeinput.ActionLabel(action))
-		text(frame, 32, 226, palette.muted, fmt.Sprintf("ACTION %d OF %d", controls.Calibration.Index+1, len(controls.Calibration.Actions)))
-		text(frame, 32, 252, palette.muted, "A BUTTON CAN HAVE ONLY ONE ACTION")
-		text(frame, 344, modeHeadingBaseline, palette.muted, "COMPLETED ACTIONS")
-		drawMappingSummary(frame, controls.Calibration.Mapping, nil, 344, 196, 140, 20)
-	case storeinput.Review:
-		if controls.Calibration.Index > 0 {
-			lastAction := storeinput.Actions[controls.Calibration.Index-1]
-			text(frame, 32, modeHeadingBaseline, palette.warning, "DETECTED  "+storeinput.ButtonLabel(controls.Calibration.Mapping[lastAction]))
-			text(frame, 32, 199, palette.text, "ASSIGNED TO  "+storeinput.ActionLabel(lastAction))
-		}
-		text(frame, 32, 216, palette.muted, fmt.Sprintf("ACTION %d OF %d", controls.Calibration.Index, len(storeinput.Actions)))
-		for index, item := range storeinput.ReviewItems {
-			prefix := "  "
-			shade := palette.text
-			if index == controls.ReviewIndex {
-				prefix = "> "
-				shade = palette.accent
-			}
-			text(frame, 48, 230+index*21, shade, prefix+item)
-		}
-		text(frame, 344, modeHeadingBaseline, palette.muted, "CURRENT ASSIGNMENTS")
-		drawMappingSummary(frame, controls.Calibration.Mapping, nil, 344, 196, 140, 20)
-	case storeinput.Paging:
-		text(frame, 32, modeHeadingBaseline, palette.warning, "PAGING IS OPTIONAL")
-		text(frame, 32, 199, palette.muted, "PAGE UP AND PAGE DOWN MOVE A LONG LIST A SCREENFUL AT A TIME.")
-		text(frame, 32, 214, palette.muted, "UP AND DOWN STILL MOVE ONE ROW, AND THE TABS STILL NARROW THE LIST.")
-		for index, item := range storeinput.PagingItems {
-			prefix := "  "
-			shade := palette.text
-			if index == controls.PagingIndex {
-				prefix = "> "
-				shade = palette.accent
-			}
-			text(frame, 48, 245+index*25, shade, prefix+item)
-		}
-	case storeinput.Preview:
-		text(frame, 32, modeHeadingBaseline, palette.warning, "TEST EVERY ACTION THIS PAD HAS")
-		drawMappingSummary(frame, controls.Calibration.Mapping, controls.Calibration.Tested, 48, 205, 280, 36)
-		if untested := storeinput.UntestedLabels(controls.Calibration); untested != "" {
-			// The preview is finished by the required actions, so this line says
-			// what happens to an optional binding the user could not press.
-			text(frame, 32, 308, palette.muted, shorten("NOT SAVED UNLESS TESTED  "+untested, 82))
-		}
-	}
-	if controls.ValidationError != "" {
-		text(frame, 32, 318, palette.error, shorten(strings.ToUpper(controls.ValidationError), 78))
-	} else if controls.Message != "" && controls.Mode != storeinput.Blocked {
-		// The blocked screen already states that no controller is available.
-		text(frame, 32, 318, palette.muted, shorten(strings.ToUpper(controls.Message), 78))
 	}
 }
 
-func drawMappingSummary(frame *image.RGBA, mapping storeinput.Mapping, tested map[storeinput.Action]bool, x, y, columnWidth, maximumCharacters int) {
-	for index, action := range storeinput.Actions {
-		button, assigned := mapping[action]
-		if !assigned {
-			continue
-		}
-		mark := ""
-		if tested != nil {
-			mark = "[X] "
-			if !tested[action] {
-				mark = "[ ] "
-			}
-		}
-		// The summary is two columns tall by however many the action set needs,
-		// so adding actions grows the summary downwards instead of off the
-		// panel's right edge.
-		column := index % 2
-		row := index / 2
-		label := storeinput.ActionLabel(action)
-		text(frame, x+column*columnWidth, y+row*22, palette.text, shorten(mark+label+": "+storeinput.ButtonLabel(button), maximumCharacters))
-	}
-}
-
-// controllerScreenTitle names each controller screen from its mode, so a
-// blocked or settings screen does not claim to be setting up a controller.
+// controllerScreenTitle distinguishes unavailable input from the catalogue.
 func controllerScreenTitle(mode storeinput.Mode) string {
 	switch mode {
 	case storeinput.Blocked:
 		return "CONTROLLER UNAVAILABLE"
-	case storeinput.Settings:
-		return "CONTROLLER SETTINGS"
 	default:
-		return "CONTROLLER SETUP"
+		return "CONTROLLER"
 	}
 }
 
@@ -235,33 +125,11 @@ func controllerIdentityStatus(controls *storeinput.Session) string {
 	guid := strings.TrimSpace(controls.Identity.GUID)
 	if guid == "" || strings.Trim(guid, "0") == "" {
 		if controls.Identity.Name == "" {
-			return "MISSING - MAPPING CANNOT BE SAVED"
+			return "UNAVAILABLE"
 		}
-		return "GUID UNAVAILABLE - DEVICE + NAME FALLBACK"
+		return "GUID UNAVAILABLE"
 	}
 	return "GUID " + shorten(strings.ToUpper(guid), 32)
-}
-
-// controllerSetupProgress reports how far a setup has come. The count follows
-// the screen: a calibration walks the plan it was given, which is shorter when
-// the user skipped paging, while a preview only has to see the required
-// actions, because an optional button this pad does not carry cannot be
-// pressed.
-func controllerSetupProgress(controls *storeinput.Session) string {
-	total := len(storeinput.Required)
-	completed := 0
-	if controls.Mode == storeinput.Normal || controls.Mode == storeinput.Settings {
-		completed = total
-	}
-	if controls.Calibration != nil {
-		total = len(controls.Calibration.Actions)
-		completed = controls.Calibration.Index
-		if controls.Mode == storeinput.Preview {
-			total = len(storeinput.Required)
-			completed = controls.Calibration.RequiredTested()
-		}
-	}
-	return fmt.Sprintf("PROGRESS  %d OF %d ACTIONS", completed, total)
 }
 
 // drawList paints the visible window of catalogue rows. The model owns which

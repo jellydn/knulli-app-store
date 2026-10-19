@@ -11,57 +11,23 @@ This target is experimental. Knulli source confirms the board and display. A rea
 
 No checked-in Knulli controller profile establishes the MagicX button indices. The App Store records the runtime GUID, name, and mapping from SDL on the device. It does not invent them from the device tree.
 
-## Install and controller setup
+## Install and automatic controls
 
 Download the `knulli-app-store-magicx-zero-28-experimental` Actions artifact. Verify `SHA256SUMS.txt`, shut down Knulli, then extract the inner ZIP into `/userdata/roms/ports`. Replace the old App Store files only when updating. Confirm `/userdata/roms/ports/images/Knulli App Store.png` is present; the Ports list uses it after a game list refresh.
 
-The first launch for each device/controller identity opens a dedicated setup screen before the catalogue. Choose **Use Detected Mapping**, **Test Detected Mapping**, **Customize**, or **Safe Exit**. Every choice that builds a mapping asks one question first: whether this pad pages with the shoulder buttons. Paging is optional, so a pad without them answers **Skip paging** and setup asks only for the required actions: Navigate for up, down, left, and right, then Select, Back, and Settings; quitting is the Select chord rather than a bound action. A mapping that keeps paging asks for Page Up and Page Down afterwards, in the same walk. Every detected button gets a Select, Retry, Start Over, or Back review before progress continues, and conflicts stay on the current action. The preview is finished by the required actions, and an optional binding the user never pressed is left out of what is saved.
+Every launch opens the catalogue immediately with automatic SDL/KNULLI controls: **ES A confirms, B backs out, Y exports diagnostics**, D-pad navigates, **L1/R1** page, and **Select+Y** quits. There is no setup, calibration, mapping editor, or saved-assignment override.
 
-Later launches load the saved mapping directly. Open Settings with the control the footer shows beside `SETTINGS` to run setup again, export diagnostics, reset the current mapping, or close. Hold the saved Back and Settings controls while launching to force setup. If no SDL GameController exists, a blocked screen shows the log and diagnostic paths and never opens the catalogue.
+If no SDL GameController exists, a blocked screen shows the log and diagnostic paths. Reconnecting resumes normal controls immediately and clears held chord state. Old `/userdata/system/configs/knulli-app-store/controller-mappings.json` files are ignored and left untouched, even when malformed.
 
-The footer is the only place the interface shows controls. It names each action available on the current screen beside its binding, for example `Confirm (SOUTH)  Settings (NORTH)  Quit (SELECT + NORTH)` on the catalogue, and the same action name always means the same action. Face buttons use compass directions (north, south, east, west) rather than A/B/X/Y, because letter labels differ across device layouts. No screen repeats a control hint in its body text, and the controller mapping summary lists the same names beside the buttons that carry them. Quitting is the one control no button carries alone: hold Select and press North. On the blocked screen, Confirm exports diagnostics and the same chord is the way out.
+The footer names available controls with ES letters: `Confirm (A)  Diagnostics (Y)  Quit (SELECT + Y)`. The launcher selects `STORE_CONTROLLER_LAYOUT=knulli` normally or `xbox` when `/var/run/ports_xbox_layout.flag` exists. Knulli maps ES a/b/x/y → SDL b/a/y/x normally and uses direct letters in Xbox mode. Bindings compensate once; SDL events are unchanged. Update the binary and launcher together. No guessed raw indices or system mapping writes are used. On the blocked screen, Confirm also exports diagnostics and Select+Y still quits.
 
 The catalogue opens on its whole list and carries a tab bar above the rows: **ALL**, **READY**, and **INSTALLED**, with the active view marked in the accent colour. Left and right step the bar, up and down step the rows, and the shoulders page a list longer than its window. A finished operation reports in a notice bar over the bottom of the panel and clears itself after three seconds; a failure is not a notice and keeps the status block until it is answered.
 
 Every screen can be checked on a development machine first, with no handheld and no controller: `make gui GUI_DEVICE=magicx-zero-28 GUI_RESOLUTION=640x480` opens the interactive GUI from the keyboard against a scratch fixture root. `make walkthrough WALK_DEVICE=magicx-zero-28 WALK_RESOLUTION=640x480` replays the offline flows and records the opening, post-key, and operation-completion frames. Add `WALK_FLAGS=--install` for the network-backed package lifecycle flows. Neither run exercises a real GameController or touches a real `/userdata`. See [Desktop GUI verification](desktop-verification.md).
 
-Mappings use this versioned file:
+## Recording a device control report
 
-```text
-/userdata/system/configs/knulli-app-store/controller-mappings.json
-```
-
-The key combines Knulli device ID and controller GUID. An all-zero or absent GUID falls back to normalized controller name plus device ID. A controller with neither is not persisted. Corrupt files are preserved as `.corrupt` before a replacement is written.
-
-## Recording a reviewed controller layout
-
-This device has no reviewed layout, and `Profile("magicx-zero-28")` says so deliberately: `Fallback` is `nil` and its evidence reads `raw controls unavailable`. `TestDeviceProfilesDoNotInventMagicXFallback` fails if either changes with no report behind it. Nothing here matches the reviewed fallback the Smart Pro carries.
-
-Runtime behaviour is unaffected. Every session starts on SDL's canonical logical layout — `0` south, `1` east, `3` north, `9`/`10` shoulders, `11`–`14` d-pad — and first launch walks the user through using, testing, or customizing it before the catalogue opens. The source label comes from the launch environment: `Knulli SDL_GAMECONTROLLERCONFIG` when Knulli set that variable, otherwise `SDL GameController mapping`. The indices are SDL's canonical numbering either way, because SDL reports GameController events in that numbering by design. What a report therefore establishes is that this pad's buttons land where a user expects, not what the indices are.
-
-Only a real-device navigation report makes a layout reviewed. A Knulli board file, a device tree, a shared A133 family, and an SDL GameController name are not it. Neither is the desktop walkthrough: it runs on a keyboard against a fixture root, and the records it writes name `desktop-keyboard` because no controller was present.
-
-### Capture
-
-Reach the catalogue on the device with the mapping you intend to record, then capture:
-
-- **Controller identity** — the SDL GameController GUID (32 hex characters) and name, both read from the device. A controller with no GUID is recorded under its normalized name plus the device ID; a controller with neither is not persisted.
-- **The mapping summary** — the screen listing each action beside the button that carries it, for example `CONFIRM: SOUTH`. This is the evidence for which button a user pressed to reach each action. A description such as "the left face button" cannot supply it, because face-button letters differ across layouts.
-- **The mapping source label** — `Knulli SDL_GAMECONTROLLERCONFIG` or `SDL GameController mapping`, exactly as the diagnostics export records it.
-- **Which actions you used** — navigate in all four directions, confirm, back, and open Settings. Confirm the quit chord too: hold Select and press North. It is the one control no single button carries.
-- **Whether paging worked** — shoulders or nothing. A pad that cannot page answers **Skip paging** and records a mapping with no page bindings, which is a complete result rather than a gap.
-- **What did not work** — a conflict, a button that reached the wrong action, an action you could not bind. A partial report is worth more than none, as long as it states what was not established.
-
-Export diagnostics from the device and keep the lines naming the controller identity and the mapping source; that export is the artifact a report cites.
-
-### Where it lands
-
-1. `internal/input/mapping.go` — `Profile("magicx-zero-28")` gains `Fallback` from the report and an `Evidence` string naming it. `AutoMapping()` is the right value when the report confirms SDL's canonical positions; anything else is recorded as the bindings the report lists.
-2. `docs/real-device-tests.md` — a dated entry shaped like the Smart Pro one: tester, device context, firmware context, what was exercised, controller identity, the report, and its provenance.
-3. `internal/input/input_test.go` — `TestDeviceProfilesDoNotInventMagicXFallback` stops asserting that no layout exists and starts asserting that the recorded one matches the report, so the guard keeps its purpose: it still fails when controls are recorded with nothing behind them.
-4. This file — the paragraphs above and the checklist below stop describing the layout as unavailable.
-
-The profile stays as it is until all four move together. Recording the layout in some of these places and not others splits the claim from the evidence, which is the outcome this device has avoided so far.
+Automatic defaults follow Knulli's logical SDL contract, not a device-specific raw fallback. A desktop walkthrough does not prove physical navigation. Record the firmware, hardware revision, controller name/GUID, selected Ports layout mode, footer, and the actual ES buttons used for confirm, back, diagnostics, navigation, paging, and Select+Y quit. Repeat in default and Xbox modes, noting any mismatch. Export diagnostics with Y, inspect it for private data, and cite it in `docs/real-device-tests.md`. Do not add guessed raw button indices from a board file or device tree.
 
 ## Package status
 
@@ -74,13 +40,13 @@ Successful App Store navigation does not prove a package. Grout, PlayTime, and R
 
 ## Test checklist
 
-1. Record Knulli version, hardware revision, and the displayed SDL controller name/GUID. [Recording a reviewed controller layout](#recording-a-reviewed-controller-layout) lists everything else a reviewed layout needs and where each field lands.
+1. Record Knulli version, hardware revision, and SDL controller name/GUID. Follow [Recording a device control report](#recording-a-device-control-report).
 2. Confirm the header says `MagicX Zero 28 / 640x480`, with readable letterboxed content and no clipping.
-3. Confirm first launch stays on the dedicated screen. Test Use Detected Mapping, then reset and test Customize.
-4. Run setup, intentionally create one conflict, retry, assign all actions, and test all actions before save.
-5. Restart and confirm the saved mapping loads. Reset it, confirm setup becomes required, and confirm only this controller/device record changes.
+3. Confirm the first launch opens the catalogue with no setup.
+4. Check ES A confirm, B back, Y diagnostics, D-pad, L1/R1 and Select+Y in both default Knulli and Ports Xbox modes. X has no new feature.
+5. Restart with an old custom mapping file present. Confirm defaults remain active and the file stays unchanged.
 6. Disconnect and reconnect the controller if the runtime permits it. Confirm the correct identity and mapping return.
-7. Export diagnostics. Confirm controller identity, mapping source, semantic events, and validation failure are present without private data.
+7. Press Y to export diagnostics. Confirm controller identity, mapping source, and semantic events are present without private data.
 8. Confirm Grout, PlayTime, and RetSend show **Install** or **Manage existing** with an experimental warning only when ABI, libraries, and display checks pass. Remove one test dependency only in a disposable test root and confirm installation is blocked with its exact name.
 9. Install PlayTime, refresh game lists or reboot, and launch it. Track a game, close it, and relaunch it.
 10. Confirm the App Store reports PlayTime healthy. Damage only a disposable managed test copy if you test Repair; confirm Repair restores it and keeps `/userdata/system/configs/playtime/`.

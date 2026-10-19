@@ -22,11 +22,7 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Tab** — One view of the catalogue: the whole list, the packages with something to act on, or the packages installed on this device. A tab filters on a package's typed state, never on its rendered state label.
 
-**Required action** — A semantic action every mapping must bind, because it is needed to reach a screen or a package.
-
-**Optional action** — A semantic action a mapping may leave unbound when the pad does not carry the button it wants. Paging is the optional pair; skipping it costs the screenful jump and nothing else.
-
-**Paging question** — The one question every setup path asks before it builds a mapping: whether this pad pages with the shoulder buttons. It is asked in words so a pad without them can say so instead of getting stuck on a button it does not have.
+**Paging** — Moving a long catalogue one screenful with L1/R1 (Page Up/Page Down on a keyboard). D-pad navigation always moves one row at a time.
 
 ## Install lifecycle
 
@@ -86,16 +82,18 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Semantic action** — One of the nine controls the GUI exposes: up, down, left, right, page up, page down, confirm, back, and diagnostics. An action is named independently of any physical button, so a device layout never changes what an action means. Exit is not one of them: quitting is the Select chord, so no single press carries it.
 
-**Binding** — The physical SDL GameController button that carries one semantic action for one device and controller identity. Bindings are detected, tested, and saved per identity; no physical position is assumed.
+**Binding** — The logical SDL GameController button carrying a semantic action. Automatic defaults use ES A for confirm, B for back, Y for diagnostics, D-pad navigation, and L1/R1 paging. No custom assignments are loaded or saved.
 
-**Verb** — The word an action carries in a footer hint, for example `Confirm` for the confirm action. Directional actions share the `Navigate` footer verb and the two paging actions share `Page`, while setup prompts and mapping summaries keep the direction visible.
+**Controller layout** — The launcher-selected letter policy: `STORE_CONTROLLER_LAYOUT=knulli` accounts for Knulli's ES a/b/x/y → SDL b/a/y/x mapping; `xbox` accounts for Ports' Xbox-layout flag and uses direct SDL letters. An unset value uses normal desktop SDL. Events are never swapped again. Footer letters follow the selected ES layout, not guessed raw indices.
 
-**Footer hint** — The single line below every screen's panel. It names each available action beside its binding, for example `Confirm (SOUTH)  Back (EAST)  Settings (NORTH)`, or gives an actionless calibration instruction. Face buttons use compass directions so the label matches the physical position on every device layout. Outside the footer, mapping summaries identify saved bindings but do not instruct the user to press them.
+**Verb** — The word an action carries in a footer hint, for example `Confirm` for the confirm action. Directional actions share `Navigate` and paging actions share `Page`.
 
-**Keyboard binding** — A binding carried by a desktop keyboard key rather than a pad button, used when no GameController exists so a development machine can reach every screen. It is a binding set like any other, with its own identity, so a desktop run never reads or overwrites a mapping saved for a handheld controller.
+**Footer hint** — The single line below every screen's panel naming available actions beside their bindings, for example `Confirm (A)  Diagnostics (Y)  Quit (SELECT + Y)`. Face labels use the selected ES letters. Quit is always Select+Y, never a lone face button.
+
+**Keyboard binding** — A fixed desktop key: arrows navigate, Page Up/Page Down page, Enter confirms, Escape backs out, Y exports diagnostics, and held Tab (or F5) plus Y quits. Keyboard input requires no setup or persistence.
 
 ## Verification
 
-**Fixture root** — A throwaway directory holding the Knulli files platform detection reads, written for desktop verification only. Installs, logs, and mappings are written below it, so it stands in for a device root without a device and is never a real device root.
+**Fixture root** — A throwaway directory holding the Knulli files platform detection reads, written for desktop verification only. Installs and logs are written below it, so it stands in for a device root without a device and is never a real device root.
 
 **Walkthrough** — A scripted key sequence a desktop run replays through the real binary. It records the opening frame, each post-key frame, and operation completions. A walkthrough is evidence that a flow still works, not a substitute for a device run: it never exercises a real GameController, a real `/userdata` write, or the kernel's SDL loading.

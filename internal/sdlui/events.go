@@ -7,7 +7,6 @@ package sdlui
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
 	storeinput "github.com/jellydn/knulli-app-store/internal/input"
@@ -22,7 +21,7 @@ const (
 	EventNone EventKind = iota
 	// EventQuit asks the UI to exit.
 	EventQuit
-	// EventButton is one button press, already mapped to a raw button code.
+	// EventButton is one logical SDL GameController button press.
 	// The active controller produces it.
 	EventButton
 	// EventKey is one portable keyboard key.
@@ -58,7 +57,7 @@ const (
 // Event is one translated device event.
 type Event struct {
 	Kind          EventKind
-	Button        int // raw button code; only for EventButton
+	Button        int // logical SDL button code; only for EventButton
 	Key           Key
 	Identity      storeinput.Identity
 	KnulliMapping bool
@@ -81,7 +80,7 @@ type Effects struct {
 }
 
 // Handle applies one device event to the model and input session. The
-// adapter owns the device: it decides which events exist and which raw
+// adapter owns the device: it decides which events exist and which logical
 // button codes they carry; Handle owns everything that happens next.
 func Handle(ctx context.Context, model *storeui.Model, controls *storeinput.Session, logger *diagnostics.Log, event Event) Effects {
 	switch event.Kind {
@@ -92,9 +91,6 @@ func Handle(ctx context.Context, model *storeui.Model, controls *storeinput.Sess
 		controls.Connect(event.Identity, event.KnulliMapping)
 		logger.Event("controller_connected", "device", controls.Device, "name", event.Identity.Name, "guid", event.Identity.GUID, "mapping_source", controls.Source)
 		logControllerTransition(logger, controls, beforeMode, beforeSource)
-		if controls.ValidationError != "" {
-			logger.Event("controller_mapping_validation_failed", "error", controls.ValidationError)
-		}
 		return Effects{}
 	case EventControllerRemoved:
 		beforeMode, beforeSource := controls.Mode, controls.Source
@@ -122,7 +118,7 @@ func Handle(ctx context.Context, model *storeui.Model, controls *storeinput.Sess
 		}
 		// A key carries a semantic action. The session resolves the binding the
 		// current screen accepts, so a key reaches the same screen a controller
-		// button would, including setup, calibration and the preview.
+		// button would.
 		code, ok := controls.Binding(action)
 		if !ok {
 			return Effects{}
@@ -171,26 +167,14 @@ func navigates(action storeinput.Action) bool {
 func processButton(ctx context.Context, model *storeui.Model, controls *storeinput.Session, button int, logger *diagnostics.Log) Effects {
 	beforeMode := controls.Mode
 	beforeSource := controls.Source
-	beforeError := controls.ValidationError
-	beforeIndex, beforeTested := setupProgress(controls)
 	action, effect := controls.HandleButton(button)
-	afterIndex, afterTested := setupProgress(controls)
 	logControllerTransition(logger, controls, beforeMode, beforeSource)
-	if afterIndex != beforeIndex && afterIndex >= 0 {
-		logger.Event("controller_setup_progress", "completed", fmt.Sprint(afterIndex), "total", fmt.Sprint(len(storeinput.Actions)))
-	}
-	if afterTested != beforeTested && afterTested >= 0 {
-		logger.Event("controller_preview_progress", "tested", fmt.Sprint(afterTested), "total", fmt.Sprint(len(storeinput.Actions)))
-	}
-	if controls.ValidationError != "" && controls.ValidationError != beforeError {
-		logger.Event("controller_mapping_validation_failed", "error", controls.ValidationError)
-	}
 	if action != "" {
 		logger.Event("controller_semantic_action", "action", string(action), "screen", string(beforeMode))
 	}
 	effects := Effects{Action: action}
 	if effect == storeinput.ExportDiagnostics {
-		logger.Event("controller_setup_action", "action", "export-diagnostics")
+		logger.Event("controller_action", "action", "export-diagnostics")
 		model.ExportDiagnostics(ctx)
 		effects.ExportedDiagnostics = true
 	}
@@ -202,13 +186,6 @@ func logControllerTransition(logger *diagnostics.Log, controls *storeinput.Sessi
 	if controls.Mode != beforeMode || controls.Source != beforeSource {
 		logger.Event("controller_screen_transition", "from", string(beforeMode), "to", string(controls.Mode), "mapping_source", controls.Source, "message", controls.Message)
 	}
-}
-
-func setupProgress(controls *storeinput.Session) (int, int) {
-	if controls.Calibration == nil {
-		return -1, -1
-	}
-	return controls.Calibration.Index, len(controls.Calibration.Tested)
 }
 
 func dispatchAction(ctx context.Context, model *storeui.Model, action storeinput.Action) bool {
