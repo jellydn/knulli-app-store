@@ -49,9 +49,9 @@ func newRouterHarness(t *testing.T) (*storeui.Model, *storeinput.Session, *diagn
 	}
 	controls := storeinput.NewSession(t.TempDir(), "test-device")
 	controls.Connect(storeinput.Identity{Name: "Test Pad"}, true)
-	// Connect without a saved mapping opens the setup wizard; route through
-	// the normal mode so the semantic actions are exercised.
-	controls.Mode = storeinput.Normal
+	if controls.Mode != storeinput.Normal {
+		t.Fatal("first connection did not open catalogue")
+	}
 	return model, controls, logger, backend
 }
 
@@ -144,19 +144,8 @@ func TestHandleControllerConnected(t *testing.T) {
 	controls.Disconnect()
 	identity := storeinput.Identity{Name: "Hotplug Pad", GUID: "guid"}
 	Handle(context.Background(), model, controls, logger, Event{Kind: EventControllerConnected, Identity: identity, KnulliMapping: true})
-	if !controls.Connected || controls.Identity.Name != identity.Name || controls.Mode != storeinput.Setup || controls.Source != "Knulli SDL_GAMECONTROLLERCONFIG" {
+	if !controls.Connected || controls.Identity.Name != identity.Name || controls.Mode != storeinput.Normal || controls.Source != "Knulli SDL_GAMECONTROLLERCONFIG" {
 		t.Fatalf("controller connection was not routed: %#v", controls)
-	}
-}
-
-func TestHandleKeyUsesFirstRunMapping(t *testing.T) {
-	model, controls, logger, _ := newRouterHarness(t)
-	controls.Mode = storeinput.Setup
-	controls.FirstRun = true
-	controls.Mapping[storeinput.Down] = 99
-	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyDown})
-	if controls.SetupIndex != 1 {
-		t.Fatalf("first-run key did not use the portable auto mapping: index %d", controls.SetupIndex)
 	}
 }
 
@@ -266,11 +255,7 @@ func TestHandleModeDependentButtons(t *testing.T) {
 		wantExport bool
 	}{
 		{name: "blocked diagnostics", prepare: func(controls *storeinput.Session) { controls.Disconnect() }, button: storeinput.AutoMapping()[storeinput.Confirm], wantMode: storeinput.Blocked, wantExport: true},
-		{name: "calibration assignment", prepare: func(controls *storeinput.Session) {
-			controls.Mode = storeinput.Calibrating
-			controls.Calibration = storeinput.NewCalibration(true)
-		}, button: 42, wantMode: storeinput.Review},
-		{name: "settings diagnostics", prepare: func(controls *storeinput.Session) { controls.Mode = storeinput.Settings; controls.SettingsIndex = 1 }, button: storeinput.AutoMapping()[storeinput.Confirm], wantMode: storeinput.Settings, wantExport: true},
+		{name: "direct diagnostics", prepare: func(controls *storeinput.Session) {}, button: storeinput.AutoMapping()[storeinput.Diagnostics], wantMode: storeinput.Normal, wantExport: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			model, controls, logger, backend := newRouterHarness(t)
@@ -278,6 +263,76 @@ func TestHandleModeDependentButtons(t *testing.T) {
 			effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: test.button})
 			if controls.Mode != test.wantMode || effects.ExportedDiagnostics != test.wantExport || (backend.exports > 0) != test.wantExport {
 				t.Fatalf("mode=%q exported=%v calls=%d", controls.Mode, effects.ExportedDiagnostics, backend.exports)
+			}
+		})
+	}
+}
+
+// Literal SDL events from ES letters exercise the public router, rather than
+// deriving the test input from the binding under test.
+func TestAutomaticFaceActionsAndLifecycleSafety(t *testing.T) {
+	for _, layout := range []string{"knulli", "xbox", ""} {
+		t.Run(layout, func(t *testing.T) {
+			t.Setenv("STORE_CONTROLLER_LAYOUT", layout)
+			model, controls, logger, backend := newRouterHarness(t)
+			backend.items = []appstore.Item{{Package: manifest.Package{ID: "org.example.demo", Review: manifest.Review{Status: "installable"}}, Compatible: true, Actions: []appstore.Action{appstore.Install}}}
+			if err := model.Load(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			a, b, x, y := 0, 1, 2, 3
+			if layout == "knulli" {
+				a, b, x, y = 1, 0, 3, 2
+			}
+			press := func(button int) Effects {
+				return Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: button})
+			}
+			if controls.Mode != storeinput.Normal || model.Focus != storeui.Browse {
+				t.Fatal("first launch not ready")
+			}
+			press(x)
+			if backend.exports != 0 || model.Focus != storeui.Browse {
+				t.Fatal("ES X gained an action")
+			}
+			press(a)
+			if model.Focus != storeui.Actions {
+				t.Fatal("ES A did not open actions")
+			}
+			press(a)
+			if model.Focus != storeui.Confirm {
+				t.Fatal("ES A did not open confirmation")
+			}
+			press(b)
+			if model.Focus != storeui.Actions || model.Busy {
+				t.Fatal("ES B did not cancel safely")
+			}
+			press(b)
+			if model.Focus != storeui.Browse {
+				t.Fatal("ES B did not return to catalogue")
+			}
+			if effect := press(y); !effect.ExportedDiagnostics || backend.exports != 1 || controls.Mode != storeinput.Normal {
+				t.Fatal("ES Y did not export directly")
+			}
+			model.Busy = true
+			press(a)
+			press(b)
+			press(y)
+			if model.Focus != storeui.Browse || backend.exports != 1 {
+				t.Fatal("busy operation accepted a face action")
+			}
+			model.Busy = false
+			Handle(context.Background(), model, controls, logger, Event{Kind: EventChordAnchor, Held: true})
+			Handle(context.Background(), model, controls, logger, Event{Kind: EventControllerRemoved})
+			press(a)
+			if model.Focus != storeui.Browse {
+				t.Fatal("disconnected input reached catalogue")
+			}
+			Handle(context.Background(), model, controls, logger, Event{Kind: EventControllerConnected, Identity: storeinput.Identity{Name: "Replacement"}})
+			if effect := press(y); effect.Exit || !effect.ExportedDiagnostics {
+				t.Fatal("hotplug kept stale chord or lost Y")
+			}
+			Handle(context.Background(), model, controls, logger, Event{Kind: EventChordAnchor, Held: true})
+			if effect := press(y); !effect.Exit || effect.ExportedDiagnostics {
+				t.Fatal("Select+Y did not exclusively quit")
 			}
 		})
 	}

@@ -4,12 +4,9 @@ import "strings"
 
 // Hint is one instruction shown in a screen footer. The verb describes what a
 // semantic action does on that screen, and the physical button name is read
-// from the active mapping. A screen never names a button itself, so a
-// customized controller keeps showing its own labels.
+// from the automatic binding set.
 type Hint struct {
-	// Action is the semantic action the hint refers to. An empty Action means
-	// the screen wants a physical input without a named action, and Footer
-	// renders the verb alone.
+	// Action is the semantic action the hint refers to.
 	Action Action
 	// Verb is the action's meaning on the current screen.
 	Verb string
@@ -27,10 +24,8 @@ const (
 	VerbPage        = "Page"
 	VerbSelect      = "Confirm"
 	VerbBack        = "Back"
-	VerbSettings    = "Settings"
+	VerbDiagnostics = "Diagnostics"
 	VerbExit        = "Quit"
-	VerbAnyButton   = "PRESS ANY BUTTON"
-	VerbShownButton = "PRESS EACH SHOWN BUTTON"
 )
 
 // Verbs maps every semantic action to its canonical footer verb.
@@ -43,7 +38,7 @@ var Verbs = map[Action]string{
 	PageDown:    VerbPage,
 	Confirm:     VerbSelect,
 	Back:        VerbBack,
-	Diagnostics: VerbSettings,
+	Diagnostics: VerbDiagnostics,
 	Exit:        VerbExit,
 }
 
@@ -58,8 +53,7 @@ func NewHint(action Action) Hint {
 	return Hint{Action: action, Verb: Verb(action)}
 }
 
-// Verb returns the canonical verb for an action. The footer and the controller
-// mapping summary both use it, so one action never reads two ways.
+// Verb returns the canonical footer verb for an action.
 func Verb(action Action) string {
 	if verb, ok := Verbs[action]; ok {
 		return verb
@@ -67,42 +61,18 @@ func Verb(action Action) string {
 	return strings.ToUpper(string(action))
 }
 
-// ActionLabel identifies an action outside the footer, where panel text is
-// uppercase. Directional actions keep their direction here even though they
-// share a footer verb with their opposite.
-func ActionLabel(action Action) string {
-	switch action {
-	case Up:
-		return "UP"
-	case Down:
-		return "DOWN"
-	case Left:
-		return "LEFT"
-	case Right:
-		return "RIGHT"
-	case PageUp:
-		return "PAGE UP"
-	case PageDown:
-		return "PAGE DOWN"
-	default:
-		return strings.ToUpper(Verb(action))
-	}
-}
-
 // Footer renders one footer line as "VERB (BUTTON)" pairs. It is the single
 // place a physical button label is written, which keeps every screen
 // consistent and free of duplicated hints.
 //
 // The quit hint is the one action no button carries on its own, so the caller
-// passes the chord it is actually listening for ("SELECT + NORTH", "TAB + Y"). An
+// passes the chord it is actually listening for ("SELECT + Y", "TAB + Y"). An
 // empty chord leaves that hint out rather than printing a button that does
 // nothing.
 func Footer(mapping Mapping, hints []Hint, chord string) string {
 	parts := make([]string, 0, len(hints))
 	for _, hint := range hints {
 		switch {
-		case hint.Action == "":
-			parts = append(parts, hint.Verb)
 		case hint.Action == Exit:
 			if chord != "" {
 				parts = append(parts, hint.Verb+" ("+chord+")")
@@ -126,8 +96,7 @@ func Footer(mapping Mapping, hints []Hint, chord string) string {
 // QuitChord names the held anchor that turns the next trigger press into the
 // quit, in the order the user presses it. The anchor is the input source's own
 // Select key — the pad's SELECT button or the keyboard's Tab — and the trigger
-// is whatever button the active mapping gives the Settings action, so a
-// customized pad keeps reading its own labels.
+// is the Y button used for diagnostics.
 func QuitChord(mapping Mapping, source string) string {
 	anchor := "SELECT"
 	if source == KeyboardSourceName {

@@ -76,7 +76,7 @@ printf 'flow\tkeys\tframes\tscreens\tresult\n' >"$SUMMARY"
 # EXPECTED_SCREENS is a comma-separated list that must all appear in the record.
 # EXPECTED_MESSAGE is a substring the record must contain, for a flow whose
 # point is a message rather than a screen. MODE is "fresh" (the default), which
-# starts from a new fixture root and a first run, or "reuse", which continues an
+# starts from a new fixture root, or "reuse", which continues an
 # existing root so a flow can walk the state an earlier flow left behind.
 walk() {
   name=$1
@@ -146,85 +146,42 @@ walk() {
   return 0
 }
 
-# mapping_binds NAME ACTION — reports whether the mapping a flow saved binds an
-# action. Skipping paging is a decision with no screen left to read afterwards,
-# so it is checked in the file the flow wrote rather than in the frames.
-mapping_binds() {
-  grep -q "\"$2\"" "$ROOT/$1/userdata/system/configs/knulli-app-store/controller-mappings.json" 2>/dev/null
-}
-
-# Controller setup, driven entirely by the keyboard. Every path that builds a
-# mapping answers the paging question first: paging is optional, so the pair is
-# asked about rather than demanded from a pad that may not carry it.
-walk first-run-use-detected keyboard \
-  "enter,enter" \
-  "setup,paging,catalogue"
-if ! mapping_binds first-run-use-detected page-up; then
-  echo "FAIL first-run-use-detected: assigning paging saved no paging binding" >&2
-  FAILURES=$((FAILURES + 1))
-fi
-
-# The answer is Skip: the mapping is saved without the pair, and the app keeps
-# working on the buttons the pad does have.
-walk first-run-skip-paging keyboard \
-  "enter,down,enter" \
-  "setup,paging,catalogue" \
-  "Detected mapping saved"
-if mapping_binds first-run-skip-paging page-up; then
-  echo "FAIL first-run-skip-paging: a skipped pair was saved anyway" >&2
-  FAILURES=$((FAILURES + 1))
-fi
-
-# The preview tests every action the mapping carries, so it presses each bound
-# button once. The desktop bindings put paging on Page Up and Page Down.
-walk first-run-test-detected keyboard \
-  "down,enter,enter,up,down,left,right,pgup,pgdown,enter,esc,y,tab,y" \
-  "setup,paging,preview,catalogue" \
-  "Controller mapping tested and saved"
-
-# Customize assigns one button per action in the plan — up, down, left, right,
-# page up, page down, confirm, back, settings — reviewing each assignment before
-# the next, then tests the mapping the same way.
-walk first-run-customize keyboard \
-  "down,down,enter,enter,up,enter,down,enter,left,enter,right,enter,pgup,enter,pgdown,enter,enter,enter,esc,enter,y,enter,up,down,left,right,pgup,pgdown,enter,esc,y,tab,y" \
-  "setup,paging,calibration,assignment-review,preview,catalogue" \
-  "Controller mapping tested and saved"
-
-walk first-run-safe-exit keyboard \
-  "down,down,down,enter" \
-  "setup"
+# First launch goes straight to the catalogue, with paging already available.
+walk automatic-first-run keyboard \
+  "down,up,pgdown,pgup" \
+  "catalogue"
 
 # Catalogue, package details, the action list, and the confirmation dialog.
 walk catalogue-walk keyboard \
-  "enter,enter,down,up,enter,enter,esc,esc,tab,y" \
-  "setup,paging,catalogue,actions,confirm"
+  "down,up,enter,enter,esc,esc,tab,y" \
+  "catalogue,actions,confirm"
 
 # The tab bar: the whole list leads, right walks onto Ready and then the
 # installed tab, and left walks back. Nothing is installed in a fresh fixture,
 # so the installed tab is empty and the same key steps out of it. The record's
 # tab column names the view each key reached.
 walk catalogue-tabs keyboard \
-  "enter,enter,right,right,left" \
-  "setup,paging,catalogue" \
+  "right,right,left" \
+  "catalogue" \
   "installed"
 
 # A read-only package offers no action and says so. Only compatible packages
 # are listed. Names sort CoverPlayer, Grout, PlayTime, then PocketCurator.
 walk catalogue-read-only keyboard \
-  "enter,enter,down,down,down,enter" \
-  "setup,paging,catalogue" \
+  "down,down,down,enter" \
+  "catalogue" \
   "No safe action is available"
 
 # Leaving is the Select chord and nothing else: Escape at the catalogue does
 # not leave it, and a held Tab plus Y does.
 walk quit-chord keyboard \
-  "enter,enter,esc,tab,y" \
-  "setup,paging,catalogue"
+  "esc,tab,y" \
+  "catalogue"
 
-# Settings: export diagnostics writes a bundle below the scratch root.
-walk settings-export-diagnostics keyboard \
-  "enter,enter,y,down,enter,esc" \
-  "setup,paging,catalogue,settings" \
+# Y exports diagnostics directly, without a controller customization menu.
+walk export-diagnostics keyboard \
+  "y" \
+  "catalogue" \
   "Diagnostics saved to"
 
 # No controller at all: the blocked screen still exports and still leaves
@@ -251,13 +208,9 @@ if [ "$INSTALL_FLOWS" = yes ]; then
   # Downloads, verifies, and applies a package, then walks the lifecycle the
   # installed package exposes: the health check, repair, and uninstall.
   walk install-package keyboard \
-    "enter,enter,enter,enter,enter" \
-    "setup,paging,catalogue,actions,confirm,progress" \
+    "enter,enter,enter" \
+    "catalogue,actions,confirm,progress" \
     "Install completed"
-  if ! mapping_binds install-package page-up; then
-    echo "FAIL install-package: the saved mapping lost the assigned paging bindings" >&2
-    FAILURES=$((FAILURES + 1))
-  fi
 
   tamper install-package
   walk install-package-health keyboard \

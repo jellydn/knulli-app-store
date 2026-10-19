@@ -14,4 +14,10 @@ if [ ! -x ./knulli-app-ui ] || [ ! -r ./catalog-index.json ] || [ ! -r ./catalog
   exit 1
 fi
 
+# Ports uses direct SDL letters only when its Xbox-layout flag is present.
+export STORE_CONTROLLER_LAYOUT=knulli
+if [ -e /var/run/ports_xbox_layout.flag ]; then
+  export STORE_CONTROLLER_LAYOUT=xbox
+fi
+
 exec ./knulli-app-ui -catalog ./catalog-index.json

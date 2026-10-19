@@ -135,9 +135,6 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 		connectController(ctx, model, controls, controller, options.Diagnostics)
 		if controller == nil {
 			model.ExportDiagnostics(ctx)
-		} else if controls.Mode == storeinput.Normal && startupOverride(controller, controls.Mapping) {
-			controls.OpenSetup()
-			options.Diagnostics.Event("controller_setup_override", "result", "opened", "gesture", "back+diagnostics")
 		}
 	}
 	defer func() {
@@ -443,11 +440,6 @@ func repeatHeldDirection(ctx context.Context, model *storeui.Model, controls *st
 		return
 	}
 	Handle(ctx, model, controls, logger, Event{Kind: EventButton, Button: button})
-}
-
-func startupOverride(controller *controllerState, mapping storeinput.Mapping) bool {
-	return C.controller_button(controller.handle, C.int(mapping[storeinput.Back])) != 0 &&
-		C.controller_button(controller.handle, C.int(mapping[storeinput.Diagnostics])) != 0
 }
 
 func selectedOutputSize(resolution string) (int, int) {

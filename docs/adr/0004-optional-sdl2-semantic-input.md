@@ -11,7 +11,7 @@ The product needs a controller-only device UI, but SDL2 requires CGO and a devic
 
 Keep installer policy in `internal/installer` and catalogue actions in `internal/appstore.Backend`. Put the SDL adapter in `internal/sdlui` behind the `sdl` build tag, with a small local cgo wrapper that imports only the SDL 2.0 functions in use. Keep `internal/ui` as a pure-Go state machine and `internal/input` as semantic actions (`confirm`, `back`, and the rest) bound to SDL GameController buttons for one device/controller identity.
 
-Prefer Knulli's generated `SDL_GAMECONTROLLERCONFIG`. Do not read raw evdev nodes or assume a universal physical A/B layout. On first launch for each identity, require the user to use, test, or customize the detected mapping before the catalogue opens. The CLI stays CGO-free and statically cross-compiled.
+Prefer Knulli's generated `SDL_GAMECONTROLLERCONFIG`. Do not read raw evdev nodes or assume a universal physical A/B layout. Updated 2026-10-19 at the owner's request: use automatic SDL/KNULLI controls and open the catalogue immediately, without setup, calibration, or mapping persistence. The launcher selects Knulli's default ES-to-SDL letter policy or Ports Xbox mode from its runtime flag. Bindings compensate once; events are unchanged. ES A confirms, B backs out, Y exports diagnostics, and Select+Y quits. Legacy custom mapping files are ignored and untouched. The CLI stays CGO-free and statically cross-compiled.
 
 ## Consequences
 
@@ -19,7 +19,7 @@ Prefer Knulli's generated `SDL_GAMECONTROLLERCONFIG`. Do not read raw evdev node
 
 - Safety tests and the recovery CLI run without SDL2.
 - Device artifacts can still link `libSDL2-2.0.so.0` for the GUI.
-- Controller setup is reviewable and persistable per device and controller.
+- Automatic controls remove first-run friction and stale custom-mapping overrides.
 
 ### Negative
 

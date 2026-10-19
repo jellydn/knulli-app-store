@@ -59,10 +59,10 @@ func TestKeyNamesCoverEveryKey(t *testing.T) {
 }
 
 func TestWalkFileSortsInWalkthroughOrder(t *testing.T) {
-	first := WalkFile(0, KeyNone, "setup")
-	second := WalkFile(1, KeyDown, "calibration")
+	first := WalkFile(0, KeyNone, "catalogue")
+	second := WalkFile(1, KeyDown, "actions")
 	tenth := WalkFile(10, KeyConfirm, "catalogue")
-	if first != "000-start-setup.png" || second != "001-down-calibration.png" {
+	if first != "000-start-catalogue.png" || second != "001-down-actions.png" {
 		t.Fatalf("unexpected names: %q %q", first, second)
 	}
 	if !(first < second && second < tenth) {
@@ -78,12 +78,7 @@ func TestWalkStateNamesEveryScreen(t *testing.T) {
 		mode  storeinput.Mode
 		state string
 	}{
-		{storeinput.Setup, "setup"},
 		{storeinput.Blocked, "blocked"},
-		{storeinput.Settings, "settings"},
-		{storeinput.Calibrating, "calibration"},
-		{storeinput.Review, "assignment-review"},
-		{storeinput.Preview, "preview"},
 	} {
 		session.Mode = test.mode
 		if got := WalkState(model, session); got != test.state {
@@ -129,11 +124,11 @@ func TestWalkDetailRecordsTheSelectedItemAndError(t *testing.T) {
 	model.Toasts.Push("Install completed", time.Now())
 	session := storeinput.NewDesktopSession(t.TempDir(), "trimui-smart-pro")
 	session.Mode = storeinput.Normal
-	session.Message = "Controller mapping tested and saved"
+	session.Message = "Controller connected"
 	detail := WalkDetail(model, session)
 	// A completion now reaches the record through the notice bar, so the evidence
 	// still says what the screen showed after an operation finished.
-	for _, want := range []string{"io.github.unitreign.playtime", "confirm", "uninstall", "false", "normal", "all", "Controller mapping tested and saved", "Downloading, verifying, and applying Grout", "Install completed", "SHA-256 mismatch"} {
+	for _, want := range []string{"io.github.unitreign.playtime", "confirm", "uninstall", "false", "normal", "all", "Controller connected", "Downloading, verifying, and applying Grout", "Install completed", "SHA-256 mismatch"} {
 		if !strings.Contains(detail, want) {
 			t.Fatalf("detail %q does not record %q", detail, want)
 		}
@@ -189,11 +184,11 @@ func TestWalkRunnerCapturesEachKeyAndWaitsForWork(t *testing.T) {
 		t.Fatal("a key sequence produced no runner")
 	}
 	// The opening frame is evidence before any key is sent.
-	frame, ok := runner.Capture("setup", false)
-	if !ok || frame.File != "000-start-setup.png" || frame.Key != KeyNone {
+	frame, ok := runner.Capture("catalogue", false)
+	if !ok || frame.File != "000-start-catalogue.png" || frame.Key != KeyNone {
 		t.Fatalf("opening frame = %#v, %v", frame, ok)
 	}
-	if _, ok := runner.Capture("setup", false); ok {
+	if _, ok := runner.Capture("catalogue", false); ok {
 		t.Fatal("the same frame was captured twice")
 	}
 	if key, ok := runner.Step(false); !ok || key != KeyConfirm {

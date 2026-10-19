@@ -73,19 +73,6 @@ func footerHints(model *storeui.Model, controls *storeinput.Session) []storeinpu
 	switch controls.Mode {
 	case storeinput.Blocked:
 		return []storeinput.Hint{confirm, quit}
-	case storeinput.Setup:
-		if controls.FirstRun {
-			return []storeinput.Hint{confirm, quit}
-		}
-		return []storeinput.Hint{confirm, back}
-	case storeinput.Paging, storeinput.Settings, storeinput.Review:
-		// The paging question is a choice between two items, so it offers the
-		// same pair of actions the other choice screens do.
-		return []storeinput.Hint{confirm, back}
-	case storeinput.Calibrating:
-		return []storeinput.Hint{{Verb: storeinput.VerbAnyButton}}
-	case storeinput.Preview:
-		return []storeinput.Hint{{Verb: storeinput.VerbShownButton}}
 	default:
 		return []storeinput.Hint{back, storeinput.NewHint(storeinput.Diagnostics)}
 	}
