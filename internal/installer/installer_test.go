@@ -635,7 +635,7 @@ func TestRandomPickerLifecyclePreservesStateAndOtherPorts(t *testing.T) {
 				t.Fatalf("repair health: %#v, %v", status, err)
 			}
 			updated := pkg
-			updated.Version = "0.1.0-alpha.2"
+			updated.Version = "0.1.0-alpha.3"
 			if _, err := manager.Apply(context.Background(), OpUpdate, updated); err != nil {
 				t.Fatal(err)
 			}
