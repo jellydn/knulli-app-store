@@ -59,10 +59,14 @@ func Copy(source, destination string, mode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(destination), 0755); err != nil {
 		return err
 	}
-	output, err := os.OpenFile(destination, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode.Perm())
+	// Replacing the inode keeps a running executable alive and leaves the old
+	// destination intact if copying fails before the rename.
+	output, err := os.CreateTemp(filepath.Dir(destination), ".write-*")
 	if err != nil {
 		return err
 	}
+	name := output.Name()
+	defer os.Remove(name)
 	if err := output.Chmod(mode.Perm()); err != nil {
 		output.Close()
 		return err
@@ -76,7 +80,13 @@ func Copy(source, destination string, mode os.FileMode) error {
 	if syncErr != nil {
 		return syncErr
 	}
-	return closeErr
+	if closeErr != nil {
+		return closeErr
+	}
+	if err := os.Rename(name, destination); err != nil {
+		return err
+	}
+	return syncDirectory(filepath.Dir(destination))
 }
 
 func SHA256(path string) (string, error) {

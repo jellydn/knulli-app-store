@@ -67,6 +67,8 @@ The check includes official experimental pre-releases and uses the build's packa
 
 Self-update is available for device builds installed at `/userdata/roms/ports/knulli-app-store`. Custom locations and older builds need a manual ZIP update first. Network failures or missing digests leave Update unavailable. The trust root is the official GitHub repository over HTTPS, not an independent long-lived update signing key.
 
+If self-update reports **text file busy**, the running build still uses the old in-place executable copy. It cannot install its own fix through that updater. Install a release containing the atomic-copy fix once using the manual ZIP procedure: verify the checksum, shut down Knulli, and replace all Store files from the device ZIP together. Do not delete `/userdata/system/knulli-app-store` or installed app data. See the [TrimUI procedure](docs/trimui-smart-pro.md#update-an-earlier-test-build) or [MagicX procedure](docs/magicx-zero-28.md#install-and-automatic-controls). Later self-updates use temporary-file replacement, and a failed rollback retains its journal and backups for recovery.
+
 Build the CLI locally:
 
 ```sh

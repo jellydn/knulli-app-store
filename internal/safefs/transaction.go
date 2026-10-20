@@ -179,12 +179,11 @@ func (t *Transaction) Rollback() error {
 	if t.closed {
 		return nil
 	}
-	t.closed = true
-	first := rollbackSnapshots(t.guard.root, t.snapshots)
-	if err := os.RemoveAll(t.directory); err != nil && first == nil {
-		first = err
+	if err := rollbackSnapshots(t.guard.root, t.snapshots); err != nil {
+		return err
 	}
-	return first
+	t.closed = true
+	return os.RemoveAll(t.directory)
 }
 
 func (t *Transaction) prepare(virtual string) (string, error) {

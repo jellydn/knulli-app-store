@@ -20,6 +20,8 @@ The Store card checks `api.github.com/repos/jellydn/knulli-app-store/releases` o
 
 Only the two Store binaries, catalogue/signature pair, README, launcher, and icon under `/userdata/roms/ports` can change. The updater shares the manager lock and journal/rollback implementation. The launcher runs `knulli-app recover` before starting the UI: recovery can restore a key-bearing binary and its matching catalogue before either is loaded. The service also recovers before catalogue verification. Atomic file replacement keeps the current Linux process running; the user must exit and reopen to load the new version. No package state or settings are removed.
 
+Transactional copies, including snapshot restoration, stream to a temporary file in the destination directory, sync and close it, then rename it over the destination and sync the directory. They never truncate a running executable. A failed rollback retains the open journal and snapshots so recovery can retry; backups are removed only after restoration succeeds. This cannot recover journals already deleted by an older build.
+
 This trusts the official GitHub repository and HTTPS API, not an independent update signing key. A compromised publisher account can publish malicious Store bytes and matching digests. The catalogue's per-build signature is not a separate signature over the Store ZIP. Custom install locations and builds without embedded target/version metadata use manual ZIP replacement.
 
 ## Installer controls

@@ -164,6 +164,58 @@ func TestRecoverReportsAFailedRollback(t *testing.T) {
 	}
 }
 
+func TestFailedRollbackRetainsSnapshotsForRecovery(t *testing.T) {
+	root := t.TempDir()
+	guard, err := NewGuard(root, []string{"/userdata/app"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	existing := filepath.Join(root, "userdata/app/existing")
+	if err := AtomicWrite(existing, []byte("original"), 0640); err != nil {
+		t.Fatal(err)
+	}
+	parent := t.TempDir()
+	tx, err := Begin(guard, parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Write("/userdata/app/existing", []byte("updated"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Write("/userdata/app/new", []byte("new"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	blocker := filepath.Join(root, "userdata/app/new")
+	if err := os.Remove(blocker); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(blocker, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(blocker, "child"), []byte("block rollback"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Rollback(); err == nil {
+		t.Fatal("expected blocked rollback to fail")
+	}
+	if pending, err := PendingForPath(root, parent, "/userdata/app"); err != nil || !pending {
+		t.Fatalf("failed rollback lost its recovery journal: pending=%v, err=%v", pending, err)
+	}
+	if err := os.RemoveAll(blocker); err != nil {
+		t.Fatal(err)
+	}
+	if err := Recover(root, parent); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(existing)
+	if err != nil || string(data) != "original" {
+		t.Fatalf("recovery did not restore original bytes: %q, %v", data, err)
+	}
+	if pending, err := PendingForPath(root, parent, "/userdata/app"); err != nil || pending {
+		t.Fatalf("recovered transaction still pending: %v, %v", pending, err)
+	}
+}
+
 func TestPendingForPathValidatesAndMatchesOpenJournal(t *testing.T) {
 	root := t.TempDir()
 	guard, err := NewGuard(root, []string{"/userdata/app", "/userdata/system/manager"})

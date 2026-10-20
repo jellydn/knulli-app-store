@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/jellydn/knulli-app-store/internal/manifest"
@@ -50,9 +52,10 @@ func TestCheckStoreUpdatePinsOfficialTargetAsset(t *testing.T) {
 }
 
 func TestStoreUpdatePreservesAppsAndRollsBackUnsafeReleases(t *testing.T) {
-	for _, scenario := range []string{"success", "checksum", "inventory", "symlink", "write failure", "space"} {
+	for _, scenario := range []string{"success", "running UI", "checksum", "inventory", "symlink", "write failure", "space"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := t.TempDir()
+			success := scenario == "success" || scenario == "running UI"
 			files := map[string]string{
 				"Knulli App Store.sh":                     "new launcher",
 				"images/Knulli App Store.png":             "new image",
@@ -64,6 +67,29 @@ func TestStoreUpdatePreservesAppsAndRollsBackUnsafeReleases(t *testing.T) {
 			}
 			for name := range files {
 				writeRootFile(t, root, "userdata/roms/ports/"+name, "old "+name)
+			}
+			if scenario == "running UI" {
+				sleep, err := exec.LookPath("sleep")
+				if err != nil {
+					t.Fatal(err)
+				}
+				ui := filepath.Join(root, "userdata/roms/ports/knulli-app-store/knulli-app-ui")
+				if err := safefs.Copy(sleep, ui, 0755); err != nil {
+					t.Fatal(err)
+				}
+				process := exec.Command(ui, "60")
+				if err := process.Start(); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() {
+					process.Process.Kill()
+					process.Wait()
+				})
+				defer func() {
+					if err := process.Process.Signal(syscall.Signal(0)); err != nil {
+						t.Errorf("running UI did not survive replacement: %v", err)
+					}
+				}()
 			}
 			writeRootFile(t, root, "userdata/system/configs/demo/settings", "keep settings")
 			writeRootFile(t, root, "userdata/roms/ports/demo/app", "keep app")
@@ -96,7 +122,7 @@ func TestStoreUpdatePreservesAppsAndRollsBackUnsafeReleases(t *testing.T) {
 				}
 			}
 			err := manager.UpdateStore(context.Background(), update)
-			if (err == nil) != (scenario == "success") {
+			if (err == nil) != success {
 				t.Fatalf("update result: %v", err)
 			}
 			for name, content := range files {
@@ -108,14 +134,14 @@ func TestStoreUpdatePreservesAppsAndRollsBackUnsafeReleases(t *testing.T) {
 					continue
 				}
 				want := "old " + name
-				if scenario == "success" {
+				if success {
 					want = content
 				}
 				assertRootFile(t, root, "userdata/roms/ports/"+name, want)
 			}
 			assertRootFile(t, root, "userdata/system/configs/demo/settings", "keep settings")
 			assertRootFile(t, root, "userdata/roms/ports/demo/app", "keep app")
-			if scenario == "success" {
+			if success {
 				info, err := os.Stat(filepath.Join(root, "userdata/roms/ports/knulli-app-store/knulli-app-ui"))
 				if err != nil || info.Mode().Perm() != 0755 {
 					t.Fatalf("UI execute mode: %v, %v", info, err)
