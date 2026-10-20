@@ -20,8 +20,7 @@ type xmlNode struct {
 }
 
 // addEntry writes the reviewed entry into its gamelist file inside the
-// transaction. An entry with the same path is left untouched: entries this
-// installer did not create are never edited.
+// transaction. An entry with the same path is not replaced or claimed.
 func addEntry(tx *safefs.Transaction, guard *safefs.Guard, menu manifest.Menu) (bool, error) {
 	return editGamelist(tx, guard, menu.Gamelist, func(data []byte) ([]byte, bool, error) {
 		return addMenuEntry(data, menu)
@@ -79,6 +78,46 @@ func addMenuEntry(data []byte, menu manifest.Menu) ([]byte, bool, error) {
 	root.Children = append(root.Children, menuNode(menu))
 	output, err := encodeGamelist(root)
 	return output, err == nil, err
+}
+
+// Filling blanks does not grant ownership of a shared entry. Keeping the
+// existing node also preserves play history, custom fields, and attributes.
+func fillMissingEntry(tx *safefs.Transaction, guard *safefs.Guard, menu manifest.Menu) (bool, error) {
+	return editGamelist(tx, guard, menu.Gamelist, func(data []byte) ([]byte, bool, error) {
+		root, err := parseGamelist(data)
+		if err != nil {
+			return nil, false, err
+		}
+		for _, game := range root.Children {
+			if game.Name.Local != "game" || childValue(game, "path") != menu.Path {
+				continue
+			}
+			changed := false
+			for _, field := range menuNode(menu).Children {
+				if field.Name.Local == "path" || childValue(game, field.Name.Local) != "" {
+					continue
+				}
+				found := false
+				for _, child := range game.Children {
+					if child.Name.Local == field.Name.Local {
+						child.Text = field.Text
+						found = true
+						break
+					}
+				}
+				if !found {
+					game.Children = append(game.Children, field)
+				}
+				changed = true
+			}
+			if changed {
+				output, err := encodeGamelist(root)
+				return output, err == nil, err
+			}
+			break
+		}
+		return data, false, nil
+	})
 }
 
 func replaceOwnedMenuEntry(data []byte, oldMenu, newMenu manifest.Menu) ([]byte, bool, error) {

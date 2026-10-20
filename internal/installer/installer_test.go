@@ -175,13 +175,15 @@ func TestUninstallRemovesOwnedMenuEntryAndRefreshesGameList(t *testing.T) {
 
 func TestSharedPreExistingMenuEntryIsNotOwnedOrRemoved(t *testing.T) {
 	root := t.TempDir()
-	writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", `<gameList><game><path>./demo/launch.sh</path><name>Manual Demo</name><custom>keep</custom></game></gameList>`)
+	const existingMenu = `<gameList><game><path>./demo/launch.sh</path><name>Manual Demo</name><custom>keep</custom></game></gameList>`
+	writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", existingMenu)
 	asset := zipBytes(t, map[string]string{"launch.sh": "managed"})
 	server := serveAsset(t, asset)
 	defer server.Close()
 	var outcomes []OperationOutcome
 	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	pkg.Install.Menu.Image = "./demo/cover.png"
 	outcome, err := manager.Apply(context.Background(), OpInstall, pkg)
 	if err != nil {
 		t.Fatal(err)
@@ -195,6 +197,19 @@ func TestSharedPreExistingMenuEntryIsNotOwnedOrRemoved(t *testing.T) {
 	if err != nil || state.MenuOwned {
 		t.Fatalf("manual menu entry became manager-owned: %#v, %v", state, err)
 	}
+	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<desc>Fixture utility.</desc>")
+	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<image>./demo/cover.png</image>")
+	writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", existingMenu)
+	if repaired, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil || !repaired.GameListChanged {
+		t.Fatalf("repair of missing metadata = %#v, %v", repaired, err)
+	}
+	state, err = loadState(baseGuard, pkg.ID)
+	if err != nil || state.MenuOwned {
+		t.Fatalf("repair claimed the shared entry: %#v, %v", state, err)
+	}
+	if repaired, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil || repaired.GameListChanged {
+		t.Fatalf("repeated metadata repair = %#v, %v", repaired, err)
+	}
 	outcome, err = manager.Uninstall(context.Background(), pkg.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -202,8 +217,9 @@ func TestSharedPreExistingMenuEntryIsNotOwnedOrRemoved(t *testing.T) {
 	outcomes = append(outcomes, outcome)
 	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<name>Manual Demo</name>")
 	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<custom>keep</custom>")
-	if len(outcomes) != 2 || outcomes[0].GameListChanged || outcomes[1].GameListChanged {
-		t.Fatalf("unchanged shared menu requested refresh: %#v", outcomes)
+	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<image>./demo/cover.png</image>")
+	if len(outcomes) != 2 || !outcomes[0].GameListChanged || outcomes[1].GameListChanged {
+		t.Fatalf("metadata fill must refresh, but uninstall must preserve the shared entry: %#v", outcomes)
 	}
 }
 

@@ -1,6 +1,7 @@
 package gamelist
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -260,5 +261,57 @@ func TestEditedArtworkIsNotReplacedOrRemoved(t *testing.T) {
 				t.Fatalf("edited artwork changed: %s %v", got, err)
 			}
 		})
+	}
+}
+
+func TestApplyFillsOnlyBlankMetadataWithoutClaimingExistingEntry(t *testing.T) {
+	for _, oldOwned := range []bool{false, true} {
+		for _, fields := range []string{
+			"<name> </name>",
+			"<name>playtime</name>",
+			"<name>playtime</name><desc> </desc><image source=\"user\">./custom.png</image>",
+			"<name>playtime</name><desc>My description</desc><image>./custom.png</image>",
+		} {
+			t.Run(fmt.Sprintf("owned=%t/%s", oldOwned, fields), func(t *testing.T) {
+				_, guard, tx := newTx(t)
+				data := "<gameList><game><path>./other.sh</path><name>Other</name></game><game id=\"keep\"><path>./demo/launch.sh</path>" + fields + "<playcount>17</playcount><lastplayed>20261020T150000</lastplayed><favorite>true</favorite></game></gameList>"
+				writeGamelistHost(t, guard, data)
+				entry := menu(testGamelist, "./demo/launch.sh", "Reviewed name", "Reviewed description")
+				entry.Image = "./demo/cover.png"
+				changed, owned, err := Apply(tx, guard, Derive(oldOwned, entry, entry))
+				wantChange := !strings.Contains(fields, "My description")
+				if err != nil || changed != wantChange || owned {
+					t.Fatalf("metadata repair: changed=%v owned=%v err=%v", changed, owned, err)
+				}
+				if err := tx.Commit(); err != nil {
+					t.Fatal(err)
+				}
+				host, _ := guard.Resolve(testGamelist)
+				got, err := os.ReadFile(host)
+				if err != nil {
+					t.Fatal(err)
+				}
+				wantDesc := "Reviewed description"
+				if strings.Contains(fields, "My description") {
+					wantDesc = "My description"
+				}
+				wantImage := "./demo/cover.png"
+				if strings.Contains(fields, "./custom.png") {
+					wantImage = "./custom.png"
+				}
+				wantName := "playtime"
+				if !strings.Contains(fields, "playtime") {
+					wantName = "Reviewed name"
+				}
+				for _, want := range []string{"<name>" + wantName + "</name>", "<desc>" + wantDesc + "</desc>", wantImage, "<playcount>17</playcount>", "<lastplayed>20261020T150000</lastplayed>", "<favorite>true</favorite>", "id=\"keep\"", "<path>./other.sh</path>"} {
+					if !strings.Contains(string(got), want) {
+						t.Fatalf("lost %q: %s", want, got)
+					}
+				}
+				if strings.Count(string(got), "<desc>") != 1 || strings.Count(string(got), "<image") != 1 {
+					t.Fatalf("duplicate metadata: %s", got)
+				}
+			})
+		}
 	}
 }

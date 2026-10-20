@@ -63,9 +63,9 @@ Download the newest device build from [GitHub Releases](https://github.com/jelly
 
 PlayTime, Grout, and RetSend belong in **Tools**; the Store and Random Game Picker belong in **Ports**. Install and Repair create missing menu entries with a name, description, and bundled image where declared. The Store registers its own missing Ports entry on launch without shipping a shared gamelist over other games. A queued refresh is not proof that EmulationStation finished reloading; return to the frontend and restart it if needed.
 
-After installing a Store build containing the RetSend menu fix, run **Repair** on RetSend 1.0.0. This moves its launcher from `RetSend/tools/Retsend.sh` to `RetSend/RetSend.sh`, within Knulli's default scan depth. Its binary, configuration, identity, history, and inbox remain in their existing locations. Run Repair on PlayTime and Grout to add metadata when their exact launcher entry is absent.
+After installing a Store build containing the RetSend menu fix, run **Repair** on RetSend 1.0.0. This moves its launcher from `RetSend/tools/Retsend.sh` to `RetSend/RetSend.sh`, within Knulli's default scan depth. Its binary, configuration, identity, history, and inbox remain in their existing locations. Run Repair on PlayTime and Grout to add missing menu metadata. Reopen the Store to fill its own missing metadata, then refresh the game lists or restart EmulationStation if needed.
 
-Existing manual, scraped, or app-created entries are left unchanged, even if their description or image is missing. To migrate one, stop EmulationStation and back up the affected `gamelist.xml`, remove only the entry for that exact launcher, then launch the Store again (for its own metadata) or run Repair (for an installed app). See [menu ownership and migration](docs/how-to-add-a-package.md#emulationstation-menu-metadata). Do not delete the whole gamelist or app data.
+For existing manual, scraped, or app-created entries, the Store fills only blank name, description, and image fields for the exact launcher path. Existing names and artwork, play history, and custom fields are preserved. Filling blanks does not grant ownership, so Uninstall does not remove these entries. No manual gamelist deletion is needed. See [menu ownership and migration](docs/how-to-add-a-package.md#emulationstation-menu-metadata).
 
 ### Update the Store from the Store
 

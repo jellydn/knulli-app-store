@@ -66,7 +66,7 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Transaction** — A reversible group of writes. Snapshots restore in reverse order when any step fails.
 
-**Menu ownership** — The installer owns a `gamelist.xml` entry only when it created that exact entry and it is unchanged. Shared or modified entries are never edited or deleted.
+**Menu ownership** — The installer owns a `gamelist.xml` entry only when it created that exact entry and it is unchanged. For an existing exact launcher path, registration and Repair can fill blank name, description, and image fields without taking ownership. Existing nonblank values, play history, and custom fields remain. Shared or modified entries are never replaced or deleted.
 
 **Game list refresh** — The loopback request asking Knulli to reload menus after a committed menu change. Accepted means queued, not completed; a refusal is reported as restart required while the operation stays committed.
 

@@ -81,14 +81,16 @@ func TestRunRegisterStoreMenuPreservesOtherAndCustomEntries(t *testing.T) {
 				t.Fatal(err)
 			}
 			if custom {
-				if string(got) != data {
-					t.Fatalf("custom Store entry changed: %s", got)
+				for _, want := range []string{"<name>My Store</name>", "<image>./my-cover.png</image>", "<desc>Install, update, and manage reviewed apps for Knulli.</desc>", "<favorite>true</favorite>"} {
+					if !strings.Contains(string(got), want) {
+						t.Fatalf("custom Store entry lacks %q: %s", want, got)
+					}
 				}
-				return
-			}
-			for _, want := range []string{"<name>Knulli App Store</name>", "<desc>Install, update, and manage reviewed apps for Knulli.</desc>", "<image>./images/Knulli App Store.png</image>", "<favorite>true</favorite>"} {
-				if !strings.Contains(string(got), want) {
-					t.Fatalf("menu lacks %q: %s", want, got)
+			} else {
+				for _, want := range []string{"<name>Knulli App Store</name>", "<desc>Install, update, and manage reviewed apps for Knulli.</desc>", "<image>./images/Knulli App Store.png</image>", "<favorite>true</favorite>"} {
+					if !strings.Contains(string(got), want) {
+						t.Fatalf("menu lacks %q: %s", want, got)
+					}
 				}
 			}
 			if strings.Count(string(got), "<path>./Knulli App Store.sh</path>") != 1 {

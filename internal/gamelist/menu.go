@@ -1,7 +1,7 @@
 // Package gamelist owns EmulationStation menu ownership: which gamelist
 // entries the installer may create, replace, or remove, and applying that
-// effect inside a transaction. Entries this installer does not own are never
-// edited or deleted.
+// effect inside a transaction. Unowned entries may receive missing metadata,
+// but their existing values are never replaced and they are never deleted.
 package gamelist
 
 import (
@@ -76,20 +76,26 @@ func sameEntry(left, right manifest.Menu) bool {
 // gamelist file changed and whether the installer owns the package's menu
 // entry afterwards. Ownership transfers only when the owning write actually
 // happened: an add or replace that found nothing to do leaves the entry
-// unowned, and a removal always releases ownership.
+// unowned, even if missing metadata is filled. A removal releases ownership.
 func Apply(tx *safefs.Transaction, guard *safefs.Guard, plan Plan) (changed bool, owned bool, err error) {
 	for _, step := range plan.Steps {
 		stepChanged, err := applyStep(tx, guard, step)
 		if err != nil {
 			return changed, false, err
 		}
-		changed = changed || stepChanged
 		switch step.Kind {
 		case StepAdd, StepReplace:
 			owned = stepChanged
+			if !stepChanged {
+				stepChanged, err = fillMissingEntry(tx, guard, step.Menu)
+				if err != nil {
+					return changed, false, err
+				}
+			}
 		case StepRemove:
 			owned = false
 		}
+		changed = changed || stepChanged
 	}
 	return changed, owned, nil
 }
