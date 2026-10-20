@@ -21,8 +21,8 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 	if len(first.Packages) != 7 || len(second.Packages) != 7 {
 		t.Fatalf("expected seven packages, got %d and %d", len(first.Packages), len(second.Packages))
 	}
-	// RetSend is published by the App Store maintainer's own fork, so its
-	// recorded provenance is the maintainer rather than the community.
+	// RetSend now uses upstream releases, but its recorded approval remains
+	// the maintainer's decision rather than community or device verification.
 	provenance := map[string]string{
 		"app.romm.grout":                         "community",
 		"io.github.heilmic.coverplayer":          "community",

@@ -1,5 +1,7 @@
 # Catalogue review — 2026-09-17
 
+Historical review of the fork. The current entry uses [upstream RetSend 1.0.0](retsend-upstream-1.0.0.md), reviewed on 2026-10-19. The fork URLs below are retained as historical evidence, not current download sources.
+
 ## RetSend 0.9.1
 
 The reviewed artifact is published by the App Store maintainer's fork `jellydn/retsend` at commit `e73257c052f360f842072ef2da065398c9997ea2`, which is the commit the release tagged `prerelease` pointed at on 2026-09-17. The tag is a moving name, so the manifest pins bytes, not the tag, and every evidence link in the manifest pins the commit.

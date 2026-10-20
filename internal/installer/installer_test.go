@@ -499,89 +499,145 @@ func retSendTestPackage(t *testing.T, asset []byte) manifest.Package {
 }
 
 func TestRetSendInstallMenuHealthRepairAndUninstallPreserveIdentityAndInbox(t *testing.T) {
+	// Exact upstream launcher: mxmgorin/retsend v1.0.0, commit 7968a92.
+	launcher, err := os.ReadFile("testdata/retsend-v1.0.0.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
 	asset := zipBytesWithModes(t, map[string]zipFixture{
+		"tools/Retsend.sh":         {body: string(launcher), mode: 0755},
+		"tools/Retsend.sh.keys":    {body: "hotkey mapping", mode: 0644},
+		"tools/gamelist.xml":       {body: "upstream package-local menu", mode: 0644},
+		"tools/images/retsend.png": {body: "icon", mode: 0644},
+		"tools/retsend/retsend":    {body: "reviewed arm64 binary", mode: 0755},
+	})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	legacyAsset := zipBytesWithModes(t, map[string]zipFixture{
 		"RetSend/LICENSE":    {body: "GPL text", mode: 0644},
 		"RetSend/NOTICES":    {body: "third-party notices", mode: 0644},
 		"RetSend/README.md":  {body: "readme", mode: 0644},
 		"RetSend/RetSend.sh": {body: "reviewed launcher", mode: 0755},
-		"RetSend/retsend":    {body: "reviewed arm64 binary", mode: 0755},
+		"RetSend/retsend":    {body: "fork binary", mode: 0755},
 	})
-	server := serveAsset(t, asset)
-	defer server.Close()
+	legacyServer := serveAsset(t, legacyAsset)
+	defer legacyServer.Close()
 
 	// The launcher's runtime data: configuration, transfer history, TLS identity,
 	// the receive inbox, and the SDL preference tree HOME points at inside the
 	// package directory. None of these are release inventory.
 	runtimeFiles := map[string]string{
-		"userdata/system/configs/retsend/settings.toml":               "settings",
+		"userdata/system/configs/retsend/config.toml":                 "settings",
 		"userdata/system/configs/retsend/history.json":                "transfer history",
-		"userdata/system/configs/retsend/identity.pem":                "tls identity",
+		"userdata/system/configs/retsend/identity.key":                "tls private key",
+		"userdata/system/configs/retsend/identity.crt":                "tls certificate",
 		"userdata/roms/retsend-inbox/handheld-rom.zip":                "received file",
 		"userdata/roms/tools/RetSend/.local/share/retsend/prefs.toml": "sdl preference path",
 		"userdata/roms/tools/RetSend/retsend-panic.log":               "panic log",
+		"userdata/roms/tools/RetSend/tools/retsend/log.txt":           "upstream log",
+		"userdata/roms/tools/RetSend/tools/retsend/retsend-panic.log": "upstream panic log",
 	}
 
 	for _, current := range []platform.Info{
 		{Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "libc"}, Device: "trimui-smart-pro", Resolution: "1280x720"},
 		{Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "libc"}, Device: "magicx-zero-28", Resolution: "640x480"},
 	} {
-		t.Run(current.Device, func(t *testing.T) {
-			root := t.TempDir()
-			pkg := retSendTestPackage(t, asset)
-			manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(current)
-
-			if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := manager.Apply(context.Background(), OpInstall, pkg); err == nil || !strings.Contains(err.Error(), "already installed") {
-				t.Fatalf("repeated install was not rejected: %v", err)
-			}
-			assertRootFile(t, root, "userdata/roms/tools/RetSend/RetSend.sh", "reviewed launcher")
-			assertRootFile(t, root, "userdata/roms/tools/RetSend/retsend", "reviewed arm64 binary")
-			for _, name := range []string{"RetSend.sh", "retsend"} {
-				info, err := os.Stat(filepath.Join(root, "userdata/roms/tools/RetSend", name))
-				if err != nil || info.Mode().Perm() != 0755 {
-					t.Fatalf("%s mode was not restored: %v, %v", name, info, err)
+		for _, fromFork := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/from-fork=%t", current.Device, fromFork), func(t *testing.T) {
+				root := t.TempDir()
+				pkg := retSendTestPackage(t, asset)
+				if pkg.Version != "1.0.0" || pkg.Repository != "https://github.com/mxmgorin/retsend" || pkg.Release.URL != "https://github.com/mxmgorin/retsend/releases/download/v1.0.0/retsend-knulli.zip" {
+					t.Fatalf("RetSend does not use the upstream Knulli release: %#v", pkg)
 				}
-			}
-			assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<path>./RetSend/RetSend.sh</path>")
-			assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<name>RetSend</name>")
+				manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(current)
+				writeRootFile(t, root, "userdata/roms/tools/Other.sh", "unrelated tool")
+				writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList><game><path>./Other.sh</path><name>Other</name></game></gameList>")
 
-			for relative, body := range runtimeFiles {
-				writeRootFile(t, root, relative, body)
-			}
-			status, err := manager.Status(pkg.ID)
-			if err != nil || !status.Healthy || len(status.Issues) != 0 {
-				t.Fatalf("normal first-launch files made RetSend unhealthy: %#v, %v", status, err)
-			}
+				operation := OpInstall
+				if fromFork {
+					legacy := retSendTestPackage(t, legacyAsset)
+					legacy.Version = "0.9.1"
+					legacy.Repository = "https://github.com/jellydn/retsend"
+					legacy.Release.URL = legacy.Repository + "/releases/download/prerelease/retsend-knulli.zip"
+					legacy.Install.StripComponents = 1
+					legacy.Install.Launcher = "RetSend.sh"
+					legacy.Install.Executables = []string{"RetSend.sh", "retsend"}
+					legacy.Install.Menu.Path = "./RetSend/RetSend.sh"
+					legacy.Install.BinaryPatches = nil
+					manager.Client = rewriteClient(t, legacyServer)
+					if _, err := manager.Apply(context.Background(), OpInstall, legacy); err != nil {
+						t.Fatal(err)
+					}
+					for relative, body := range runtimeFiles {
+						writeRootFile(t, root, relative, body)
+					}
+					manager.Client = rewriteClient(t, server)
+					operation = OpUpdate
+				}
+				if _, err := manager.Apply(context.Background(), operation, pkg); err != nil {
+					t.Fatal(err)
+				}
+				if fromFork {
+					assertMissing(t, root, "userdata/roms/tools/RetSend/retsend")
+					assertMissing(t, root, "userdata/roms/tools/RetSend/RetSend.sh")
+					assertNotContains(t, root, "userdata/roms/tools/gamelist.xml", "./RetSend/RetSend.sh")
+					for relative, body := range runtimeFiles {
+						assertRootFile(t, root, relative, body)
+					}
+				}
+				if _, err := manager.Apply(context.Background(), OpInstall, pkg); err == nil || !strings.Contains(err.Error(), "already installed") {
+					t.Fatalf("repeated install was not rejected: %v", err)
+				}
+				assertContains(t, root, "userdata/roms/tools/RetSend/tools/Retsend.sh", "RETSEND_DATA_DIR=/userdata/system/configs/retsend RETSEND_SAVE_DIR=/userdata/roms/retsend-inbox")
+				assertRootFile(t, root, "userdata/roms/tools/RetSend/tools/retsend/retsend", "reviewed arm64 binary")
+				for _, name := range []string{"tools/Retsend.sh", "tools/retsend/retsend"} {
+					info, err := os.Stat(filepath.Join(root, "userdata/roms/tools/RetSend", name))
+					if err != nil || info.Mode().Perm() != 0755 {
+						t.Fatalf("%s mode was not restored: %v, %v", name, info, err)
+					}
+				}
+				assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<path>./RetSend/tools/Retsend.sh</path>")
+				assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<name>RetSend</name>")
+				assertRootFile(t, root, "userdata/roms/tools/RetSend/tools/gamelist.xml", "upstream package-local menu")
 
-			binary := filepath.Join(root, "userdata/roms/tools/RetSend/retsend")
-			if err := os.WriteFile(binary, []byte("corrupt"), 0755); err != nil {
-				t.Fatal(err)
-			}
-			status, err = manager.Status(pkg.ID)
-			if err != nil || status.Healthy || len(status.Issues) == 0 || status.Issues[0].Check != "content changed" {
-				t.Fatalf("changed reviewed binary was not reported: %#v, %v", status, err)
-			}
-			if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
-				t.Fatal(err)
-			}
-			assertRootFile(t, root, "userdata/roms/tools/RetSend/retsend", "reviewed arm64 binary")
-			if status, err = manager.Status(pkg.ID); err != nil || !status.Healthy {
-				t.Fatalf("repair did not restore health: %#v, %v", status, err)
-			}
+				for relative, body := range runtimeFiles {
+					writeRootFile(t, root, relative, body)
+				}
+				status, err := manager.Status(pkg.ID)
+				if err != nil || !status.Healthy || len(status.Issues) != 0 {
+					t.Fatalf("normal first-launch files made RetSend unhealthy: %#v, %v", status, err)
+				}
 
-			if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
-				t.Fatal(err)
-			}
-			assertMissing(t, root, "userdata/roms/tools/RetSend/retsend")
-			assertMissing(t, root, "userdata/roms/tools/RetSend/RetSend.sh")
-			assertMissing(t, root, "userdata/system/knulli-app-store/installed/io.github.jellydn.retsend.json")
-			assertNotContains(t, root, "userdata/roms/tools/gamelist.xml", "./RetSend/RetSend.sh")
-			for relative, body := range runtimeFiles {
-				assertRootFile(t, root, relative, body)
-			}
-		})
+				binary := filepath.Join(root, "userdata/roms/tools/RetSend/tools/retsend/retsend")
+				if err := os.WriteFile(binary, []byte("corrupt"), 0755); err != nil {
+					t.Fatal(err)
+				}
+				status, err = manager.Status(pkg.ID)
+				if err != nil || status.Healthy || len(status.Issues) == 0 || status.Issues[0].Check != "content changed" {
+					t.Fatalf("changed reviewed binary was not reported: %#v, %v", status, err)
+				}
+				if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
+					t.Fatal(err)
+				}
+				assertRootFile(t, root, "userdata/roms/tools/RetSend/tools/retsend/retsend", "reviewed arm64 binary")
+				if status, err = manager.Status(pkg.ID); err != nil || !status.Healthy {
+					t.Fatalf("repair did not restore health: %#v, %v", status, err)
+				}
+
+				if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+					t.Fatal(err)
+				}
+				assertMissing(t, root, "userdata/roms/tools/RetSend/tools/retsend/retsend")
+				assertMissing(t, root, "userdata/roms/tools/RetSend/tools/Retsend.sh")
+				assertMissing(t, root, "userdata/system/knulli-app-store/installed/io.github.jellydn.retsend.json")
+				assertNotContains(t, root, "userdata/roms/tools/gamelist.xml", "./RetSend/tools/Retsend.sh")
+				assertRootFile(t, root, "userdata/roms/tools/Other.sh", "unrelated tool")
+				assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<path>./Other.sh</path>")
+				for relative, body := range runtimeFiles {
+					assertRootFile(t, root, relative, body)
+				}
+			})
+		}
 	}
 }
 
