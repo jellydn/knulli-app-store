@@ -63,7 +63,7 @@ if [ "${#PUBLIC_KEY}" -ne 64 ]; then
 fi
 echo "catalogue public key $PUBLIC_KEY" >&2
 
-LDFLAGS="-s -w -X github.com/jellydn/knulli-app-store/internal/catalog.embeddedPublicKeyHex=$PUBLIC_KEY"
+LDFLAGS="-s -w -X github.com/jellydn/knulli-app-store/internal/catalog.embeddedPublicKeyHex=$PUBLIC_KEY -X github.com/jellydn/knulli-app-store/internal/appstore.StoreVersion=$VERSION -X github.com/jellydn/knulli-app-store/internal/appstore.StoreTarget=$TARGET"
 
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
   go build -buildvcs=false -trimpath -ldflags="$LDFLAGS" -o "$WORK/knulli-app" ./cmd/knulli-app

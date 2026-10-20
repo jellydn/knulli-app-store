@@ -47,7 +47,8 @@ install -m 0644 "packaging/$TARGET/README.txt" "$PORTS/knulli-app-store/README.t
 install -m 0644 "$ICON" "$PORTS/images/Knulli App Store.png"
 
 ARCHIVE="$OUTPUT_DIR/knulli-app-store-$TARGET-experimental-$VERSION.zip"
-(cd "$PORTS" && find . -type f -print | LC_ALL=C sort | zip -X "$ARCHIVE" -@ >/dev/null)
+# Canonical relative paths are required by the self-updater's safe extractor.
+(cd "$PORTS" && find . -type f -printf '%P\n' | LC_ALL=C sort | zip -X "$ARCHIVE" -@ >/dev/null)
 (cd "$OUTPUT_DIR" && sha256sum "$(basename "$ARCHIVE")" >SHA256SUMS.txt)
 
 printf '%s\n' "$ARCHIVE"

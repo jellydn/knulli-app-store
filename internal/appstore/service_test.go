@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/jellydn/knulli-app-store/internal/catalog"
@@ -21,6 +22,7 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/installer"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/platform"
+	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
 
 func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
@@ -446,6 +448,118 @@ func TestCompletionMessageReportsRefreshOrRestartPrecisely(t *testing.T) {
 	}
 	if got := completionMessage(Adopt, installer.OperationOutcome{RestartRequired: true}); got != "Manage existing install completed; restart required to update game list" {
 		t.Fatalf("restart message = %q", got)
+	}
+}
+
+func TestStoreChecksBeforeUpdatingAndRequiresRestart(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"Knulli App Store.sh": "launcher", "images/Knulli App Store.png": "icon",
+		"knulli-app-store/knulli-app": "CLI", "knulli-app-store/knulli-app-ui": "UI",
+		"knulli-app-store/catalog-index.json": "catalogue", "knulli-app-store/catalog-index.json.sig": "signature", "knulli-app-store/README.txt": "readme",
+	}
+	asset := testZip(t, files)
+	digest := sha256.Sum256(asset)
+	var broken atomic.Bool
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if broken.Load() {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		if r.URL.Path == "/repos/jellydn/knulli-app-store/releases" {
+			io.WriteString(w, `[{"tag_name":"v2","assets":[{"name":"knulli-app-store-trimui-smart-pro-experimental-v2.zip","browser_download_url":"https://github.com/jellydn/knulli-app-store/releases/download/v2/knulli-app-store-trimui-smart-pro-experimental-v2.zip","size":`+strconv.Itoa(len(asset))+`,"digest":"sha256:`+hex.EncodeToString(digest[:])+`"}]}]`)
+			return
+		}
+		w.Write(asset)
+	}))
+	defer server.Close()
+	client := server.Client()
+	client.Transport = testRewriteTransport{base: client.Transport, host: strings.TrimPrefix(server.URL, "https://")}
+	service := &Service{manager: installer.Manager{Root: root, Client: client}}
+	service.EnableSelfUpdate("v1", "trimui-smart-pro")
+	ctx := context.Background()
+	items, err := service.Items(ctx)
+	if err != nil || len(items) != 1 {
+		t.Fatalf("Store item: %#v, %v", items, err)
+	}
+	assertActions(t, items[0].Actions, CheckUpdate)
+	if err := service.Execute(ctx, StoreID, Update, func(string) {}); err == nil {
+		t.Fatal("update allowed without a release check")
+	}
+	if err := service.Execute(ctx, StoreID, CheckUpdate, func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+	items, err = service.Items(ctx)
+	if err != nil || items[0].Package.Version != "v2" {
+		t.Fatalf("update offer: %#v, %v", items, err)
+	}
+	assertActions(t, items[0].Actions, Update, CheckUpdate)
+	if _, err := os.Stat(filepath.Join(root, installer.StoreDirectory, "knulli-app-ui")); !os.IsNotExist(err) {
+		t.Fatal("checking releases wrote Store files")
+	}
+	broken.Store(true)
+	if err := service.Execute(ctx, StoreID, CheckUpdate, func(string) {}); err == nil {
+		t.Fatal("failed check reported success")
+	}
+	items, err = service.Items(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertActions(t, items[0].Actions, CheckUpdate)
+	broken.Store(false)
+	if err := service.Execute(ctx, StoreID, CheckUpdate, func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+	message := ""
+	if err := service.Execute(ctx, StoreID, Update, func(value string) { message = value }); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(message, "exit and reopen") {
+		t.Fatalf("missing restart instruction: %q", message)
+	}
+	for name, want := range files {
+		got, err := os.ReadFile(filepath.Join(root, "userdata/roms/ports", name))
+		if err != nil || string(got) != want {
+			t.Fatalf("updated %s = %q, %v", name, got, err)
+		}
+	}
+	items, err = service.Items(ctx)
+	if err != nil || len(items[0].Actions) != 0 || !strings.Contains(items[0].Package.Summary, "Exit and reopen") {
+		t.Fatalf("updated Store permits another operation before restart: %#v, %v", items, err)
+	}
+}
+
+func TestOpenRecoversStoreCatalogueBeforeLoadingIt(t *testing.T) {
+	root := t.TempDir()
+	manager := installer.Manager{Root: root}
+	if err := manager.RecoverTransactions(); err != nil {
+		t.Fatal(err)
+	}
+	index, err := catalogForTest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	virtual := installer.StoreDirectory + "/catalog-index.json"
+	indexPath := filepath.Join(root, virtual)
+	if err := os.MkdirAll(filepath.Dir(indexPath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeIndexForTest(index, indexPath); err != nil {
+		t.Fatal(err)
+	}
+	guard, err := safefs.NewGuard(root, []string{installer.StoreDirectory})
+	if err != nil {
+		t.Fatal(err)
+	}
+	transaction, err := safefs.Begin(guard, filepath.Join(root, manifest.ManagerStatePath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := transaction.Write(virtual, []byte("interrupted invalid catalogue"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(indexPath, manager); err != nil {
+		t.Fatalf("startup tried to parse the interrupted catalogue before recovery: %v", err)
 	}
 }
 

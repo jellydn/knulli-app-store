@@ -68,28 +68,47 @@ func TestRenderRepresentativeStates(t *testing.T) {
 	tabsReady.Tabs.Cycle(1)
 	notice := &storeui.Model{Items: []appstore.Item{experimental}}
 	notice.Toasts.Push("Install completed; game list refresh requested", time.Now())
+	service := &appstore.Service{}
+	service.EnableSelfUpdate("v2026.10.20", "trimui-smart-pro")
+	storeItems, err := service.Items(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := storeItems[0]
+	storeOffer := store
+	storeOffer.Package.Version = "v2026.10.21"
+	storeOffer.Actions = []appstore.Action{appstore.Update, appstore.CheckUpdate}
+	storeOffer.Verdict.State = appstore.StateAvailable
+	storeDone := storeOffer
+	storeDone.Actions = nil
+	storeDone.Verdict.State = appstore.StateInstalled
+	storeDone.Package.Summary = "Store update completed. Exit and reopen the Store to use the new version."
 	states := map[string]*storeui.Model{
-		"catalogue":           {Items: []appstore.Item{verified, experimental, candidate}},
-		"tabs-ready":          tabsReady,
-		"notice":              notice,
-		"details":             {Items: []appstore.Item{experimental}, Focus: storeui.Actions},
-		"installed-healthy":   {Items: []appstore.Item{verified}},
-		"verified":            {Items: []appstore.Item{verified}, Focus: storeui.Actions},
-		"experimental":        {Items: []appstore.Item{experimental}, Focus: storeui.Actions},
-		"candidate":           {Items: []appstore.Item{candidate}, Focus: storeui.Actions},
-		"external":            {Items: []appstore.Item{external}, Focus: storeui.Actions},
-		"external-confirm":    {Items: []appstore.Item{external}, Focus: storeui.Confirm},
-		"recovery":            {Items: []appstore.Item{recovery}, Focus: storeui.Actions, Error: recovery.RecoveryReason},
-		"force-review":        {Items: []appstore.Item{recovery}, Focus: storeui.Confirm, Action: 1},
-		"force-confirm":       {Items: []appstore.Item{recovery}, Focus: storeui.ForceConfirm, Action: 1},
-		"issue":               {Items: []appstore.Item{issue}},
-		"issue-details":       {Items: []appstore.Item{issue}, Focus: storeui.Health},
-		"compatibility-error": {Items: []appstore.Item{incompatible}, Focus: storeui.Actions},
-		"confirm":             {Items: []appstore.Item{experimental}, Focus: storeui.Confirm},
-		"verified-confirm":    {Items: []appstore.Item{{Package: verified.Package, Compatible: true, Actions: []appstore.Action{appstore.Install}}}, Focus: storeui.Confirm},
-		"diagnostics":         {Items: []appstore.Item{experimental}, Message: "Diagnostics saved to /userdata/system/knulli-app-store/diagnostics/knulli-app-store-diagnostics-20260915T073500Z.txt"},
-		"error":               {Items: []appstore.Item{issue}, Error: "SHA-256 mismatch; package files were not changed"},
-		"progress":            {Items: []appstore.Item{experimental}, Focus: storeui.Confirm, Busy: true, Message: "Downloading, verifying, and applying Grout"},
+		"store-update-check":   {Items: []appstore.Item{store}},
+		"store-update-offer":   {Items: []appstore.Item{storeOffer}},
+		"store-update-confirm": {Items: []appstore.Item{storeOffer}, Focus: storeui.Confirm},
+		"store-update-done":    {Items: []appstore.Item{storeDone}},
+		"catalogue":            {Items: []appstore.Item{verified, experimental, candidate}},
+		"tabs-ready":           tabsReady,
+		"notice":               notice,
+		"details":              {Items: []appstore.Item{experimental}, Focus: storeui.Actions},
+		"installed-healthy":    {Items: []appstore.Item{verified}},
+		"verified":             {Items: []appstore.Item{verified}, Focus: storeui.Actions},
+		"experimental":         {Items: []appstore.Item{experimental}, Focus: storeui.Actions},
+		"candidate":            {Items: []appstore.Item{candidate}, Focus: storeui.Actions},
+		"external":             {Items: []appstore.Item{external}, Focus: storeui.Actions},
+		"external-confirm":     {Items: []appstore.Item{external}, Focus: storeui.Confirm},
+		"recovery":             {Items: []appstore.Item{recovery}, Focus: storeui.Actions, Error: recovery.RecoveryReason},
+		"force-review":         {Items: []appstore.Item{recovery}, Focus: storeui.Confirm, Action: 1},
+		"force-confirm":        {Items: []appstore.Item{recovery}, Focus: storeui.ForceConfirm, Action: 1},
+		"issue":                {Items: []appstore.Item{issue}},
+		"issue-details":        {Items: []appstore.Item{issue}, Focus: storeui.Health},
+		"compatibility-error":  {Items: []appstore.Item{incompatible}, Focus: storeui.Actions},
+		"confirm":              {Items: []appstore.Item{experimental}, Focus: storeui.Confirm},
+		"verified-confirm":     {Items: []appstore.Item{{Package: verified.Package, Compatible: true, Actions: []appstore.Action{appstore.Install}}}, Focus: storeui.Confirm},
+		"diagnostics":          {Items: []appstore.Item{experimental}, Message: "Diagnostics saved to /userdata/system/knulli-app-store/diagnostics/knulli-app-store-diagnostics-20260915T073500Z.txt"},
+		"error":                {Items: []appstore.Item{issue}, Error: "SHA-256 mismatch; package files were not changed"},
+		"progress":             {Items: []appstore.Item{experimental}, Focus: storeui.Confirm, Busy: true, Message: "Downloading, verifying, and applying Grout"},
 	}
 	directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR")
 	for _, device := range []string{"trimui-smart-pro", "magicx-zero-28"} {

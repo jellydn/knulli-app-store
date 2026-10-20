@@ -146,6 +146,8 @@ func drawCard(frame *image.RGBA, model *storeui.Model, controls *storeinput.Sess
 		}
 	} else if item.Verdict.HasReason(appstore.ReasonPlatform) {
 		label = "INCOMPATIBLE - SEE MORE"
+	} else if item.Package.ID == appstore.StoreID {
+		label = "EXIT AND REOPEN STORE"
 	}
 	if model.Busy {
 		label = "WORKING..."
@@ -402,6 +404,9 @@ func drawDetails(frame *image.RGBA, model *storeui.Model) {
 }
 
 func trustLabel(item appstore.Item) string {
+	if item.Package.ID == appstore.StoreID {
+		return "STORE UPDATE"
+	}
 	if !item.Package.Installable() {
 		return "CANDIDATE"
 	}

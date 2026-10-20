@@ -59,6 +59,14 @@
 
 Download the newest device build from [GitHub Releases](https://github.com/jellydn/knulli-app-store/releases), then follow the [TrimUI Smart Pro](docs/trimui-smart-pro.md) or [MagicX Zero 28](docs/magicx-zero-28.md) guide.
 
+### Update the Store from the Store
+
+After installing a build with self-update support, select the **Knulli App Store** card, then **Check for updates**. Confirm the check. If a newer published build is available, select **Update** and confirm again. Exit and reopen the Store after completion.
+
+The check includes official experimental pre-releases and uses the build's packaged target, not a device allowlist. The Store verifies GitHub's asset size and SHA-256 before extraction, replaces only its seven release files, and keeps installed apps, settings, and manager state. Failed writes roll back; startup recovers interrupted transactions before loading the signed catalogue. It does not run a downloaded installer script.
+
+Self-update is available for device builds installed at `/userdata/roms/ports/knulli-app-store`. Custom locations and older builds need a manual ZIP update first. Network failures or missing digests leave Update unavailable. The trust root is the official GitHub repository over HTTPS, not an independent long-lived update signing key.
+
 Build the CLI locally:
 
 ```sh
@@ -104,29 +112,29 @@ The installer never runs remote install scripts. It only copies regular files fr
 
 ## Catalogue status
 
-The catalogue has seven packages. CoverPlayer, Grout, PlayTime, and RetSend are broad experimental: the Store can install them when detection passes. Random Game Picker is experimental only for the two declared handhelds, with glibc 2.36 or later. PocketCurator and RAOfflineProxy are approved for review but blocked, so they offer no install action. Recorded approval provenance stays separate from technical and real-device status. PortMaster is a featured external provider and is not installed from this catalogue.
+The catalogue has seven packages. All five packaged apps—CoverPlayer, Grout, PlayTime, Random Game Picker, and RetSend—can install on any Knulli device when architecture, ABI, and runtime dependencies pass. Missing device identity, an unlisted board, or a display outside the recorded scope does not block installation. **UNTESTED** means no exact device report exists; it is a warning, not an installation gate. PocketCurator and RAOfflineProxy still have no actionable installation definitions, so they offer no install action. PortMaster is a featured external provider and is not installed from this catalogue.
 
 | Package | What it does | Status | Remaining blocker |
 | --- | --- | --- | --- |
 | [CoverPlayer 0.1.0-rc.4](https://github.com/heilmic/CoverPlayer) | Offline, cover-first audio player for audiobooks, podcasts, radio plays, and music | Broad experimental Knulli | No real-device validation recorded |
 | [Grout 5.2.0.0](https://github.com/rommapp/grout) | Connects a Linux retro handheld to a RomM server | Broad experimental Knulli | No 5.2.0.0 device test; Store staging disables the self-updater with a verified binary patch |
 | [PlayTime 1.0.0](https://github.com/unitreign/playtime) | Tracks game play time on Knulli | Broad experimental Knulli | Exact 1.0.0 Smart Pro evidence only; other matching devices are experimental |
-| [Random Game Picker 0.1.1](https://github.com/jellydn/knulli-random-game-picker) | Opens on a random existing ES game, with saved filters and scraped artwork | Experimental TrimUI Smart Pro / MagicX Zero 28 | New selector-first flow needs handheld retesting; earlier TSP evidence does not verify this version. Requires glibc 2.36+, SDL2/image/ttf and loopback ES API; [review](docs/catalogue-review-2026-10-19.md) |
-| [RetSend 0.9.1](https://github.com/jellydn/retsend) | Sends and receives files over local Wi-Fi with any LocalSend peer | Broad experimental Knulli | No device test; bytes are pinned by size and SHA-256 because the maintainer fork's `prerelease` tag is mutable, and its own tracker still lists TLS pinning, key mode, receive containment, overwrite default, quotas, and signed provenance as open |
+| [Random Game Picker 0.1.1](https://github.com/jellydn/knulli-random-game-picker) | Opens on a random existing ES game, with saved filters and scraped artwork | Any Knulli device; untested without exact evidence | New selector-first flow needs handheld retesting; earlier TSP evidence does not verify this version. Requires glibc 2.36+, SDL2/image/ttf and loopback ES API; [review](docs/catalogue-review-2026-10-19.md) |
+| [RetSend 1.0.0](https://github.com/mxmgorin/retsend/releases/tag/v1.0.0) | Sends and receives files over local Wi-Fi with any LocalSend peer | Broad experimental Knulli | Official upstream Knulli ZIP; no device test. Store staging retains existing config/TLS identity and the default inbox. TLS, receive safety, quotas, signed provenance, and missing bundled notices remain open; [review](docs/retsend-upstream-1.0.0.md) |
 | [PocketCurator](https://github.com/tomtombombadil/PocketCurator) v1.1.2 | Manages a user's own ROM collection from an EmulationStation-style interface | Approved; blocked | The release is mutable; extracted inventory/size, narrow ROM and game-list writes, updater safety, and exact Knulli evidence are unresolved |
 | [RAOfflineProxy](https://github.com/misantronic/RAOfflineProxy) v1.13.0-alpha1 | Provides an offline RetroAchievements proxy for supported emulators | Approved; blocked | The Knulli asset is a self-extracting script; supported archive, extracted size, dependencies, narrow writes, and updater safety are unresolved |
 
-The notes for PlayTime, Grout, RetSend, RAOfflineProxy, and PocketCurator record evidence reviewed on 2026-09-15 and 2026-09-17. CoverPlayer has no real-device report. Upstream facts can change. The weekly [catalogue update check](https://github.com/jellydn/knulli-app-store/actions/workflows/catalogue-updates.yml) reports metadata changes for manual review; it never edits or approves a package.
+The notes for PlayTime, Grout, RAOfflineProxy, and PocketCurator record evidence reviewed on 2026-09-15 and 2026-09-17. RetSend's upstream 1.0.0 review is dated 2026-10-19. CoverPlayer has no real-device report. Upstream facts can change. The weekly [catalogue update check](https://github.com/jellydn/knulli-app-store/actions/workflows/catalogue-updates.yml) reports metadata changes for manual review; it never edits or approves a package.
 
 ## Current scope
 
-- Manifest-driven packages for detected Knulli `aarch64` devices with a supported glibc ABI, declared runtime libraries, a known device identity, and validated display bounds
+- Manifest-driven packages for any Knulli device with matching architecture, a supported glibc ABI, and declared runtime libraries; device and display scope are advisory
 - Experimental GUI artifacts for TrimUI Smart Pro at 1280×720 and MagicX Zero 28 at 640×480
-- Exact tested resolutions or reviewed experimental display bounds; no resolution is assumed
+- Exact device reports control tested badges; unknown device/display values remain unknown and do not block installation
 - ZIP and `tar.gz` release archives, up to 512 MiB compressed and installed
 - Writes below `/userdata` only
 
-The GUI is functional on one community-tested TrimUI Smart Pro. A real MagicX diagnostic confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController `magicx-input`; full GUI testing is still incomplete. CoverPlayer, Grout, PlayTime, and RetSend are available for experimental tests on any detected device that satisfies their exact architecture, ABI, dependency, and display bounds. A matching device is not verified unless the manifest has evidence for that exact package version and matrix.
+The GUI is functional on one community-tested TrimUI Smart Pro. A real MagicX diagnostic confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController `magicx-input`; full GUI testing is still incomplete. All packaged apps are available on untested hardware when runtime checks pass. A matching device is not verified unless the manifest has evidence for that exact package version and matrix. See the [advisory device policy](docs/adr/0009-advisory-device-compatibility.md).
 
 ROM-download sources are outside the official catalogue policy.
 

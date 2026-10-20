@@ -79,6 +79,11 @@ func run() error {
 		diagnosticLog.Event("startup_error", "error", err.Error())
 		return err
 	}
+	// A custom/manual location must not update a different Store installation.
+	storeExecutable := filepath.Join(*root, installer.StoreDirectory, "knulli-app-ui")
+	if filepath.Clean(executable) == filepath.Clean(storeExecutable) && appstore.StoreTarget != "" {
+		service.EnableSelfUpdate(appstore.StoreVersion, appstore.StoreTarget)
+	}
 	err = sdlui.Run(context.Background(), service, sdlui.Options{
 		Windowed:    *windowed || *screenshot != "" || len(walkKeys) > 0,
 		Screenshot:  *screenshot,

@@ -28,6 +28,7 @@ Usage:
   knulli-app update [platform flags] MANIFEST
   knulli-app repair [platform flags] MANIFEST
   knulli-app uninstall [-root /] PACKAGE_ID
+  knulli-app recover [-root /]
 
 Platform flags override detected values:
   -root, -firmware, -firmware-version, -arch, -device, -resolution
@@ -49,6 +50,16 @@ func run(arguments []string) error {
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 		return nil
+	case "recover":
+		flags := flag.NewFlagSet("recover", flag.ContinueOnError)
+		root := flags.String("root", "/", "filesystem root")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 {
+			return fmt.Errorf("recover takes no positional arguments")
+		}
+		return (installer.Manager{Root: *root}).RecoverTransactions()
 	case "validate":
 		if len(arguments) != 2 {
 			return fmt.Errorf("validate requires one manifest path")

@@ -57,6 +57,7 @@ func (s *Service) SetPlatform(info platform.Info) {
 type Service struct {
 	index   catalog.Index
 	manager installer.Manager
+	store   *selfUpdate
 }
 
 // Open loads the catalogue index and binds the service to it. The manager keeps
@@ -64,6 +65,9 @@ type Service struct {
 // package on every load and would otherwise re-hash every installed package's
 // files each time. Every operation still invalidates the package it touched.
 func Open(indexPath string, manager installer.Manager) (*Service, error) {
+	if err := manager.RecoverTransactions(); err != nil {
+		return nil, fmt.Errorf("recover interrupted transactions: %w", err)
+	}
 	index, err := catalog.Load(indexPath)
 	if err != nil {
 		manager.Diagnostics.Event("catalogue_error", "path", indexPath, "error", err.Error())
@@ -85,11 +89,17 @@ func (s *Service) Items(ctx context.Context) ([]Item, error) {
 		}
 		items = append(items, item)
 	}
+	if s.store != nil {
+		items = append(items, s.storeItem())
+	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Package.Name < items[j].Package.Name })
 	return items, nil
 }
 
 func (s *Service) Execute(ctx context.Context, id string, action Action, progress func(string)) error {
+	if id == StoreID && s.store != nil {
+		return s.executeStore(ctx, action, progress)
+	}
 	entry, found := s.find(id)
 	if !found {
 		return fmt.Errorf("package %s is not in the catalogue", id)

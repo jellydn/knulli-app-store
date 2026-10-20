@@ -60,10 +60,18 @@ Mappings are stored by device and controller identity under:
 
 CURRENT SAFETY STATE
 
-Grout 5.2.0.0, PlayTime 1.0.0, and RetSend 0.9.1 have broad experimental
-Knulli eligibility only when architecture, glibc ABI, SDL libraries, device
-identity, and display bounds pass. Only PlayTime 1.0.0 has exact current Smart
-Pro evidence. RetSend has no device report and needs local Wi-Fi.
+STORE SELF-UPDATE: select the Knulli App Store card, confirm Check for updates,
+then select and confirm Update when offered. Exit and reopen after completion.
+Official experimental builds are included. Exact asset size and SHA-256 are
+verified before journaled replacement. Installed apps and settings stay intact.
+Requires the standard /userdata/roms/ports/knulli-app-store location. Older
+builds need one manual ZIP update to gain this feature.
+
+All packaged apps can install on any Knulli device when architecture, glibc
+ABI and runtime libraries pass. Device identity and display size do not block
+installation. Without an exact device report, the badge is UNTESTED.
+Only PlayTime 1.0.0 has exact current Smart Pro evidence. RetSend has no
+device report and needs local Wi-Fi.
 An existing copy shows EXTERNAL and offers Manage existing; that inventories
 and backs up uncertain files without reinstalling the reviewed release. Only
 files count, so an empty directory left by a rolled-back write still offers
@@ -75,7 +83,9 @@ binary. Use App Store Repair and reviewed updates only. Grout config stays
 under /userdata/roms/tools/Grout. PlayTime
 statistics stay under /userdata/system/configs/playtime. RetSend keeps its
 configuration and TLS identity under /userdata/system/configs/retsend and
-receives files in /userdata/roms/retsend-inbox; both stay after uninstall.
+defaults to receiving files in /userdata/roms/retsend-inbox; both stay after
+uninstall. A verified launcher patch keeps these paths when updating from
+the fork; saved or selected receive routes can override the default inbox.
 Manager state and
 adoption backups are under /userdata/system/knulli-app-store. After Manage
 existing fails, Force reinstall needs two confirmations and keeps a complete

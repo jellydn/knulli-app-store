@@ -58,16 +58,25 @@ with neither is not saved. Corrupt files are retained with a .corrupt suffix.
 
 PACKAGE STATUS
 
-Grout 5.2.0.0, PlayTime 1.0.0, and RetSend 0.9.1 are user-authorized
-experimental tests only when architecture, glibc ABI, SDL libraries, device
-identity, and 640x480 pass.
+STORE SELF-UPDATE: select the Knulli App Store card, confirm Check for updates,
+then select and confirm Update when offered. Exit and reopen after completion.
+Official experimental builds are included. Exact asset size and SHA-256 are
+verified before journaled replacement. Installed apps and settings stay intact.
+Requires the standard /userdata/roms/ports/knulli-app-store location. Older
+builds need one manual ZIP update to gain this feature.
+
+All packaged apps can install on any Knulli device when architecture, glibc
+ABI and runtime libraries pass. Device identity and display size do not block
+installation. Without an exact device report, the badge is UNTESTED.
 Select Install, or Manage existing for detected external files, and confirm
 the warning. An empty destination directory is not a copy, and a card that
 reports a wider file mode than requested is not a health failure. The Store
 disables Grout's self-updater with a verified staging patch. RetSend needs
 local Wi-Fi and keeps its configuration and TLS identity under
-/userdata/system/configs/retsend, with received files in
-/userdata/roms/retsend-inbox. None of the three has MagicX real-device evidence.
+/userdata/system/configs/retsend, with the default receive directory in
+/userdata/roms/retsend-inbox. A verified launcher patch keeps these paths on
+update from the fork; saved or selected routes can override the default inbox.
+None of the three has MagicX real-device evidence.
 
 PlayTime data stays under /userdata/system/configs/playtime. Manager state and
 adoption backups are under /userdata/system/knulli-app-store. Force reinstall

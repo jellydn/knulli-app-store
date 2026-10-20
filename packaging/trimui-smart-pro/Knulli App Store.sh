@@ -9,6 +9,10 @@ LOG_FILE="$LOG_DIR/knulli-app-store.log"
 mkdir -p "$LOG_DIR"
 cd "$APP_DIR" || exit 1
 
+# Recovery can restore both the executable and its matching catalogue key.
+# Run it in a separate CLI process before loading the UI binary.
+./knulli-app recover >>"$LOG_FILE" 2>&1 || exit 1
+
 if [ ! -x ./knulli-app-ui ] || [ ! -r ./catalog-index.json ] || [ ! -r ./catalog-index.json.sig ]; then
   printf '%s\n' "Knulli App Store installation is incomplete." >>"$LOG_FILE"
   exit 1

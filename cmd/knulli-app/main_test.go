@@ -16,8 +16,43 @@ import (
 	"testing"
 
 	"github.com/jellydn/knulli-app-store/internal/catalog"
+	"github.com/jellydn/knulli-app-store/internal/installer"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
+	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
+
+func TestRunRecoverRestoresInterruptedStoreFiles(t *testing.T) {
+	root := t.TempDir()
+	if err := run([]string{"recover", "-root", root}); err != nil {
+		t.Fatal(err)
+	}
+	virtual := installer.StoreDirectory + "/knulli-app-ui"
+	host := filepath.Join(root, virtual)
+	if err := os.MkdirAll(filepath.Dir(host), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(host, []byte("old UI matching old catalogue"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	guard, err := safefs.NewGuard(root, []string{installer.StoreDirectory})
+	if err != nil {
+		t.Fatal(err)
+	}
+	transaction, err := safefs.Begin(guard, filepath.Join(root, manifest.ManagerStatePath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := transaction.Write(virtual, []byte("new UI with different key"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"recover", "-root", root}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(host)
+	if err != nil || string(got) != "old UI matching old catalogue" {
+		t.Fatalf("CLI recovery did not restore executable before launch: %q, %v", got, err)
+	}
+}
 
 func TestWriteNewFileCreatesPrivateFileWithoutReplacingExistingPath(t *testing.T) {
 	directory := t.TempDir()

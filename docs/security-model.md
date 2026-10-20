@@ -14,10 +14,18 @@ Catalogue review decides whether metadata is actionable. HTTPS provides transpor
 
 Upstream package code runs later when the user launches it. The installer does not sandbox that runtime. The `network` field tells users and future policy code whether the installed application needs network access; it does not grant or enforce an operating-system permission.
 
+## Store self-update
+
+The Store card checks `api.github.com/repos/jellydn/knulli-app-store/releases` only after confirmation. It includes CI pre-releases and selects the asset for the packaged build target. A separate Update confirmation uses the pinned official release URL, byte size, and SHA-256 returned by GitHub. Missing digests, download mismatches, unsafe archive paths, unexpected file inventories, symlinks, and insufficient space reject the update.
+
+Only the two Store binaries, catalogue/signature pair, README, launcher, and icon under `/userdata/roms/ports` can change. The updater shares the manager lock and journal/rollback implementation. The launcher runs `knulli-app recover` before starting the UI: recovery can restore a key-bearing binary and its matching catalogue before either is loaded. The service also recovers before catalogue verification. Atomic file replacement keeps the current Linux process running; the user must exit and reopen to load the new version. No package state or settings are removed.
+
+This trusts the official GitHub repository and HTTPS API, not an independent update signing key. A compromised publisher account can publish malicious Store bytes and matching digests. The catalogue's per-build signature is not a separate signature over the Store ZIP. Custom install locations and builds without embedded target/version metadata use manual ZIP replacement.
+
 ## Installer controls
 
 - Reject candidate manifests and unknown manifest fields.
-- Match firmware, minimum version, architecture, approved device, and resolution before download.
+- Match firmware, minimum version, architecture, ABI, and required runtime libraries before download. Device and display scope are advisory; missing exact device-test evidence shows **UNTESTED**, not a blocked action.
 - Accept only HTTPS, version-pinned release URLs and require exact compressed size and SHA-256.
 - Limit compressed and installed size to 512 MiB and check free space before download.
 - Stage extraction before package writes.
@@ -46,9 +54,9 @@ Upstream package code runs later when the user launches it. The installer does n
 - Path checks do not defend against a hostile local process that races a checked directory into a symlink.
 - A corrupt transaction journal blocks the next locked operation until the leftover directory is inspected.
 - Empty directories can remain after rollback or uninstall. They are inert: external detection counts files, so a leftover skeleton does not block a fresh install or offer adoption.
-- Device detection reads the Knulli board identifier (`/boot/boot/knulli.board`), then `/etc/knulli-device`, then Batocera's board file. An unrecognized board shows `UNKNOWN DEVICE` and is blocked until the operator supplies explicit flags.
+- Device detection reads the Knulli board identifier (`/boot/boot/knulli.board`), then `/etc/knulli-device`, then Batocera's board file. An unrecognized board shows `UNKNOWN DEVICE` but is not blocked. Missing or out-of-scope display metadata also does not block installation; runtime controls remain enforced.
 - The GUI has one community-reported TrimUI Smart Pro test. The Grout result applies to 5.1.0.0, not the current 5.2.0.0 release. The report did not itemize lifecycle steps.
-- PlayTime, Grout, and RetSend are broad experimental packages only when Knulli, AArch64, glibc, the required runtime libraries, a device identity, and reviewed display bounds match. Exact package-version device evidence controls the tested badge.
+- All packaged apps, including Random Game Picker, can install on any device when Knulli, architecture, glibc ABI, and required runtime libraries match. Device lists and display bounds do not restrict installation. Exact package-version device evidence controls the tested badge. PocketCurator and RAOfflineProxy remain candidates without actionable install definitions; hardware evidence is not their blocker.
 - Grout's reviewed staging patch replaces its only updater metadata URL with a reserved `.invalid` URL and verifies the transformed binary hash. A mismatch stops installation before any transaction write.
 - Health checks use the observed destination mode after transactional copy or adoption mode normalization, and require that mode to keep the owner read, write, and execute permissions the installer set. A wider mode from a normalizing filesystem is not a health failure; a lost owner permission is. They compare the full SHA-256 of every manager-owned immutable file on every check. Unmanaged external files show their full reviewed and actual hashes for Repair instead of being treated as reviewed bytes.
 - Force reinstall is offered only after a recoverable adoption ownership failure or a validated stale transaction journal. An active transaction blocks all recovery actions. Compatibility, free-space, signature, checksum, archive, path, and licensing failures stay blocked and show their exact reason; force mode cannot disable those checks.
