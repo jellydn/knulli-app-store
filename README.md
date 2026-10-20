@@ -59,6 +59,14 @@
 
 Download the newest device build from [GitHub Releases](https://github.com/jellydn/knulli-app-store/releases), then follow the [TrimUI Smart Pro](docs/trimui-smart-pro.md) or [MagicX Zero 28](docs/magicx-zero-28.md) guide.
 
+### App menu entries and metadata
+
+PlayTime, Grout, and RetSend belong in **Tools**; the Store and Random Game Picker belong in **Ports**. Install and Repair create missing menu entries with a name, description, and bundled image where declared. The Store registers its own missing Ports entry on launch without shipping a shared gamelist over other games. A queued refresh is not proof that EmulationStation finished reloading; return to the frontend and restart it if needed.
+
+After installing a Store build containing the RetSend menu fix, run **Repair** on RetSend 1.0.0. This moves its launcher from `RetSend/tools/Retsend.sh` to `RetSend/RetSend.sh`, within Knulli's default scan depth. Its binary, configuration, identity, history, and inbox remain in their existing locations. Run Repair on PlayTime and Grout to add metadata when their exact launcher entry is absent.
+
+Existing manual, scraped, or app-created entries are left unchanged, even if their description or image is missing. To migrate one, stop EmulationStation and back up the affected `gamelist.xml`, remove only the entry for that exact launcher, then launch the Store again (for its own metadata) or run Repair (for an installed app). See [menu ownership and migration](docs/how-to-add-a-package.md#emulationstation-menu-metadata). Do not delete the whole gamelist or app data.
+
 ### Update the Store from the Store
 
 After installing a build with self-update support, select the **Knulli App Store** card, then **Check for updates**. Confirm the check. If a newer published build is available, select **Update** and confirm again. Exit and reopen the Store after completion.

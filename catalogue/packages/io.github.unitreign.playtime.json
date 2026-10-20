@@ -93,6 +93,13 @@
     "launcher": "playtime.sh",
     "executables": ["playtime", "playtime.sh"],
     "warning": "Unverified experimental test on this device. Existing files are backed up. Statistics stay under /userdata/system.",
+    "menu": {
+      "gamelist": "/userdata/roms/tools/gamelist.xml",
+      "path": "./PlayTime/playtime.sh",
+      "name": "PlayTime",
+      "description": "Track game play time and view your play statistics on Knulli.",
+      "image": "./PlayTime/icons/playtime.png"
+    },
     "network": false,
     "allowed_write_paths": [
       "/userdata/roms/tools/PlayTime",

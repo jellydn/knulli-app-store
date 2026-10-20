@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -51,6 +52,49 @@ func TestRunRecoverRestoresInterruptedStoreFiles(t *testing.T) {
 	got, err := os.ReadFile(host)
 	if err != nil || string(got) != "old UI matching old catalogue" {
 		t.Fatalf("CLI recovery did not restore executable before launch: %q, %v", got, err)
+	}
+}
+
+func TestRunRegisterStoreMenuPreservesOtherAndCustomEntries(t *testing.T) {
+	for _, custom := range []bool{false, true} {
+		t.Run(fmt.Sprintf("custom=%t", custom), func(t *testing.T) {
+			root := t.TempDir()
+			gamelist := filepath.Join(root, "userdata/roms/ports/gamelist.xml")
+			if err := os.MkdirAll(filepath.Dir(gamelist), 0755); err != nil {
+				t.Fatal(err)
+			}
+			data := "<gameList><game><path>./Other.sh</path><name>Other</name><favorite>true</favorite></game>"
+			if custom {
+				data += "<game><path>./Knulli App Store.sh</path><name>My Store</name><image>./my-cover.png</image></game>"
+			}
+			data += "</gameList>"
+			if err := os.WriteFile(gamelist, []byte(data), 0644); err != nil {
+				t.Fatal(err)
+			}
+			for range 2 {
+				if err := run([]string{"register-store-menu", "-root", root}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got, err := os.ReadFile(gamelist)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if custom {
+				if string(got) != data {
+					t.Fatalf("custom Store entry changed: %s", got)
+				}
+				return
+			}
+			for _, want := range []string{"<name>Knulli App Store</name>", "<desc>Install, update, and manage reviewed apps for Knulli.</desc>", "<image>./images/Knulli App Store.png</image>", "<favorite>true</favorite>"} {
+				if !strings.Contains(string(got), want) {
+					t.Fatalf("menu lacks %q: %s", want, got)
+				}
+			}
+			if strings.Count(string(got), "<path>./Knulli App Store.sh</path>") != 1 {
+				t.Fatalf("duplicate Store entry: %s", got)
+			}
+		})
 	}
 }
 

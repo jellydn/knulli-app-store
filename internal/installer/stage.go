@@ -161,10 +161,27 @@ func (m Manager) stage(ctx context.Context, operation string, pkg manifest.Packa
 		return nil, fmt.Errorf("release archive contains no installable files")
 	}
 	m.event("extraction_complete", "package", pkg.ID, "format", pkg.Release.Format, "files", fmt.Sprint(len(files)))
-	if err := applyExecutableModes(files, pkg.Install.Executables); err != nil {
+	if err := applyBinaryPatches(files, pkg.Install.BinaryPatches); err != nil {
 		return nil, err
 	}
-	if err := applyBinaryPatches(files, pkg.Install.BinaryPatches); err != nil {
+	// Patches identify the verified archive paths; mappings only change the
+	// installed inventory, so launchers can fit EmulationStation's scan depth.
+	paths := make(map[string]bool, len(files))
+	mapped := 0
+	for index := range files {
+		if target, found := pkg.Install.FileMappings[files[index].Relative]; found {
+			files[index].Relative = target
+			mapped++
+		}
+		if paths[files[index].Relative] {
+			return nil, fmt.Errorf("file mapping collides with release path %s", files[index].Relative)
+		}
+		paths[files[index].Relative] = true
+	}
+	if mapped != len(pkg.Install.FileMappings) {
+		return nil, fmt.Errorf("file mapping source is absent from release archive")
+	}
+	if err := applyExecutableModes(files, pkg.Install.Executables); err != nil {
 		return nil, err
 	}
 	if !containsArchiveFile(files, pkg.Install.Launcher) {

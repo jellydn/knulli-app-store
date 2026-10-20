@@ -172,6 +172,7 @@ func TestApplyMetadataUpdateAndSameGamelistMove(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			_, guard, tx := newTx(t)
 			old := menu(testGamelist, "./demo/launch.sh", "Old name", "Old description")
+			test.next.Image = "./demo/art & cover.png"
 			writeGamelistHost(t, guard, "<gameList><game><path>./demo/launch.sh</path><name>Old name</name><desc>Old description</desc></game></gameList>")
 			changed, owned, err := Apply(tx, guard, Derive(true, old, test.next))
 			if err != nil || !changed || !owned {
@@ -189,7 +190,7 @@ func TestApplyMetadataUpdateAndSameGamelistMove(t *testing.T) {
 				t.Fatal(err)
 			}
 			text := string(data)
-			if strings.Contains(text, "Old name") || !strings.Contains(text, test.next.Path) || !strings.Contains(text, "New description") {
+			if strings.Contains(text, "Old name") || !strings.Contains(text, test.next.Path) || !strings.Contains(text, "New description") || !strings.Contains(text, "<image>./demo/art &amp; cover.png</image>") {
 				t.Fatalf("unexpected updated gamelist: %s", text)
 			}
 		})
@@ -228,5 +229,36 @@ func TestApplyNoOpDoesNotTransferOwnership(t *testing.T) {
 	}
 	if owned {
 		t.Fatal("no-op add must not claim ownership")
+	}
+}
+
+func TestEditedArtworkIsNotReplacedOrRemoved(t *testing.T) {
+	for _, action := range []string{"replace", "remove"} {
+		t.Run(action, func(t *testing.T) {
+			_, guard, tx := newTx(t)
+			old := menu(testGamelist, "./demo/launch.sh", "Demo", "Description")
+			old.Image = "./demo/original.png"
+			data := "<gameList><game><path>./demo/launch.sh</path><name>Demo</name><desc>Description</desc><image>./my-cover.png</image></game></gameList>"
+			writeGamelistHost(t, guard, data)
+			next := menu(testGamelist, old.Path, "New name", "New description")
+			if action == "remove" {
+				next = nil
+			}
+			changed, owned, err := Apply(tx, guard, Derive(true, old, next))
+			if err != nil || changed || owned {
+				t.Fatalf("edited artwork not preserved: changed=%v owned=%v err=%v", changed, owned, err)
+			}
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+			host, err := guard.Resolve(testGamelist)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := os.ReadFile(host)
+			if err != nil || string(got) != data {
+				t.Fatalf("edited artwork changed: %s %v", got, err)
+			}
+		})
 	}
 }

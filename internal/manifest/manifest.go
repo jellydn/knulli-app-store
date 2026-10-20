@@ -105,16 +105,17 @@ type DisplayBounds struct {
 }
 
 type Install struct {
-	Destination       string        `json:"destination"`
-	StripComponents   int           `json:"strip_components,omitempty"`
-	Launcher          string        `json:"launcher"`
-	Executables       []string      `json:"executables,omitempty"`
-	Warning           string        `json:"warning,omitempty"`
-	Menu              *Menu         `json:"menu,omitempty"`
-	Preserve          []string      `json:"preserve,omitempty"`
-	Network           bool          `json:"network"`
-	AllowedWritePaths []string      `json:"allowed_write_paths"`
-	BinaryPatches     []BinaryPatch `json:"binary_patches,omitempty"`
+	Destination       string            `json:"destination"`
+	StripComponents   int               `json:"strip_components,omitempty"`
+	FileMappings      map[string]string `json:"file_mappings,omitempty"`
+	Launcher          string            `json:"launcher"`
+	Executables       []string          `json:"executables,omitempty"`
+	Warning           string            `json:"warning,omitempty"`
+	Menu              *Menu             `json:"menu,omitempty"`
+	Preserve          []string          `json:"preserve,omitempty"`
+	Network           bool              `json:"network"`
+	AllowedWritePaths []string          `json:"allowed_write_paths"`
+	BinaryPatches     []BinaryPatch     `json:"binary_patches,omitempty"`
 }
 
 type BinaryPatch struct {
@@ -130,6 +131,7 @@ type Menu struct {
 	Path        string `json:"path"`
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
+	Image       string `json:"image,omitempty"`
 }
 
 func (p Package) Installable() bool {
@@ -281,6 +283,13 @@ func (p Package) validateInstallable() []string {
 	if p.Experimental() && strings.TrimSpace(p.Install.Warning) == "" {
 		problems = append(problems, "experimental packages require an install warning")
 	}
+	mappedPaths := make(map[string]bool)
+	for source, destination := range p.Install.FileMappings {
+		if !safeRelative(source) || !safeRelative(destination) || mappedPaths[destination] {
+			problems = append(problems, "file mappings require safe relative paths and unique destinations")
+		}
+		mappedPaths[destination] = true
+	}
 	executables := make(map[string]bool)
 	for _, executable := range p.Install.Executables {
 		if !safeRelative(executable) {
@@ -323,6 +332,9 @@ func (p Package) validateInstallable() []string {
 		}
 		if p.Install.Menu.Path == "" || p.Install.Menu.Name == "" {
 			problems = append(problems, "menu path and name are required")
+		}
+		if p.Install.Menu.Image != "" && !safeRelative(strings.TrimPrefix(p.Install.Menu.Image, "./")) {
+			problems = append(problems, "menu image must be a safe relative path")
 		}
 	}
 	return problems

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	storearchive "github.com/jellydn/knulli-app-store/internal/archive"
+	"github.com/jellydn/knulli-app-store/internal/gamelist"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
@@ -95,6 +96,40 @@ func (m Manager) RecoverTransactions() error {
 	}
 	session.release()
 	return nil
+}
+
+// RegisterStoreMenu merges the Store entry on launch rather than packaging a
+// shared gamelist.xml that would overwrite the user's other Ports entries.
+func (m Manager) RegisterStoreMenu(ctx context.Context) (outcome OperationOutcome, err error) {
+	session, err := m.acquireManager()
+	if err != nil {
+		return outcome, err
+	}
+	defer session.release()
+	menu := manifest.Menu{
+		Gamelist:    "/userdata/roms/ports/gamelist.xml",
+		Path:        "./Knulli App Store.sh",
+		Name:        "Knulli App Store",
+		Description: "Install, update, and manage reviewed apps for Knulli.",
+		Image:       "./images/Knulli App Store.png",
+	}
+	guard, err := safefs.NewGuard(m.root(), []string{menu.Gamelist})
+	if err != nil {
+		return outcome, err
+	}
+	tx, err := safefs.Begin(guard, session.managerHost)
+	if err != nil {
+		return outcome, err
+	}
+	defer m.rollback("knulli-app-store", "register-menu", tx, guard, nil, &err)
+	changed, _, err := gamelist.Apply(tx, guard, gamelist.Derive(false, nil, &menu))
+	if err != nil {
+		return outcome, err
+	}
+	if err = tx.Commit(); err != nil {
+		return outcome, err
+	}
+	return m.outcome(ctx, changed), nil
 }
 
 // UpdateStore replaces only the seven packaged Store files. Atomic renames keep

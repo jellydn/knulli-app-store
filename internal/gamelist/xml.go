@@ -146,11 +146,14 @@ func menuNode(menu manifest.Menu) *xmlNode {
 	if menu.Description != "" {
 		game.Children = append(game.Children, &xmlNode{Name: xml.Name{Local: "desc"}, Text: menu.Description})
 	}
+	if menu.Image != "" {
+		game.Children = append(game.Children, &xmlNode{Name: xml.Name{Local: "image"}, Text: menu.Image})
+	}
 	return game
 }
 
 func menuNodeMatches(node *xmlNode, menu manifest.Menu) bool {
-	return node.Name.Local == "game" && childValue(node, "path") == menu.Path && childValue(node, "name") == menu.Name && childValue(node, "desc") == menu.Description
+	return node.Name.Local == "game" && childValue(node, "path") == menu.Path && childValue(node, "name") == menu.Name && childValue(node, "desc") == menu.Description && childValue(node, "image") == menu.Image
 }
 
 func encodeGamelist(root *xmlNode) ([]byte, error) {

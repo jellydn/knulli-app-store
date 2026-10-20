@@ -86,6 +86,13 @@
     "launcher": "Grout.sh",
     "executables": ["Grout.sh", "grout"],
     "warning": "Experimental on this device. Store integrity controls disable Grout's self-updater; update only through the Store.",
+    "menu": {
+      "gamelist": "/userdata/roms/tools/gamelist.xml",
+      "path": "./Grout/Grout.sh",
+      "name": "Grout",
+      "description": "Browse your RomM library and sync games to your handheld.",
+      "image": "./Grout/logo.png"
+    },
     "preserve": ["config.json", "save_slots.json", ".cache", "logs"],
     "network": true,
     "allowed_write_paths": [

@@ -382,6 +382,9 @@ func TestPlayTimeFirstLaunchHealthRepairAndUninstallOnExperimentalDevices(t *tes
 			if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
 				t.Fatal(err)
 			}
+			assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<path>./PlayTime/playtime.sh</path>")
+			assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<desc>Track game play time and view your play statistics on Knulli.</desc>")
+			assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<image>./PlayTime/icons/playtime.png</image>")
 			baseGuard, err := safefs.NewGuard(root, []string{managerPath})
 			if err != nil {
 				t.Fatal(err)
@@ -498,6 +501,33 @@ func retSendTestPackage(t *testing.T, asset []byte) manifest.Package {
 	return pkg
 }
 
+func TestFileMappingsRejectUnsafeOrAmbiguousInventory(t *testing.T) {
+	asset := zipBytes(t, map[string]string{"launch.sh": "launcher", "nested/launch.sh": "nested launcher"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	for _, mappings := range []map[string]string{
+		{"nested/launch.sh": "../escape.sh"},
+		{"/nested/launch.sh": "moved.sh"},
+		{"launch.sh": "same.sh", "nested/launch.sh": "same.sh"},
+		{"nested/launch.sh": "launch.sh"},
+		{"absent.sh": "moved.sh"},
+	} {
+		t.Run(fmt.Sprint(mappings), func(t *testing.T) {
+			root := t.TempDir()
+			pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+			pkg.Install.FileMappings = mappings
+			manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+			if _, err := manager.Apply(context.Background(), OpInstall, pkg); err == nil {
+				t.Fatal("unsafe or ambiguous mapping accepted")
+			}
+			assertMissing(t, root, "userdata/roms/tools/demo/launch.sh")
+			if status, err := manager.Status(pkg.ID); err != nil || status.Installed {
+				t.Fatalf("rejected mapping left installed state: %#v, %v", status, err)
+			}
+		})
+	}
+}
+
 func TestRetSendInstallMenuHealthRepairAndUninstallPreserveIdentityAndInbox(t *testing.T) {
 	// Exact upstream launcher: mxmgorin/retsend v1.0.0, commit 7968a92.
 	launcher, err := os.ReadFile("testdata/retsend-v1.0.0.sh")
@@ -542,8 +572,8 @@ func TestRetSendInstallMenuHealthRepairAndUninstallPreserveIdentityAndInbox(t *t
 		{Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "libc"}, Device: "trimui-smart-pro", Resolution: "1280x720"},
 		{Firmware: "knulli", Version: "scarab 2026/08/19 16:06", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "libc"}, Device: "magicx-zero-28", Resolution: "640x480"},
 	} {
-		for _, fromFork := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s/from-fork=%t", current.Device, fromFork), func(t *testing.T) {
+		for _, previous := range []string{"fresh", "fork", "nested-upstream"} {
+			t.Run(current.Device+"/"+previous, func(t *testing.T) {
 				root := t.TempDir()
 				pkg := retSendTestPackage(t, asset)
 				if pkg.Version != "1.0.0" || pkg.Repository != "https://github.com/mxmgorin/retsend" || pkg.Release.URL != "https://github.com/mxmgorin/retsend/releases/download/v1.0.0/retsend-knulli.zip" {
@@ -554,7 +584,7 @@ func TestRetSendInstallMenuHealthRepairAndUninstallPreserveIdentityAndInbox(t *t
 				writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList><game><path>./Other.sh</path><name>Other</name></game></gameList>")
 
 				operation := OpInstall
-				if fromFork {
+				if previous == "fork" {
 					legacy := retSendTestPackage(t, legacyAsset)
 					legacy.Version = "0.9.1"
 					legacy.Repository = "https://github.com/jellydn/retsend"
@@ -563,6 +593,8 @@ func TestRetSendInstallMenuHealthRepairAndUninstallPreserveIdentityAndInbox(t *t
 					legacy.Install.Launcher = "RetSend.sh"
 					legacy.Install.Executables = []string{"RetSend.sh", "retsend"}
 					legacy.Install.Menu.Path = "./RetSend/RetSend.sh"
+					legacy.Install.Menu.Image = ""
+					legacy.Install.FileMappings = nil
 					legacy.Install.BinaryPatches = nil
 					manager.Client = rewriteClient(t, legacyServer)
 					if _, err := manager.Apply(context.Background(), OpInstall, legacy); err != nil {
@@ -574,13 +606,25 @@ func TestRetSendInstallMenuHealthRepairAndUninstallPreserveIdentityAndInbox(t *t
 					manager.Client = rewriteClient(t, server)
 					operation = OpUpdate
 				}
+				if previous == "nested-upstream" {
+					legacy := retSendTestPackage(t, asset)
+					legacy.Install.FileMappings = nil
+					legacy.Install.Launcher = "tools/Retsend.sh"
+					legacy.Install.Executables = []string{"tools/Retsend.sh", "tools/retsend/retsend"}
+					legacy.Install.Menu.Path = "./RetSend/tools/Retsend.sh"
+					legacy.Install.Menu.Image = ""
+					legacy.Install.BinaryPatches = legacy.Install.BinaryPatches[1:]
+					legacy.Install.BinaryPatches[0].SHA256 = "85070aacb3c1bc0c9136f8458cce79ccfe34089f471b33f3f480e54f67d50092"
+					if _, err := manager.Apply(context.Background(), OpInstall, legacy); err != nil {
+						t.Fatal(err)
+					}
+					operation = OpRepair
+				}
 				if _, err := manager.Apply(context.Background(), operation, pkg); err != nil {
 					t.Fatal(err)
 				}
-				if fromFork {
+				if previous == "fork" {
 					assertMissing(t, root, "userdata/roms/tools/RetSend/retsend")
-					assertMissing(t, root, "userdata/roms/tools/RetSend/RetSend.sh")
-					assertNotContains(t, root, "userdata/roms/tools/gamelist.xml", "./RetSend/RetSend.sh")
 					for relative, body := range runtimeFiles {
 						assertRootFile(t, root, relative, body)
 					}
@@ -588,16 +632,22 @@ func TestRetSendInstallMenuHealthRepairAndUninstallPreserveIdentityAndInbox(t *t
 				if _, err := manager.Apply(context.Background(), OpInstall, pkg); err == nil || !strings.Contains(err.Error(), "already installed") {
 					t.Fatalf("repeated install was not rejected: %v", err)
 				}
-				assertContains(t, root, "userdata/roms/tools/RetSend/tools/Retsend.sh", "RETSEND_DATA_DIR=/userdata/system/configs/retsend RETSEND_SAVE_DIR=/userdata/roms/retsend-inbox")
+				assertContains(t, root, "userdata/roms/tools/RetSend/RetSend.sh", "RETSEND_DATA_DIR=/userdata/system/configs/retsend RETSEND_SAVE_DIR=/userdata/roms/retsend-inbox")
+				assertContains(t, root, "userdata/roms/tools/RetSend/RetSend.sh", `&& pwd)/tools/retsend`)
+				assertRootFile(t, root, "userdata/roms/tools/RetSend/RetSend.sh.keys", "hotkey mapping")
+				assertMissing(t, root, "userdata/roms/tools/RetSend/tools/Retsend.sh")
+				assertMissing(t, root, "userdata/roms/tools/RetSend/tools/Retsend.sh.keys")
 				assertRootFile(t, root, "userdata/roms/tools/RetSend/tools/retsend/retsend", "reviewed arm64 binary")
-				for _, name := range []string{"tools/Retsend.sh", "tools/retsend/retsend"} {
+				for _, name := range []string{"RetSend.sh", "tools/retsend/retsend"} {
 					info, err := os.Stat(filepath.Join(root, "userdata/roms/tools/RetSend", name))
 					if err != nil || info.Mode().Perm() != 0755 {
 						t.Fatalf("%s mode was not restored: %v, %v", name, info, err)
 					}
 				}
-				assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<path>./RetSend/tools/Retsend.sh</path>")
+				assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<path>./RetSend/RetSend.sh</path>")
 				assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<name>RetSend</name>")
+				assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<image>./RetSend/tools/images/retsend.png</image>")
+				assertNotContains(t, root, "userdata/roms/tools/gamelist.xml", "./RetSend/tools/Retsend.sh")
 				assertRootFile(t, root, "userdata/roms/tools/RetSend/tools/gamelist.xml", "upstream package-local menu")
 
 				for relative, body := range runtimeFiles {
@@ -628,9 +678,10 @@ func TestRetSendInstallMenuHealthRepairAndUninstallPreserveIdentityAndInbox(t *t
 					t.Fatal(err)
 				}
 				assertMissing(t, root, "userdata/roms/tools/RetSend/tools/retsend/retsend")
-				assertMissing(t, root, "userdata/roms/tools/RetSend/tools/Retsend.sh")
+				assertMissing(t, root, "userdata/roms/tools/RetSend/RetSend.sh")
+				assertMissing(t, root, "userdata/roms/tools/RetSend/RetSend.sh.keys")
 				assertMissing(t, root, "userdata/system/knulli-app-store/installed/io.github.jellydn.retsend.json")
-				assertNotContains(t, root, "userdata/roms/tools/gamelist.xml", "./RetSend/tools/Retsend.sh")
+				assertNotContains(t, root, "userdata/roms/tools/gamelist.xml", "./RetSend/RetSend.sh")
 				assertRootFile(t, root, "userdata/roms/tools/Other.sh", "unrelated tool")
 				assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<path>./Other.sh</path>")
 				for relative, body := range runtimeFiles {
@@ -737,14 +788,16 @@ func TestGroutPreviousVersionUpdateRepairRollbackAndUninstallPreserveState(t *te
 	}))
 	defer server.Close()
 	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
-	old := groutTestPackage(v51, "https://github.com/example/demo/releases/download/v5.1/grout.zip", "5.1.0.0")
+	old := groutTestPackage(t, v51, "https://github.com/example/demo/releases/download/v5.1/grout.zip", "5.1.0.0")
 	if _, err := manager.Apply(context.Background(), OpInstall, old); err != nil {
 		t.Fatal(err)
 	}
+	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<desc>Browse your RomM library and sync games to your handheld.</desc>")
+	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "<image>./Grout/logo.png</image>")
 	for name, body := range map[string]string{"config.json": "credentials", "save_slots.json": "slots", ".cache/grout.db": "cache", "logs/grout.log": "log"} {
 		writeRootFile(t, root, "userdata/roms/tools/Grout/"+name, body)
 	}
-	current := groutTestPackage(v52, "https://github.com/example/demo/releases/download/v5.2/grout.zip", "5.2.0.0")
+	current := groutTestPackage(t, v52, "https://github.com/example/demo/releases/download/v5.2/grout.zip", "5.2.0.0")
 	writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList><broken></gameList>")
 	if _, err := manager.Apply(context.Background(), OpUpdate, current); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
 		t.Fatalf("expected update rollback trigger, got %v", err)
@@ -771,7 +824,12 @@ func TestGroutPreviousVersionUpdateRepairRollbackAndUninstallPreserveState(t *te
 	}
 }
 
-func groutTestPackage(asset []byte, url, version string) manifest.Package {
+func groutTestPackage(t *testing.T, asset []byte, url, version string) manifest.Package {
+	t.Helper()
+	reviewed, err := manifest.Load("../../catalogue/packages/app.romm.grout.json")
+	if err != nil {
+		t.Fatal(err)
+	}
 	pkg := testPackage(url, asset, version)
 	pkg.ID = "app.romm.grout"
 	pkg.Name = "Grout"
@@ -780,7 +838,7 @@ func groutTestPackage(asset []byte, url, version string) manifest.Package {
 	pkg.Install.Executables = []string{"Grout.sh", "grout"}
 	pkg.Install.Preserve = []string{"config.json", "save_slots.json", ".cache", "logs"}
 	pkg.Install.AllowedWritePaths = []string{"/userdata/roms/tools/Grout", "/userdata/roms/tools/gamelist.xml"}
-	pkg.Install.Menu = &manifest.Menu{Gamelist: "/userdata/roms/tools/gamelist.xml", Path: "./Grout/Grout.sh", Name: "Grout"}
+	pkg.Install.Menu = reviewed.Install.Menu
 	return pkg
 }
 
@@ -1188,7 +1246,7 @@ func TestGroutAdoptionUsesTransformedHashAndEffectiveDestinationMode(t *testing.
 	})
 	server := serveAsset(t, asset)
 	defer server.Close()
-	pkg := groutTestPackage(asset, "https://github.com/example/demo/releases/download/v5.2/grout.zip", "5.2.0.0")
+	pkg := groutTestPackage(t, asset, "https://github.com/example/demo/releases/download/v5.2/grout.zip", "5.2.0.0")
 	pkg.Install.StripComponents = 1
 	digest := sha256.Sum256(after)
 	pkg.Install.BinaryPatches = []manifest.BinaryPatch{{
