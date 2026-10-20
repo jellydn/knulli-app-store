@@ -166,9 +166,9 @@ walk catalogue-tabs keyboard \
   "installed"
 
 # A read-only package offers no action and says so. Only compatible packages
-# are listed. Names sort CoverPlayer, Grout, PlayTime, then PocketCurator.
+# are listed. Names sort Grout, PlayTime, then PocketCurator.
 walk catalogue-read-only keyboard \
-  "down,down,down,enter" \
+  "down,down,enter" \
   "catalogue" \
   "No safe action is available"
 

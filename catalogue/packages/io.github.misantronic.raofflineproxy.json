@@ -2,7 +2,7 @@
   "schema": "org.knulli.app-store/package-manifest/v1",
   "id": "io.github.misantronic.raofflineproxy",
   "name": "RAOfflineProxy",
-  "version": "1.13.0-alpha1",
+  "version": "2.2.0-alpha1",
   "type": "integration",
   "summary": "Provides an offline RetroAchievements proxy for supported emulators.",
   "repository": "https://github.com/misantronic/RAOfflineProxy",
@@ -13,9 +13,10 @@
       "provenance": "community"
     },
     "notes": [
-      "User-approved for review, but blocked: the Knulli asset is a self-extracting shell installer instead of a supported ZIP or tar.gz archive.",
-      "The built-in updater downloads and executes a selected shell asset without checksum verification. It cannot bypass App Store transactions.",
-      "The GitHub asset is 510188 bytes with API digest cd3e8b2eb891751b7f80463e9cbcc5b9065668d26a20c14acf2d8f63191fcda3, but exact extracted size, complete writes, dependency ABI, and device evidence remain unresolved."
+      "Review on 2026-10-20 verified the Knulli v2.2.0-alpha1 shell asset against the GitHub digest: 1377625 bytes, SHA-256 94d1d2de7d213300463dc6e4f4fd28ce9ba25344e3b2fe9c7371f7b4f9a06f0b. No installer was executed.",
+      "Data-only decoding after the unique __RAOFFLINEPROXY_PAYLOAD_BELOW__ marker yielded a 1018930-byte tar.gz with 66 regular files, 9 directories, and 2340621 regular-file bytes. No duplicate paths, traversal, absolute paths, or special-file entries were found. A separately published reviewed archive is still needed by the Store's ZIP/tar.gz contract.",
+      "The packaged updater downloads a Knulli shell asset without a pinned size or checksum; the menu invokes its installation. These paths must be disabled in a Store-managed package.",
+      "Runtime integration writes shared boot and emulator configuration, including /userdata/system/custom.sh. Configured path overrides and hook removal need containment and ownership review. readelf inspection of both bundled native libraries confirms ELF64 AArch64, libc/libpthread dependencies, and a highest GLIBC symbol requirement of 2.17. The SQLite extension targets CPython 3.12; target Python/pygame availability and runtime loading remain unverified. Missing device-test evidence alone will not block a safe package."
     ],
     "evidence": [
       {
@@ -24,8 +25,13 @@
       },
       {
         "kind": "tagged-release",
-        "url": "https://github.com/misantronic/RAOfflineProxy/releases/tag/v1.13.0-alpha1",
-        "note": "Alpha release observed during review. GitHub reports the release as mutable; it is not approved for installation."
+        "url": "https://github.com/misantronic/RAOfflineProxy/releases/tag/v2.2.0-alpha1",
+        "note": "Downloaded Knulli shell asset matches the GitHub API size and SHA-256. Embedded archive was read as data only; extraction safety does not establish runtime safety or device compatibility."
+      },
+      {
+        "kind": "filesystem-and-network-review",
+        "url": "https://github.com/misantronic/RAOfflineProxy/blob/3958abcecd4762128cdb1d4c24cbf179ea4c0f44/linux/raofflineproxy/update.py",
+        "note": "Packaged download_knulli_update_installer writes a downloaded executable without an expected checksum. Packaged menu_sdl.py invokes installation; platform.py writes a boot hook and accepts configured startup paths."
       },
       {
         "kind": "license",
