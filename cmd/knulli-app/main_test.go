@@ -245,16 +245,12 @@ func TestRunCatalogueSignsTheIndexWithAGeneratedKey(t *testing.T) {
 	assertSignedIndex(t, second, key+".pub")
 }
 
-// The gate is the only thing standing between a half-detected device and a
-// package written against a guess, so each of its four conditions is pinned on
-// its own. Every fixture supplies a complete platform minus one field, so a
-// condition dropped from the disjunction fails a case here instead of silently
-// letting a half-detected install through.
-func TestRunApplyRequiresACompleteDetectedPlatform(t *testing.T) {
+func TestRunApplyRequiresRuntimeFactsButNotDeviceOrResolution(t *testing.T) {
 	// The fixture root holds library markers but no Knulli identity, so firmware,
 	// device, and version are only ever what a flag says they are.
 	root := platformRoot(t)
-	manifestPath := writeManifest(t, t.TempDir(), cliPackage(t, zipBytes(t, map[string]string{"run.sh": "x"})))
+	archive := zipBytes(t, map[string]string{"run.sh": "x"})
+	manifestPath := writeManifest(t, t.TempDir(), cliPackage(t, archive))
 
 	withoutFlag := func(omit string) []string {
 		arguments := []string{"-root", root}
@@ -277,29 +273,36 @@ func TestRunApplyRequiresACompleteDetectedPlatform(t *testing.T) {
 		omit   string
 		reason string
 	}{
-		{name: "firmware", omit: "-firmware", reason: "no Knulli identity in the root"},
-		{name: "device", omit: "-device", reason: "device identity is never inferred from the SoC family"},
-		{name: "resolution", omit: "-resolution", reason: "resolution is explicit, never assumed"},
-		{name: "firmware version", omit: "-firmware-version", reason: "the package names a minimum version"},
+		{name: "firmware", omit: "-firmware", reason: "field=firmware:"},
+		{name: "firmware version", omit: "-firmware-version", reason: "field=firmware_version:"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			_, err := capture(t, func() error { return runApply("install", withoutFlag(testCase.omit), applyDeps{}) })
-			if err == nil || !strings.Contains(err.Error(), "platform detection is incomplete") {
-				t.Fatalf("expected a platform missing its %s to be refused because %s, got %v", testCase.name, testCase.reason, err)
+			if err == nil || !strings.Contains(err.Error(), testCase.reason) {
+				t.Fatalf("expected missing %s to fail runtime validation with %s, got %v", testCase.name, testCase.reason, err)
 			}
 		})
 	}
 
-	// No flags at all is the same gate, and it fires before the manifest is read:
-	// the path here does not exist, yet the platform complaint is what surfaces.
+	// No flags still fails the shared Knulli firmware requirement.
 	_, err := capture(t, func() error { return runApply("install", []string{"-root", root, manifestPath}, applyDeps{}) })
-	if err == nil || !strings.Contains(err.Error(), "platform detection is incomplete") {
+	if err == nil || !strings.Contains(err.Error(), "field=firmware:") {
 		t.Fatalf("expected an entirely undetected platform to be refused, got %v", err)
 	}
 
-	// A complete platform gets past the gate: the absent manifest is reported
-	// instead, proving the gate opened and no download was attempted.
+	// Missing device and display evidence must not block a real CLI install.
+	output, err := capture(t, func() error {
+		return runApply("install", []string{"-root", root, "-firmware", testFirmware, "-firmware-version", testVersion, "-arch", testArch, manifestPath}, applyDeps{client: staticClient(archive)})
+	})
+	if err != nil || !strings.Contains(output, "warning: untested on this device") {
+		t.Fatalf("unknown device/display install = %q, %v", output, err)
+	}
+	if got, err := readRoot(t, root, "/userdata/roms/tools/demo/run.sh"); err != nil || got != "x" {
+		t.Fatalf("untested install did not write reviewed bytes: %q, %v", got, err)
+	}
+
+	// An absent manifest still fails before any download.
 	_, err = capture(t, func() error {
 		return runApply("install", append(platformFlags(root), filepath.Join(root, "absent.json")), applyDeps{})
 	})

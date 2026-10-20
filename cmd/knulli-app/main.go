@@ -219,10 +219,8 @@ func runApply(operation string, arguments []string, deps applyDeps) error {
 		diagnosticLog.Event("catalogue_error", "path", flags.Arg(0), "error", err.Error())
 		return err
 	}
-	if current.Firmware == "" || current.Device == "" || current.Resolution == "" || (pkg.Compatibility != nil && pkg.Compatibility.MinimumVersion != "" && current.Version == "") {
-		err := fmt.Errorf("platform detection is incomplete: %s", platform.Summary(current))
-		diagnosticLog.Event("platform_detection_incomplete", "error", err.Error())
-		return err
+	if pkg.Installable() && !pkg.DeviceTested(current.Firmware, current.Arch, current.Device, current.Resolution) {
+		fmt.Println("warning: untested on this device; the application may not run correctly")
 	}
 	ops := map[string]installer.Op{"install": installer.OpInstall, "adopt": installer.OpAdopt, "update": installer.OpUpdate, "repair": installer.OpRepair}
 	op, known := ops[operation]

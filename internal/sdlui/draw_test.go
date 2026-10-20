@@ -261,8 +261,8 @@ func TestHeaderIncludesBrandMark(t *testing.T) {
 func TestCompactLabelsAndRequiredNotices(t *testing.T) {
 	verified := manifest.Package{Review: manifest.Review{Status: "verified"}, Install: &manifest.Install{Warning: "Do not use the updater."}}
 	experimental := manifest.Package{Review: manifest.Review{Status: "experimental"}, Install: &manifest.Install{Warning: "Unverified test."}}
-	if trustLabel(appstore.Item{Package: verified}) != "VERIFIED" || trustLabel(appstore.Item{Package: experimental}) != "EXPERIMENTAL" || trustLabel(appstore.Item{Package: experimental, DeviceTested: true}) != "DEVICE TESTED" {
-		t.Fatal("trust labels do not separate verified and experimental packages")
+	if trustLabel(appstore.Item{Package: verified, DeviceTested: true}) != "VERIFIED" || trustLabel(appstore.Item{Package: verified}) != "UNTESTED" || trustLabel(appstore.Item{Package: experimental}) != "UNTESTED" || trustLabel(appstore.Item{Package: experimental, DeviceTested: true}) != "DEVICE TESTED" {
+		t.Fatal("trust labels must reflect evidence for this exact device, not another device")
 	}
 	if got := installState(appstore.Item{Package: verified, Verdict: appstore.Verdict{State: appstore.StateInstalled}}); got != "INSTALLED" {
 		t.Fatalf("healthy install label = %q", got)

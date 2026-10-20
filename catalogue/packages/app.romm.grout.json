@@ -13,7 +13,7 @@
       "provenance": "community"
     },
     "notes": [
-      "Grout 5.2.0.0 is authorized for broad experimental Knulli testing only on detected aarch64 glibc systems with the declared SDL libraries and a validated 640x480 through 1280x720 display. This is not universal verification.",
+      "Grout 5.2.0.0 is authorized for experimental installation on any Knulli device with matching aarch64 glibc and declared SDL libraries. Device lists and display bounds are advisory; missing exact-device evidence means untested, not blocked.",
       "The Store replaces the one pinned updater-metadata URL in the reviewed binary with a reserved .invalid URL and verifies the exact transformed SHA-256. This prevents Grout's self-updater from obtaining release metadata.",
       "The manager preserves config.json, save_slots.json, .cache, and logs during update, repair, force reinstall, and uninstall. Recovery backups remain available for manual restore.",
       "Real-device validation is limited to Grout 5.1.0.0 on TrimUI Smart Pro with Knulli Scarab; it does not verify this 5.2.0.0 release or another device."

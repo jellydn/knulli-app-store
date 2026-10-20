@@ -32,7 +32,7 @@ make walkthrough            # offline GUI evidence; add WALK_FLAGS=--install for
 - Release = pinned HTTPS URL + exact byte size + SHA-256; archives ≤ 512 MiB compressed and installed. Mutable/aliased assets are not releases.
 - Transaction order: download → verify → stage → journal → mutate → installed-state-last. Roll back in reverse on failure.
 - Compatibility failures must report raw value, normalized value, source, and full detected matrix.
-- Device identity is per-device (never infer from SoC family); resolution is explicit WIDTHxHEIGHT, never assumed. Knulli identity = `OS_NAME="knulli"` in `/etc/os-release`, version from `/usr/share/knulli/knulli.version`.
+- Record device identity and explicit WIDTHxHEIGHT without guessing. Device lists and display bounds are advisory: unknown or untested hardware must not block a packaged app. Exact device-test evidence controls the tested badge. Firmware, architecture, ABI, and dependencies still gate installation. Knulli identity = `OS_NAME="knulli"` in `/etc/os-release`, version from `/usr/share/knulli/knulli.version`.
 - Menu ownership: add only an absent exact launch path, remove only an unchanged entry this installer created. Game-list reload via loopback `GET 127.0.0.1:1234/reloadgames` means queued, not completed.
 
 ## Catalogue contributions

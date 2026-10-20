@@ -3,13 +3,13 @@
 ## States
 
 - `candidate`: informative metadata only. The schema rejects release and install instructions in this state.
-- `experimental`: actionable only for declared exact devices/resolutions or reviewed broad bounds. Broad scope still requires detected Knulli, architecture, ABI, dependencies, a device identity, and display bounds. It requires an explicit warning and may omit a minimum firmware version when no evidence supports one.
+- `experimental`: actionable on any device when Knulli, architecture, ABI, and runtime dependencies pass. Device identity and display size do not block installation. Declared devices/resolutions or broad bounds record reviewed scope only. An explicit warning is required; a minimum firmware version may be omitted when no evidence supports one.
 - `installable`: two reviewers have checked all evidence and the package can be used by the installer.
 - `verified`: `installable` plus linked real-device test evidence for every declared device and resolution.
 
 `review.approval` is separate from these technical states. Community approval permits catalogue inclusion, but it does not provide compatibility evidence, enable installation, or grant a verified badge.
 
-`real-device-test` evidence records the tester, date, exact package version, firmware, architecture, device, resolution, and passed result. A mixed device matrix can show a tested device without marking an untested device as verified.
+`real-device-test` evidence records the tester, date, exact package version, firmware, architecture, device, resolution, and passed result. Missing exact evidence shows **UNTESTED**, even if the release is verified on another device. It does not block Install, Manage existing, Update, or Repair. Candidate entries still need an actual installation definition; an untested badge cannot supply a missing archive or install layout.
 
 ## Promotion checklist
 
@@ -20,7 +20,7 @@
 5. Inspect the complete archive. It must contain regular files only and one declared launcher.
 6. Review source or packaged behavior for network use and filesystem writes.
 7. List the narrowest `/userdata` destination, menu file, preserved configuration, and allowed write paths.
-8. Establish the Knulli version evidence, architecture, dynamic ABI, minimum glibc version, runtime libraries, device scope, and exact resolutions or experimental display bounds. Missing runtime facts must block with the exact reason.
+8. Establish the Knulli version evidence, architecture, dynamic ABI, minimum glibc version, and runtime libraries. Missing runtime facts must block with the exact reason. Record device scope and resolutions as advisory evidence, not an installation allowlist.
 9. Have a second reviewer reproduce the checksum, archive inspection, and manifest validation.
 10. Use `experimental` for an authorized, clearly warned hardware test when mandatory release and path controls pass but compatibility evidence is incomplete. Promote to `installable` after review. Add `real-device-test` evidence and promote to `verified` only after the exact matrix passes on hardware.
 

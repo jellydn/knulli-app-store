@@ -138,15 +138,15 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, item := range items {
-		if item.Package.Experimental() {
-			if !item.Compatible || len(item.Actions) != 1 || item.Verdict.State != StateAvailable || !hasReason(item.Verdict, ReasonReview, "no minimum version is claimed") || !hasReason(item.Verdict, ReasonReview, "/etc/os-release:OS_NAME") || !hasReason(item.Verdict, ReasonReview, "source=SDL renderer output") {
+		if item.Package.Experimental() && !item.DeviceTested {
+			if !item.Compatible || len(item.Actions) != 1 || item.Verdict.State != StateAvailable || !hasReason(item.Verdict, ReasonReview, "Untested on this device; installation is allowed") || !hasReason(item.Verdict, ReasonReview, "/etc/os-release:OS_NAME") || !hasReason(item.Verdict, ReasonReview, "source=SDL renderer output") {
 				t.Fatalf("latest Knulli experimental decision is wrong: %#v", item)
 			}
 		}
 	}
 }
 
-func TestMagicXAllowsOnlyPlayTimeExperimentalPackage(t *testing.T) {
+func TestPackagedAppsAreAvailableOnUntestedAndUnknownDevices(t *testing.T) {
 	index, err := catalogForTest()
 	if err != nil {
 		t.Fatal(err)
@@ -155,39 +155,38 @@ func TestMagicXAllowsOnlyPlayTimeExperimentalPackage(t *testing.T) {
 	if err := writeIndexForTest(index, indexPath); err != nil {
 		t.Fatal(err)
 	}
-	detected := platform.Resolve(t.TempDir(), platform.WithFirmware("knulli"), platform.WithVersion("scarab 2026/08/19 16:06"), platform.WithArch("aarch64"), platform.WithDevice("magicx-zero-28"), platform.WithResolutionOverride("640x480"))
-	detected.ABI = "linux-aarch64-glibc"
-	detected.GLIBCVersion = "2.40"
-	detected.Dependencies = []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc", "libresolv", "libpthread"}
-	service, err := Open(indexPath, installer.Manager{Root: t.TempDir()}.WithPlatform(detected))
-	if err != nil {
-		t.Fatal(err)
-	}
-	items, err := service.Items(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, item := range items {
-		switch item.Package.ID {
-		case "io.github.unitreign.playtime":
-			if !item.Compatible || item.DeviceTested || !item.Package.Experimental() || len(item.Actions) != 1 || item.Actions[0] != Install || !strings.Contains(strings.ToLower(item.Package.Install.Warning), "unverified") {
-				t.Fatalf("PlayTime was not offered as an unverified MagicX experiment: %#v", item)
+	for _, test := range []struct{ name, device, resolution string }{
+		{"MagicX", "magicx-zero-28", "640x480"},
+		{"unlisted small display", "new-board", "320x240"},
+		{"unlisted large display", "new-board", "1920x1080"},
+		{"unknown", "", ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			detected := platform.Info{Firmware: "knulli", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc", "libresolv", "libpthread"}, Device: test.device, Resolution: test.resolution}
+			service, err := Open(indexPath, installer.Manager{Root: t.TempDir()}.WithPlatform(detected))
+			if err != nil {
+				t.Fatal(err)
 			}
-		case "app.romm.grout":
-			if !item.Compatible || item.DeviceTested || len(item.Actions) != 1 || item.Actions[0] != Install || item.Verdict.State != StateAvailable {
-				t.Fatalf("Grout was not offered as an unverified MagicX experiment: %#v", item)
+			items, err := service.Items(context.Background())
+			if err != nil {
+				t.Fatal(err)
 			}
-		case "io.github.heilmic.coverplayer":
-			if !item.Compatible || item.DeviceTested || !item.Package.Experimental() || len(item.Actions) != 1 || item.Actions[0] != Install || item.Verdict.State != StateAvailable {
-				t.Fatalf("CoverPlayer was not offered as an unverified MagicX experiment: %#v", item)
+			for _, item := range items {
+				if !item.Package.Installable() {
+					continue
+				}
+				if !item.Compatible || item.DeviceTested || !hasReason(item.Verdict, ReasonReview, "Untested on this device") {
+					t.Fatalf("packaged app blocked or missing warning: %#v", item)
+				}
+				assertActions(t, item.Actions, Install)
 			}
-		}
+		})
 	}
 }
 
 func TestVerdictActionsReflectInstallStateAndHealth(t *testing.T) {
 	pkg := installablePackage()
-	current := platform.Info{Firmware: "knulli", Version: "2026.05", Arch: "aarch64", ABI: "linux-aarch64-glibc", Dependencies: []string{"sdl2"}, Device: "trimui-smart-pro", Resolution: "1280x720"}
+	current := platform.Info{Firmware: "knulli", Version: "2026.05", Arch: "aarch64", ABI: "linux-aarch64-glibc", Dependencies: []string{"sdl2"}, Device: "unlisted-board", Resolution: "320x240"}
 	assertActions(t, assess(pkg, current, installer.Status{}, false).Actions, Install)
 	assertActions(t, assess(pkg, current, installer.Status{}, true).Actions, Adopt)
 	status := installer.Status{Installed: true, Version: pkg.Version, Healthy: true}
@@ -354,7 +353,7 @@ func TestDirectoryOnlyDestinationDoesNotRetryManageExisting(t *testing.T) {
 	assertActions(t, items[0].Actions, Install)
 }
 
-func TestExecuteInstallFailureAndUninstall(t *testing.T) {
+func TestExecuteInstallOnUnknownDeviceFailureAndUninstall(t *testing.T) {
 	root := t.TempDir()
 	asset := testZip(t, map[string]string{"run.sh": "#!/bin/sh\n"})
 	digest := sha256.Sum256(asset)
@@ -374,7 +373,7 @@ func TestExecuteInstallFailureAndUninstall(t *testing.T) {
 	pkg.Release.Size = int64(len(asset))
 	pkg.Release.InstalledSize = int64(len("#!/bin/sh\n"))
 	manager := installer.Manager{Root: root, Client: client, Diagnostics: log}.WithPlatform(platform.Info{
-		Firmware: "knulli", Version: "2026.05", Arch: "aarch64", ABI: "linux-aarch64-glibc", Dependencies: []string{"sdl2"}, Device: "trimui-smart-pro", Resolution: "1280x720",
+		Firmware: "knulli", Version: "2026.05", Arch: "aarch64", ABI: "linux-aarch64-glibc", Dependencies: []string{"sdl2"},
 	})
 	service := &Service{index: catalog.Index{Packages: []catalog.Entry{{ID: pkg.ID, Package: pkg}}}, manager: manager}
 	var progress []string

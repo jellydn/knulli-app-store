@@ -31,10 +31,10 @@ Automatic defaults follow Knulli's logical SDL contract, not a device-specific r
 
 ## Package status
 
-- **Grout 5.2.0.0 is a user-authorized experimental test.** It is allowed only after Knulli, AArch64, glibc 2.17 or later, all SDL libraries, the device identity, and 640×480 pass detection. The Store disables its self-updater with an exact verified staging patch. No Grout version has MagicX real-device evidence.
+- **Grout 5.2.0.0 is a user-authorized experimental test.** Knulli, AArch64, glibc 2.17 or later, and the declared SDL libraries must pass detection. Device identity and display size do not block installation. The Store disables its self-updater with an exact verified staging patch. No Grout version has MagicX real-device evidence.
 - **PlayTime 1.0.0 is a user-authorized experimental test.** The reviewed ARM64 archive uses the Knulli SDL2 libraries, runtime display dimensions with a 640×480 fallback, and SDL GameController actions. Select **Install**, or **Manage existing** when detected external files show the row state **EXTERNAL**, and confirm the unverified warning. An empty destination directory is not a copy and keeps the **Install** action. Its accelerated renderer, launch, tracking, and complete life cycle are not proven on MagicX.
 
-- **RetSend 0.9.1 is a user-authorized experimental test.** It is allowed only after Knulli, AArch64, glibc 2.28 or later, a system SDL2, the device identity, and 640×480 pass detection. It needs local Wi-Fi, keeps its configuration, transfer history, and TLS identity in `/userdata/system/configs/retsend`, and receives files in `/userdata/roms/retsend-inbox`. No RetSend version has MagicX real-device evidence.
+- **RetSend 1.0.0 is a user-authorized experimental test.** The [upstream Knulli package](retsend-upstream-1.0.0.md) requires Knulli, AArch64, glibc 2.28 or later, and system SDL2. Device identity and display size do not block installation. Store staging keeps configuration, transfer history, and TLS identity in `/userdata/system/configs/retsend`, and the default receive directory in `/userdata/roms/retsend-inbox`. Saved or selected routes can override that default. No RetSend version has MagicX real-device evidence.
 
 Successful App Store navigation does not prove a package. Grout, PlayTime, and RetSend remain unverified on MagicX.
 
@@ -47,7 +47,7 @@ Successful App Store navigation does not prove a package. Grout, PlayTime, and R
 5. Restart with an old custom mapping file present. Confirm defaults remain active and the file stays unchanged.
 6. Disconnect and reconnect the controller if the runtime permits it. Confirm the correct identity and mapping return.
 7. Press Y for More, then Y to export diagnostics. Confirm controller identity, mapping source, and semantic events are present without private data.
-8. Confirm Grout, PlayTime, and RetSend show **Install** or **Manage existing** with an experimental warning only when ABI, libraries, and display checks pass. Remove one test dependency only in a disposable test root and confirm installation is blocked with its exact name.
+8. Confirm packaged apps show **Install** or **Manage existing** with an **UNTESTED** badge when no exact device report exists. Device/display scope must not block the action. Remove one runtime dependency only in a disposable test root and confirm installation is blocked with its exact name.
 9. Install PlayTime, refresh game lists or reboot, and launch it. Track a game, close it, and relaunch it.
 10. Confirm the App Store reports PlayTime healthy. Damage only a disposable managed test copy if you test Repair; confirm Repair restores it and keeps `/userdata/system/configs/playtime/`.
 11. Uninstall PlayTime and confirm its managed files are gone while `/userdata/system/configs/playtime/` remains. If you managed an external copy and later repaired it, confirm uncertain original files are restored from `/userdata/system/knulli-app-store/originals/io.github.unitreign.playtime/`.

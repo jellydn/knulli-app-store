@@ -74,11 +74,13 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Platform detection** — Reading firmware, version, architecture, device, and resolution from Knulli-owned files. Every field records its raw value, its source, and its normalized value.
 
-**Compatibility** — The match between a package's declared matrix and the detected platform. A failure must show the raw value, the normalized value, the source, and the full detected matrix.
+**Compatibility** — The match between a package's firmware, architecture, ABI, and runtime requirements and the detected platform. A failure must show the raw value, the normalized value, the source, and the full detected matrix. Device lists and display bounds record reviewed scope, not installation permission.
 
-**Device** — A specific handheld identity read from a Knulli board file. Device support is explicit per device, never inferred from a shared SoC family.
+**Device** — A specific handheld identity read from a Knulli board file, never inferred from a shared SoC family. An unknown identity does not block installation.
 
-**Resolution** — An explicit WIDTHxHEIGHT from a real source. No resolution is ever assumed; every actionable manifest names the resolutions it supports.
+**Resolution** — An explicit WIDTHxHEIGHT from a real source. No resolution is ever assumed. Missing resolution or a size outside a manifest's reviewed scope does not block installation.
+
+**Untested** — No passed device report matches the exact package version, firmware, architecture, device, and resolution. The UI shows UNTESTED and still offers installation when the package and runtime checks pass; evidence for another device never grants a tested badge.
 
 ## Interface
 

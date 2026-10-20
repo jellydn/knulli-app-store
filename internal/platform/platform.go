@@ -326,23 +326,8 @@ func Check(pkg manifest.Package, current Info) error {
 			return compatibilityError("dependency", current, fmt.Sprintf("package requires runtime dependency=%q", dependency))
 		}
 	}
-	if current.Device == "" {
-		return compatibilityError("device", current, "detected device identity is empty")
-	}
-	if wanted.DeviceScope != "any" && !includes(wanted.Devices, current.Device) {
-		return compatibilityError("device", current, fmt.Sprintf("package allows devices=%q", strings.Join(wanted.Devices, ",")))
-	}
-	if current.Resolution == "" {
-		return compatibilityError("resolution", current, "no validated display resolution was detected")
-	}
-	if wanted.DisplayBounds != nil {
-		var width, height int
-		if _, err := fmt.Sscanf(current.Resolution, "%dx%d", &width, &height); err != nil || width < wanted.DisplayBounds.MinimumWidth || height < wanted.DisplayBounds.MinimumHeight || width > wanted.DisplayBounds.MaximumWidth || height > wanted.DisplayBounds.MaximumHeight {
-			return compatibilityError("resolution", current, fmt.Sprintf("package allows display bounds=%dx%d..%dx%d", wanted.DisplayBounds.MinimumWidth, wanted.DisplayBounds.MinimumHeight, wanted.DisplayBounds.MaximumWidth, wanted.DisplayBounds.MaximumHeight))
-		}
-	} else if !includes(wanted.Resolutions, current.Resolution) {
-		return compatibilityError("resolution", current, fmt.Sprintf("package allows resolutions=%q", strings.Join(wanted.Resolutions, ",")))
-	}
+	// Device and display metadata describe reviewed scope, not permission to
+	// install. Exact real-device evidence controls the tested badge instead.
 	return nil
 }
 

@@ -13,7 +13,7 @@
       "provenance": "community"
     },
     "notes": [
-      "User-authorized experimental Knulli package for detected aarch64 glibc systems with a 640x480 through 1280x720 display; no real-device validation is recorded yet.",
+      "User-authorized experimental installation on any Knulli device with matching aarch64 glibc. Device lists and display bounds are advisory; no real-device validation is recorded yet.",
       "The reviewed upstream Knulli archive contains the launcher, AArch64 binary, bundled runtime libraries, license files, and an upstream MANIFEST.sha256. GitHub reports release v0.1.0-rc.4 as not immutable. The Store treats the URL as a locator and pins the accepted bytes with the exact size and SHA-256, so a replaced asset cannot install.",
       "The Store owns only /userdata/roms/ports/CoverPlayer and one Ports gamelist entry. It does not adopt or back up other ports in the shared Ports directory.",
       "CoverPlayer stores progress, collections, bookmarks, language, and cache data under /userdata/system/configs/coverplayer. The launcher log is /userdata/system/logs/coverplayer.log. Staging replaces the launcher's /tmp fallback with a same-length fail-closed exit.",

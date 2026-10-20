@@ -13,7 +13,7 @@
       "provenance": "community"
     },
     "notes": [
-      "User-authorized broad experimental Knulli package for detected aarch64 glibc systems with the declared SDL libraries and validated 640x480 through 1280x720 displays; this is not universal verification.",
+      "User-authorized experimental installation on any Knulli device with matching aarch64 glibc and declared SDL libraries. Device lists and display bounds are advisory; exact-device evidence controls the tested badge.",
       "Real-device validation is limited to PlayTime 1.0.0 on TrimUI Smart Pro with Knulli Scarab. The tester reported only that the test was all good; individual lifecycle steps were not reported.",
       "MagicX testing is authorized from confirmed Knulli, aarch64, 640x480, and SDL GameController runtime facts; package install and launch remain untested.",
       "The manager restores execute permission only for the reviewed playtime binary and playtime.sh launcher.",

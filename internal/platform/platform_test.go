@@ -197,7 +197,7 @@ func TestResolutionCandidateParserRejectsMalformedValues(t *testing.T) {
 	}
 }
 
-func TestCheckRejectsOlderVersionAndWrongResolution(t *testing.T) {
+func TestCheckRejectsOlderVersionButAllowsUntestedResolution(t *testing.T) {
 	pkg := manifest.Package{Compatibility: &manifest.Compatibility{
 		Firmware: "knulli", MinimumVersion: "2025.10", Architectures: []string{"aarch64"}, Devices: []string{"h700"}, Resolutions: []string{"640x480"},
 	}}
@@ -207,8 +207,8 @@ func TestCheckRejectsOlderVersionAndWrongResolution(t *testing.T) {
 	}
 	current.Version = "2025.11"
 	current.Resolution = "720x720"
-	if err := Check(pkg, current); err == nil {
-		t.Fatal("expected unsupported resolution to fail")
+	if err := Check(pkg, current); err != nil {
+		t.Fatalf("untested resolution blocked installation: %v", err)
 	}
 }
 
@@ -255,9 +255,6 @@ func TestBroadExperimentalCompatibilityRequiresEveryRuntimeConstraint(t *testing
 		{name: "unknown ABI", edit: func(info *Info) { info.ABI = "" }, want: "field=abi"},
 		{name: "old glibc", edit: func(info *Info) { info.GLIBCVersion = "2.17" }, want: `glibc>="2.34"`},
 		{name: "missing dependency", edit: func(info *Info) { info.Dependencies = []string{"sdl2", "sdl2-ttf"} }, want: `runtime dependency="sdl2-image"`},
-		{name: "unknown device", edit: func(info *Info) { info.Device = "" }, want: "device identity is empty"},
-		{name: "unknown display", edit: func(info *Info) { info.Resolution = "" }, want: "no validated display"},
-		{name: "display outside bounds", edit: func(info *Info) { info.Resolution = "320x240" }, want: "display bounds=640x480..1280x720"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -272,6 +269,24 @@ func TestBroadExperimentalCompatibilityRequiresEveryRuntimeConstraint(t *testing
 	}
 }
 
+func TestCheckAllowsUnknownDevicesAndDisplaysOutsideReviewedScope(t *testing.T) {
+	for _, compatibility := range []manifest.Compatibility{
+		{Firmware: "knulli", Architectures: []string{"aarch64"}, Devices: []string{"trimui-smart-pro"}, Resolutions: []string{"1280x720"}},
+		{Firmware: "knulli", Architectures: []string{"aarch64"}, DeviceScope: "any", DisplayBounds: &manifest.DisplayBounds{MinimumWidth: 640, MinimumHeight: 480, MaximumWidth: 1280, MaximumHeight: 720}},
+	} {
+		pkg := manifest.Package{Compatibility: &compatibility}
+		for _, current := range []Info{
+			{Firmware: "knulli", Arch: "aarch64", Device: "unlisted-board", Resolution: "320x240"},
+			{Firmware: "knulli", Arch: "aarch64", Device: "unlisted-board", Resolution: "1920x1080"},
+			{Firmware: "knulli", Arch: "aarch64"},
+		} {
+			if err := Check(pkg, current); err != nil {
+				t.Fatalf("untested device/display blocked installation: %#v: %v", current, err)
+			}
+		}
+	}
+}
+
 func TestCheckFailureIncludesDetectedEvidenceAndConstraint(t *testing.T) {
 	pkg := manifest.Package{Compatibility: &manifest.Compatibility{Firmware: "knulli", Architectures: []string{"aarch64"}, Devices: []string{"trimui-smart-pro"}, Resolutions: []string{"1280x720"}}}
 	current := Info{Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720", evidence: evidence{FirmwareRaw: "buildroot", FirmwareSource: "/etc/os-release:ID"}}
@@ -283,8 +298,8 @@ func TestCheckFailureIncludesDetectedEvidenceAndConstraint(t *testing.T) {
 	}
 }
 
-func TestResolutionFailureIncludesSelectedSource(t *testing.T) {
-	pkg := manifest.Package{Compatibility: &manifest.Compatibility{Firmware: "knulli", Architectures: []string{"aarch64"}, Devices: []string{"trimui-smart-pro"}, Resolutions: []string{"1280x720"}}}
+func TestRuntimeFailureIncludesSelectedResolutionSource(t *testing.T) {
+	pkg := manifest.Package{Compatibility: &manifest.Compatibility{Firmware: "knulli", Architectures: []string{"aarch64"}, Dependencies: []string{"sdl2"}, Devices: []string{"trimui-smart-pro"}, Resolutions: []string{"1280x720"}}}
 	current := Info{Firmware: "knulli", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1024x600", evidence: evidence{ResolutionSource: "/sys/class/graphics/fb0/mode"}}
 	err := Check(pkg, current)
 	if err == nil || !strings.Contains(err.Error(), `resolution_source="/sys/class/graphics/fb0/mode"`) {

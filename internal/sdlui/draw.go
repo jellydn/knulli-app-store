@@ -402,19 +402,16 @@ func drawDetails(frame *image.RGBA, model *storeui.Model) {
 }
 
 func trustLabel(item appstore.Item) string {
-	if item.DeviceTested && item.Package.Review.Status != "verified" {
-		return "DEVICE TESTED"
-	}
-	switch item.Package.Review.Status {
-	case "verified":
-		return "VERIFIED"
-	case "experimental":
-		return "EXPERIMENTAL"
-	case "installable":
-		return "REVIEWED"
-	default:
+	if !item.Package.Installable() {
 		return "CANDIDATE"
 	}
+	if !item.DeviceTested {
+		return "UNTESTED"
+	}
+	if item.Package.Review.Status == "verified" {
+		return "VERIFIED"
+	}
+	return "DEVICE TESTED"
 }
 
 func installState(item appstore.Item) string {
@@ -454,7 +451,7 @@ func rowInstallState(item appstore.Item) string {
 }
 
 func trustColor(item appstore.Item) color.Color {
-	if item.Package.Review.Status == "verified" || item.DeviceTested {
+	if item.DeviceTested {
 		return palette.accent
 	}
 	return palette.warning

@@ -70,8 +70,8 @@ func assess(pkg manifest.Package, current platform.Info, status installer.Status
 			}
 		}
 		if compatible {
-			if pkg.Experimental() {
-				verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonReview, Detail: experimentalReason(current)})
+			if !pkg.DeviceTested(current.Firmware, current.Arch, current.Device, current.Resolution) {
+				verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonReview, Detail: untestedReason(current)})
 			}
 			if status.Healthy {
 				verdict.State = StateInstalled
@@ -111,18 +111,16 @@ func assess(pkg manifest.Package, current platform.Info, status installer.Status
 		return verdict
 	}
 
-	// Platform gate: the declared compatibility matrix against the detected
-	// platform.
+	// Runtime requirements still gate installation; device and display scope
+	// are advisory and cannot remove an action.
 	if err := platform.Check(pkg, current); err != nil {
 		verdict.State = StateIncompatible
 		verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonPlatform, Detail: err.Error()})
 		return verdict
 	}
 
-	// Experimental packages stay actionable but record the weaker evidence
-	// in the verdict.
-	if pkg.Experimental() {
-		verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonReview, Detail: experimentalReason(current)})
+	if !pkg.DeviceTested(current.Firmware, current.Arch, current.Device, current.Resolution) {
+		verdict.Reasons = append(verdict.Reasons, Reason{Kind: ReasonReview, Detail: untestedReason(current)})
 	}
 
 	if preExisting {
@@ -136,8 +134,8 @@ func assess(pkg manifest.Package, current platform.Info, status installer.Status
 	return verdict
 }
 
-func experimentalReason(current platform.Info) string {
-	return fmt.Sprintf("Experimental compatibility: Knulli identity confirmed from %s; no minimum version is claimed; device=%s architecture=%s resolution=%s source=%s version=%s", current.Evidence(platform.FieldFirmware).Location, current.Device, current.Arch, current.Resolution, current.Evidence(platform.FieldResolution).Location, current.Version)
+func untestedReason(current platform.Info) string {
+	return fmt.Sprintf("Untested on this device; installation is allowed. Knulli identity from %s; device=%s architecture=%s resolution=%s source=%s version=%s", current.Evidence(platform.FieldFirmware).Location, current.Device, current.Arch, current.Resolution, current.Evidence(platform.FieldResolution).Location, current.Version)
 }
 
 // Message renders the verdict's first reason for display. A verdict without

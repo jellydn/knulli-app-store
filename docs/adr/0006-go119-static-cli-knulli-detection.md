@@ -3,6 +3,7 @@
 - Status: accepted
 - Date: 2026-09-15
 - Note: ADR 0007 replaced the Go 1.19 language baseline. The static CLI and Knulli-owned firmware detection still apply.
+- Note: [ADR 0009](0009-advisory-device-compatibility.md) replaced device/display installation blocking with an untested warning. Detection still records actual values without guessing.
 
 ## Context
 
