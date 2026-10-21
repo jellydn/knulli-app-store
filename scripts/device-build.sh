@@ -80,6 +80,12 @@ if [ "$(readelf -d "$WORK/knulli-app-ui" | grep -c '(NEEDED)')" -ne 2 ]; then
   echo "the GUI must need exactly two shared libraries" >&2
   exit 1
 fi
-readelf --version-info "$WORK/knulli-app-ui" | grep -F 'Name: GLIBC_2.34' >&2
+versions=$(readelf --version-info "$WORK/knulli-app-ui")
+maximum_glibc=$(printf '%s\n' "$versions" | sed -nE 's/.*Name: GLIBC_([0-9]+(\.[0-9]+)*).*/\1/p' | sort -V | tail -n 1)
+if [ -z "$maximum_glibc" ] || [ "$(printf '%s\n' 2.34 "$maximum_glibc" | sort -V | tail -n 1)" != 2.34 ]; then
+  echo "the GUI must require glibc no newer than 2.34; found ${maximum_glibc:-no version requirements}" >&2
+  exit 1
+fi
+echo "maximum required glibc: $maximum_glibc" >&2
 
 scripts/package-device.sh "$WORK/knulli-app" "$WORK/knulli-app-ui" "$CATALOG" "$OUTPUT_DIR" "$VERSION" "$TARGET" >&2
