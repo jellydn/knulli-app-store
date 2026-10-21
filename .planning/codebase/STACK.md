@@ -1,99 +1,71 @@
 # Technology Stack
 
-**Analysis Date:** 2026-09-21
+**Analysis Date:** 2026-10-21
 
 ## Languages
 
-**Primary:**
-- Go 1.27 - Entire codebase: 9,595 production lines across `internal/`, `cmd/`, `scripts/` helpers are POSIX `sh`
+**Primary:** Go 1.27, declared in `go.mod`. Production code lives in `cmd/` and `internal/`.
 
 **Secondary:**
-- C - A single inline cgo block in `internal/sdlui/run.go` wraps the SDL2 functions the GUI needs
-- POSIX `sh` - `scripts/device-build.sh`, `scripts/package-device.sh`, `scripts/desktop-fixture.sh`, `scripts/desktop-walk.sh`, `packaging/*/Knulli App Store.sh`
-- JSON - Manifest contract (`catalogue/packages/*.json`), JSON Schema (`schema/package-manifest-v1.schema.json`), catalogue index, installed/lifecycle/recovery state
-- YAML - GitHub Actions workflows in `.github/workflows/`
-
-**Deliberately absent:**
-- TypeScript / JavaScript - there is no web front end; the GUI is SDL2 rendered from Go
-- Python - not used anywhere in the build or test path
+- C through cgo in `internal/sdlui/run.go`, for SDL2 window, controller, event, and texture calls.
+- POSIX shell in `scripts/`; Bash in the device launchers, including `packaging/magicx-zero-28/Knulli App Store.sh`.
+- JSON for manifests and persisted records; YAML for `.github/workflows/`.
+- No JavaScript web frontend or server framework is present in `go.mod` or `cmd/`.
 
 ## Runtime
 
 **Environment:**
-- Go 1.27 (`go.mod` declares `go 1.27`; `.github/workflows/check.yml` pins `go-version: "1.27.x"`)
-- Device target: Linux `aarch64`, glibc ABI `linux-aarch64-glibc`, minimum glibc 2.34
-- Pinned Go toolchain for cloud agents: `go1.27.1` in `.agents/setup` with SHA-256 verification
+- Linux aarch64 on device; the CLI also builds without cgo. `scripts/device-build.sh` cross-compiles for `GOOS=linux GOARCH=arm64`.
+- `.agents/setup` installs checksum-verified Go 1.27.1 if an existing Go >= 1.27 is not available. It also installs SDL2 development headers.
+- `.github/workflows/check.yml` pins test and walkthrough jobs to Go 1.27.1 because Staticcheck v0.8.1 cannot read Go 1.27.2 export data. Device builds use `golang:1.27-bookworm`; the weekly checker uses 1.27.x.
 
-**Build Modes:**
-- CLI (`cmd/knulli-app`): `CGO_ENABLED=0`, `-trimpath`, fully static — no libc or SDL dependency
-- GUI (`cmd/knulli-app-ui`): `CGO_ENABLED=1` + `//go:build sdl`, links exactly two shared libraries (libSDL2-2.0.so.0 and glibc), enforced by `readelf` in `scripts/device-build.sh`
-- Desktop GUI: same `sdl` tag, built on macOS/Linux with `libsdl2-dev` / `brew install sdl2`
-
-**Package Manager:**
-- Go modules (`go.mod` + `go.sum`)
-- System libs via `pkg-config: sdl2`; device builds install `libsdl2-dev:arm64` and `aarch64-linux-gnu-gcc` in `scripts/device-build.sh`
+**Package Manager:** Go modules with `go.mod` and `go.sum`. SDL2 is a system dependency found through `pkg-config` in `internal/sdlui/run.go`.
 
 ## Frameworks
 
-**Core:** None. The project uses the Go standard library only, plus one image helper.
+**Core:** Standard-library Go modules with explicit ownership boundaries, not an application framework. See `internal/installer/installer.go` and `internal/appstore/service.go`.
 
-**Testing:**
-- `testing` (stdlib) — 34 test files, 7,735 test lines, 191 `func Test` functions
-- `net/http/httptest` — 6 uses for fake release servers and loopback refresh servers
-- No third-party assertion, mocking, or snapshot library
+**Testing:** Standard-library `testing` and `net/http/httptest`. The refreshed tree has 31 Go test files and 290 top-level `Test` functions across `cmd/` and `internal/`, including the new staging-recovery regression case; these are source counts, not executed results.
 
 **Build/Dev:**
-- `make` — the canonical task runner (`Makefile`)
-- `gofmt` / `go vet` / `staticcheck`
-- `prek` (`prek.toml`) — git hooks mirroring CI, with `staticcheck@v0.8.1` pinned via `go run`
-- GitHub Actions — `check.yml`, `release.yml`, `catalogue-updates.yml`
-- Renovate (`renovate.json`, `config:recommended` only)
+- `Makefile`: build, catalogue, formatting, vet, race tests, coverage, SDL tests, desktop GUI, and walkthrough tasks.
+- `prek.toml`: local commit/push hooks; Staticcheck is pinned to v0.8.1.
+- `.github/workflows/check.yml`, `.github/workflows/release.yml`, and `.github/workflows/catalogue-updates.yml`: verification, release publication, and read-only package update reports.
+- `renovate.json`: dependency update configuration.
 
 ## Key Dependencies
 
-**Critical:**
-- `golang.org/x/image v0.46.0` — the only direct module dependency. Used in `internal/sdlui/run.go` for `xdraw.NearestNeighbor` canvas-to-display scaling and in `internal/sdlui/draw.go` for font/raster drawing.
+**Critical:** `golang.org/x/image v0.47.0` is the only direct Go module requirement (`go.mod`). It supplies image scaling and text drawing in `internal/sdlui/run.go` and `internal/sdlui/draw.go`.
 
-**Infrastructure (system, not Go modules):**
-- SDL2 (`libSDL2-2.0.so.0`) — game controller enumeration, events, window/renderer/texture. Behind the `sdl` tag.
-- `syscall.Flock` — exclusive manager lock in `internal/installer/stage.go` (Linux/POSIX only)
-- `crypto/ed25519` (stdlib) — catalogue index signing in `internal/catalog/sign.go`
-
-**Notable stdlib reliance:**
-- `archive/zip`, `archive/tar`, `compress/gzip` — bounded extraction in `internal/archive/archive.go`
-- `flag` — CLI parsing in `cmd/knulli-app/main.go`, `cmd/knulli-app-ui/main.go`, `cmd/check-updates/main.go`
-- `encoding/json` — every persisted schema; decode paths use `DisallowUnknownFields()` and reject trailing JSON
+**Infrastructure:**
+- SDL2 shared library and glibc for the GUI; `scripts/device-build.sh` requires an SDL2 dependency, exactly two ELF NEEDED entries, and a highest numeric required GLIBC version no newer than 2.34.
+- POSIX `syscall.Flock` and `syscall.Statfs` in `internal/installer/stage.go` and `internal/safefs/files.go`; native Windows support is not implemented.
+- Standard-library ed25519/SHA-256 for catalogue and release integrity (`internal/catalog/sign.go`, `internal/installer/download.go`).
 
 ## Configuration
 
 **Environment:**
-- No `.env` files, no config files read at runtime. All runtime configuration is flags or detected files.
-- `GITHUB_TOKEN` — optional, read only by `cmd/check-updates/main.go` for API rate limits; never written to a report
-- `SDL_GAMECONTROLLERCONFIG` — read by the GUI to prefer Knulli's generated mapping (`internal/sdlui/run.go`)
-- `SDL_VIDEODRIVER=dummy` — set by CI for headless walkthrough runs
-- Makefile knobs: `GUI_DEVICE`, `GUI_ARCH`, `GUI_RESOLUTION`, `GUI_ROOT`, `WALK_ROOT`, `WALK_OUT`, `WALK_FLAGS`, `COVER_MIN` (default 70)
-- Walkthrough knobs in `scripts/desktop-walk.sh`: `WALK_BIN`, `WALK_INDEX`, `WALK_DEVICE`, `WALK_ARCH`, `WALK_RESOLUTION`, `WALK_TIMEOUT`, `WALK_PACKAGE_PATH`
+- Runtime flags and detected Knulli files, not `.env` files: `cmd/knulli-app/main.go`, `cmd/knulli-app-ui/main.go`, `internal/platform/platform.go`.
+- `STORE_CONTROLLER_LAYOUT=knulli|xbox` selects logical face-button bindings and labels in `internal/input/mapping.go`. Device launchers choose it from `/var/run/ports_xbox_layout.flag`.
+- `SDL_GAMECONTROLLERCONFIG` supplies Knulli's controller database; `SDL_VIDEODRIVER=dummy` supports headless walkthroughs (`internal/sdlui/run.go`, `.github/workflows/check.yml`).
+- Optional `GITHUB_TOKEN` is used by the maintenance checker, not Store self-update (`cmd/check-updates/main.go`, `internal/installer/selfupdate.go`).
 
 **Build:**
-- `Makefile` — `check`, `build`, `build-ui`, `catalogue`, `catalogue-check`, `fmt`, `vet`, `test`, `test-ui`, `cover`, `cover-untested`, `gui`, `walkthrough`, `clean`
-- `make catalogue-check` — the determinism gate: builds the index twice and requires the two builds to be byte-identical. `build/` is gitignored, so a `git diff` on the generated index cannot verify it; the `prek.toml` hook calls this target so the documented command and the enforced check stay one implementation.
-- `scripts/device-build.sh TARGET VERSION OUTPUT_DIR` — the single home of the signed cross-compile, ABI gate, and packaging; used by both CI and tag releases
-- `scripts/device-fixture.sh` / `scripts/desktop-fixture.sh` — write the Knulli files platform detection reads into a scratch root
-- `-ldflags "-X github.com/jellydn/knulli-app-store/internal/catalog.embeddedPublicKeyHex=..."` bakes the catalogue public key into device binaries
+- CLI: `make build` uses `CGO_ENABLED=0` and `-trimpath` (`Makefile`).
+- GUI: `make build-ui` uses `-tags sdl`; only `internal/sdlui/run.go`, `internal/sdlui/draw.go`, SDL draw tests, and the GUI entry point require the SDL build path.
+- `make catalogue-check` compares two generated index files byte for byte; a diff against ignored `build/` output is not a valid gate (`Makefile`).
+- `scripts/device-build.sh TARGET VERSION OUTPUT_DIR` signs the catalogue, stamps its public key plus Store version/target into both binaries, and calls `scripts/package-device.sh`.
+- Device ZIPs contain seven files, including the launcher, icon, binaries, catalogue/signature pair, and README (`scripts/package-device.sh`).
 
 ## Platform Requirements
 
-**Development:**
-- Go >= 1.27
-- `libsdl2-dev` (Linux) or `sdl2` via Homebrew (macOS) for `-tags sdl` work
-- No SDL and no CGO needed for `make check`, `make build`, or the CLI tests
-- GCC/PKG_CONFIG not required unless the `sdl` tag is used
+**Development:** Go >= 1.27; SDL2 development headers and a C compiler for `make vet`, `make check`, `make test-ui`, and GUI work. `make build` and untagged `go test ./...` do not need SDL (`Makefile`).
 
 **Production:**
-- Knulli running on `aarch64` with glibc >= 2.34
-- Explicitly supported device identities read from a Knulli board file: `trimui-smart-pro` (1280×720) and `magicx-zero-28` (640×480)
-- Writes confined to `/userdata`; `/userdata` is on the SD card and may normalize permission bits
+- Two packaged build targets: TrimUI Smart Pro and MagicX Zero 28 (`scripts/device-build.sh`). This is not an installer device allowlist.
+- Firmware/version, architecture, ABI/glibc, and dependencies gate package installation. Device and display scope are advisory; exact matching evidence controls the tested badge (`internal/platform/platform.go`, `internal/manifest/manifest.go`).
+- Package mutations stay below `/userdata`, under declared path policy and journaled transactions (`internal/safefs/guard.go`, `internal/installer/commit.go`).
 
 ---
 
-*Stack analysis: 2026-09-21*
+*Stack analysis: 2026-10-21*

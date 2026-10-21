@@ -1,217 +1,97 @@
 # Architecture
 
-**Analysis Date:** 2026-09-21
+**Analysis Date:** 2026-10-21
 
 ## Pattern Overview
 
-**Overall:** Layered domain modules behind a single policy-owning service, with two thin adapters (CLI, SDL GUI) and a pure-Go UI state machine.
+**Overall:** A policy-owning transactional installer with CLI and SDL2 adapters, an application service, and a pure-Go UI state machine.
 
 **Key Characteristics:**
-- One component owns side effects: `internal/installer`. Front ends never extract archives, edit XML, or shell out.
-- Dependencies point inward and downward. `manifest` is the contract, `main` is the outer edge, nothing in between imports presentation.
-- Data flows through typed, persisted records (installed state, lifecycle record, transaction journal) rather than through in-memory handoffs.
-- The GUI is behind the `sdl` build tag, so the CLI stays static and CGO-free by construction.
-- Determinism is a stated invariant: the same inputs must produce byte-identical catalogue output.
+- `internal/installer/installer.go` owns package lifecycle side effects; frontends do not extract archives or edit menus themselves.
+- `internal/appstore/service.go` combines catalogue, compatibility, health, and recovery into typed actions. The CLI calls the manager directly; the GUI uses `appstore.Backend`.
+- `internal/sdlui/run.go` and `internal/sdlui/draw.go` are behind `sdl`; event routing and state logic remain testable without cgo.
+- Runtime compatibility gates are separate from advisory device/display scope (`internal/platform/platform.go`, `docs/adr/0009-advisory-device-compatibility.md`).
 
 ## Layers
 
-**Contract / policy (`internal/manifest`):**
-- Purpose: The v1 JSON contract plus every semantic rule JSON Schema cannot express.
-- Location: `internal/manifest/manifest.go`, `internal/manifest/load.go`
-- Contains: `Package`, `Release`, `Compatibility`, `Install`, `Menu`, `BinaryPatch`, `Evidence`; `Validate()` and `validateInstallable()`; path helpers `safeAbsolute`, `safeRelative`, `under`, `coveredBy`
-- Depends on: stdlib only
-- Used by: everything else
-
-**Deterministic index (`internal/catalog`):**
-- Purpose: Build, validate, write, and sign the catalogue index.
-- Location: `internal/catalog/catalog.go`, `internal/catalog/sign.go`
-- Contains: `Build`, `Load`, `Write` (atomic temp+rename), `Entry`, `Index`, ed25519 `Sign`/`Verify`/`SignFile`/`ParsePublicKey`
-- Depends on: `manifest`
-- Used by: `internal/appstore`, all three `cmd/` binaries, `internal/updatecheck` (via `cmd/check-updates`)
-
-**Detection and compatibility (`internal/platform`):**
-- Purpose: Read Knulli-owned files into a normalized `Info` with recorded provenance, and gate packages against it.
-- Location: `internal/platform/platform.go`
-- Contains: `Resolve` with functional options, `Info`/`Source`/`evidence`, resolution candidate assessment, ABI/glibc/dependency detection, `Check`
-- Depends on: `manifest`, `internal/version`
-- Used by: `internal/appstore`, `internal/installer`, both `cmd/knulli-app*`
-
-**Verification (`internal/version`):**
-- Purpose: Every version comparison in the project, lenient and strict variants separated on purpose.
-- Location: `internal/version/version.go`
-- Contains: `Normalize`, `Compare` (always returns an order), `Parse`, `CompareNumeric` (refuses to guess)
-- Used by: `internal/platform`, `internal/updatecheck`
-
-**Filesystem policy (`internal/safefs`):**
-- Purpose: Allowed-path resolution, symlink rejection, atomic file writes, free-space checks, rollback snapshots.
-- Location: `internal/safefs/guard.go`, `internal/safefs/transaction.go`, `internal/safefs/files.go`
-- Contains: `Guard` (`NewGuard`, `Resolve`, `Virtual`), `rejectSymlinkParents`, `Transaction` (`Begin`, `Write`, `Copy`, `Chmod`, `Remove`, `Commit`, `Rollback`), `Recover`, `PendingForPath`, `AtomicWrite`, `Copy`, `SHA256`
-- Depends on: stdlib only
-- Used by: `internal/installer`, `internal/gamelist`
-
-**Bounded extraction (`internal/archive`):**
-- Purpose: Extract ZIP and tar.gz into staging with every unsafe shape rejected.
-- Location: `internal/archive/archive.go`
-- Contains: `Extract`, `extractZIP`, `extractTarGZ`, `safeName` (backslash normalization, absolute/traversal rejection, `strip_components`), `interruptible` (in-transfer cancellation), per-entry and total size caps
-- Rejects: symlinks, non-regular entries, devices, duplicate paths, entries expanding beyond the installed-size budget
-- Cancellation: `Extract` takes a `context.Context` and checks it at the top, before each entry, and inside each entry's transfer, so an interrupted extraction returns `context.Canceled` instead of finishing the archive
-- Used by: `internal/installer` only
-
-**Menu ownership (`internal/gamelist`):**
-- Purpose: Derive and apply EmulationStation `gamelist.xml` edits without ever touching an entry it did not create.
-- Location: `internal/gamelist/menu.go`, `internal/gamelist/xml.go`
-- Contains: `Derive(oldOwned, oldMenu, menu) Plan`, `Apply(tx, guard, plan)`, `Step`/`StepKind` (add/replace/remove), XML read/write
-- Depends on: `manifest`, `safefs`
-- Used by: `internal/installer` (`commit.go`, `uninstall.go`)
-
-**Lifecycle (`internal/installer`):**
-- Purpose: The single owner of every side effect a package operation performs.
-- Location: `internal/installer/` split by concern — `installer.go` (orchestrator + `Manager`), `stage.go` (acquire/lock/recover/download/extract), `commit.go` (transaction, file application, adoption), `uninstall.go`, `adoption.go` (destination inventory), `recovery.go` (force-reinstall backups), `state.go` (installed record), `status.go` (health + pre-existence), `cache.go`, `lifecycle.go`, `refresh.go`, `download.go`, `files.go`
-- Depends on: `manifest`, `platform`, `archive`, `safefs`, `gamelist`, `diagnostics`
-- Used by: `internal/appstore` only
-
-**Application service (`internal/appstore`):**
-- Purpose: Join review status, compatibility, install state, and health into one typed catalogue verdict, and expose the operations the UI may run.
-- Location: `internal/appstore/service.go`, `internal/appstore/verdict.go`
-- Contains: `Backend` interface, `Service` (`Items`, `Execute`, `ExportDiagnostics`, `SetPlatform`), `Item`, `Action`, `assess`, `Verdict`, `State`, `Reason`
-- Depends on: `catalog`, `installer`, `manifest`, `platform`
-- Used by: `internal/ui`, `internal/sdlui`, the GUI adapter
-
-**Catalogue state machine (`internal/ui`):**
-- Purpose: Pure-Go navigation, tabs, toasts, and operation progress; no CGO, no SDL, no filesystem.
-- Location: `internal/ui/model.go`, `internal/ui/tabs.go`, `internal/ui/toast.go`
-- Contains: `Model` (`Load`, `Move`, `Page`, `Horizontal`, `Select`, `Back`, `Poll`, `Window`), `Focus`, `Tab`/`Tabs`, `Toasts`
-- Depends on: `appstore` (the `Backend` interface)
-- Used by: `internal/sdlui`
-
-**Input semantics (`internal/input`):**
-- Purpose: Semantic actions, mappings, calibration, assignment review, controller identity, atomic persistence, footer hints.
-- Location: `internal/input/mapping.go`, `session.go`, `calibration.go`, `store.go`, `keyboard.go`, `footer.go`
-- Contains: `Action` (nine bindables), `Mapping`, `Plan`/`Required`/`Optional`, `Session` mode machine, `Store`, `Identity`, `Hint`/`Footer`
-- Depends on: stdlib only
-- Used by: `internal/sdlui`
-
-**SDL adapter (`internal/sdlui`):**
-- Purpose: Translate SDL events to semantic actions, render the fixed 640×360 canvas, drive scripted walkthroughs.
-- Location: `internal/sdlui/run.go`, `events.go`, `draw.go`, `layout.go`, `hints.go`, `repeat.go`, `walk.go`, `input_mode.go`
-- Depends on: `appstore`, `input`, `ui`, `platform`, `diagnostics`, SDL2 via cgo, `golang.org/x/image/draw`
-- Used by: `cmd/knulli-app-ui` only
+| Layer | Ownership and dependencies | Main locations |
+| --- | --- | --- |
+| Manifest | JSON contract, semantic policy, shared size/state-path constants; stdlib only | `internal/manifest/manifest.go`, `internal/manifest/load.go` |
+| Catalogue | Sorted deterministic index, manifest digests, optional embedded-key signature validation; depends on manifest | `internal/catalog/catalog.go`, `internal/catalog/sign.go` |
+| Platform/version | Detection with provenance, runtime checks, version comparison; uses manifest and version helpers | `internal/platform/platform.go`, `internal/version/version.go` |
+| Safe filesystem | Allowed paths, symlink rejection, atomic replacement, durable journals and recovery | `internal/safefs/guard.go`, `internal/safefs/files.go`, `internal/safefs/transaction.go` |
+| Archive | Bounded ZIP/tar.gz extraction with context cancellation; no live destination writes | `internal/archive/archive.go` |
+| Menu | Derive and apply owned-entry changes; fill blank metadata on unowned exact paths without claiming them | `internal/gamelist/menu.go`, `internal/gamelist/xml.go` |
+| Installer | Lock, recovery, download/stage, transactional lifecycle, installed state, health/cache, Store replacement | `internal/installer/installer.go`, `internal/installer/stage.go`, `internal/installer/commit.go`, `internal/installer/selfupdate.go` |
+| Application | Backend interface, typed verdicts, permitted actions, diagnostics, synthetic Store card | `internal/appstore/service.go`, `internal/appstore/verdict.go`, `internal/appstore/selfupdate.go` |
+| UI/input | Card selection, filters, confirmation/health/progress, toasts; automatic logical button bindings and quit chord | `internal/ui/model.go`, `internal/ui/tabs.go`, `internal/input/session.go`, `internal/input/mapping.go` |
+| SDL adapter | SDL lifecycle, portable event dispatch, rendering, repeat, scripted walkthroughs | `internal/sdlui/run.go`, `internal/sdlui/events.go`, `internal/sdlui/draw.go`, `internal/sdlui/walk.go` |
+| Maintenance | Read-only upstream release comparison and review reports | `internal/updatecheck/check.go`, `internal/updatecheck/report.go` |
 
 ## Data Flow
 
-**Install (the canonical path):**
-1. `cmd/knulli-app` or GUI → `appstore.Service.Execute` → `installer.Manager.Apply(ctx, OpInstall, pkg)`
-2. **Preconditions** (`installer.go` → `checkPreconditions`): `pkg.Validate()`, `Installable()`, `platform.Check`, `validateDownloadURL`
-3. **Acquire** (`stage.go` → `acquireManager`): new `safefs.Guard` rooted at `Manager.Root`, `os.MkdirAll` manager state, `syscall.Flock` exclusive non-blocking lock, `safefs.Recover` rolls back any open journal
-4. **Reconcile**: `loadState`, reject install-if-installed / repair-of-different-release, inventory the destination, free-space check (`release + 3×installed + 2×existing`)
-5. **Download and verify** (`download.go`): stream to a temp file while hashing, enforce `Content-Length`, byte count, and SHA-256; redirects must stay HTTPS
-6. **Extract** (`archive.Extract`) into `work/staging` with the installed-size cap, honouring the operation context so a cancelled run stops mid-archive; then `applyExecutableModes` and `applyBinaryPatches`; the launcher must exist
-7. **Commit** (`commit.go`): `safefs.Begin` creates a journal directory; each mutation calls `tx.prepare`, which snapshots the previous file and persists the open journal *before* the destination changes
-8. Files are copied (preserved files are recorded but not overwritten), stale owned files are removed or restored from originals, `gamelist.Apply` writes the menu effect, then `tx.Write(statePath(id), ...)`
-9. `tx.Commit()` marks the journal committed and removes the directory. **Installed state is the last write.**
-10. `m.outcome(ctx, gameListChanged)` performs the loopback reload request; a failure sets `RestartRequired` while the operation stays committed.
-11. Any failure between 7 and 9 runs `m.rollback`, restoring snapshots in reverse order and folding a rollback failure into the returned error.
+**Package installation:**
+1. CLI calls `Manager.Apply`; GUI calls `Service.Execute`, revalidates the action, and records lifecycle/retry context (`cmd/knulli-app/main.go`, `internal/appstore/service.go`).
+2. Preconditions validate the manifest, actionable review status, runtime platform, and release URL (`internal/installer/installer.go`). Candidates remain read-only; experimental is actionable but not a tested claim.
+3. Acquire a guarded manager directory and exclusive nonblocking flock, recover open transaction journals, then reclaim abandoned package/Store staging directories (`internal/installer/stage.go`).
+4. Reconcile installed/external state and check space. Download exact release bytes and verify SHA-256 before bounded extraction (`internal/installer/stage.go`, `internal/installer/download.go`).
+5. Apply reviewed binary patches to archive paths, then declarative file mappings with collision/missing-source checks, then executable modes and launcher checks (`internal/installer/stage.go`, `internal/installer/files.go`).
+6. Begin a journaled transaction. Apply managed/preserved/original-file rules and menu effects, then write installed state last and commit (`internal/installer/commit.go`). Force reinstall first backs up the complete existing destination; uninstall restores originals and keeps preserved/unmanaged files (`internal/installer/recovery.go`, `internal/installer/uninstall.go`).
+7. Request a loopback game list refresh after a menu change. A refusal reports restart required but leaves the operation committed (`internal/installer/refresh.go`).
 
-**Catalogue read (every GUI frame / list load):**
-1. `appstore.Service.Items` iterates index entries → `s.item(ctx, entry)`
-2. `manager.Status(id)` loads the installed state, checks the `StatusCache` by state digest, and otherwise hashes every immutable managed file and compares owner permission bits
-3. `manager.PreExisting(pkg)` walks the destination and stops at the first entry (a file, or an unreadable entry) — an empty skeleton counts as absent
-4. `manager.LifecycleState(id)` and `RecoveryStatus(pkg)` supply retry context
-5. `assess(pkg, platform, status, preExisting)` produces a typed `Verdict` (state, reasons, actions); `actions(item)` folds in force-reinstall and retry ordering
-6. Items are sorted by name and returned
+**Catalogue and card browsing:**
+1. `Service.Open` recovers interrupted transactions before loading the signed catalogue. This avoids reading a partially replaced binary/catalogue pair (`internal/appstore/service.go`).
+2. `Items` derives each package's verdict from platform, health, pre-existing files, and retry context, optionally adds the Store item, and sorts by name (`internal/appstore/service.go`, `internal/appstore/verdict.go`).
+3. `Model` filters All/Ready/Installed and remembers selection per tab. Arrows browse one app card; shoulders/Page Up/Page Down filter; confirm opens the first action or health; Y opens More (`internal/ui/model.go`, `internal/ui/tabs.go`, `internal/sdlui/events.go`).
+4. Operations run asynchronously and send progress/completion through a buffered channel drained by `Model.Poll`. Notices expire after three seconds; errors remain until answered (`internal/ui/model.go`, `internal/ui/toast.go`). Catalogue loads, not every rendered frame, perform status reads.
 
-**Controller setup (first run per device/controller identity):**
-1. `sdlui.Run` opens an SDL GameController or falls back to a keyboard session (`input.NewDesktopSession`)
-2. `input.Session.connect` loads a saved mapping for the identity or opens setup
-3. Setup asks the paging question (`PagingItems`) before any mapping is built, then saves / previews / calibrates
-4. Calibration walks `input.Plan(paging)`, reviews each assignment (`ReviewItems`), optionally previews every bound button, and saves atomically to `controller-mappings.json`
-5. Quitting is always the Select+Y chord (`chordAnchorButton = 4`), never a single mapped button — `Exit` is deliberately not in `input.Actions`
+**Automatic input:**
+1. The launcher sets `STORE_CONTROLLER_LAYOUT` from the Ports Xbox-layout flag (`packaging/trimui-smart-pro/Knulli App Store.sh`).
+2. An SDL GameController connection uses automatic logical bindings immediately; no setup, calibration, or mapping persistence occurs (`internal/input/session.go`, `internal/input/mapping.go`).
+3. Knulli layout changes bindings/labels, not incoming events. Disconnect enters Blocked; keyboard mode has fixed bindings. Select+Y (Tab/F5+Y on keyboard) quits (`internal/sdlui/events.go`, `internal/input/keyboard.go`).
 
-**State Management:**
-- No global state, no singletons. `Manager` is a value with copies returned by `WithPlatform`/`WithStatusCache`.
-- UI state lives in `ui.Model` and `input.Session`; the SDL loop owns both and polls `model.Poll()` each frame.
-- Operations run on a goroutine and communicate back through a buffered `chan operationEvent` (capacity 8) drained by `Model.Poll`.
-- Persisted state is always written atomically (`safefs.AtomicWrite`: temp file, `Sync`, `Rename`).
+**Store self-update:**
+1. Only a canonical packaged GUI with a stamped build target enables the synthetic Store card (`cmd/knulli-app-ui/main.go`).
+2. Check queries official releases including prereleases, pins a target asset using GitHub size/digest, and offers a separate confirmed Update action (`internal/appstore/selfupdate.go`, `internal/installer/selfupdate.go`).
+3. `UpdateStore` acquires the manager lock and recovers journals, downloads/verifies/extracts, checks the seven-file inventory and free space, and transactionally replaces only the packaged files. Atomic rename keeps the running executable alive (`internal/installer/selfupdate.go`, `internal/safefs/files.go`).
+4. Installed apps/settings remain outside that inventory. Exit/reopen is required. The device launcher runs the CLI `recover` command before loading the GUI, then attempts menu registration without making metadata failure fatal (`packaging/magicx-zero-28/Knulli App Store.sh`).
+
+**State Management:** Installed state, lifecycle records, original/recovery backups, and transaction journals live below manager state. Input bindings are process-local. `StatusCache` hashes the installed record for its key, not live file contents; unchanged records can reuse health until invalidation (`internal/installer/state.go`, `internal/installer/lifecycle.go`, `internal/installer/cache.go`, `internal/input/session.go`).
 
 ## Key Abstractions
 
-**`appstore.Backend` interface:**
-- Purpose: The seam that keeps the GUI free of installer types, and lets GUI tests run against an in-memory fake.
-- Definition: `internal/appstore/service.go` — `Items`, `Execute`, `ExportDiagnostics`, `SetPlatform`
-- Consumers: `internal/ui.Model`, `internal/sdlui.Run`, `cmd/knulli-app-ui/main.go`, `internal/ui/model_test.go` fakes
-
-**`safefs.Guard`:**
-- Purpose: Convert a virtual `/userdata/...` path into a host path under a root, while enforcing allowed prefixes and rejecting symlinked components.
-- Examples: `internal/safefs/guard.go`, constructed in `internal/installer/stage.go`, `internal/gamelist`, `internal/installer/status.go`
-- Pattern: Capability object — nothing can write without one, and every guard carries its own allowed-path list
-
-**`safefs.Transaction`:**
-- Purpose: A reversible group of filesystem writes with a durable journal.
-- Examples: `internal/safefs/transaction.go`; used by `internal/installer/commit.go` and `uninstall.go`
-- Pattern: Write-ahead journal + reverse-order snapshot restore. `prepare` persists `status=open` before each mutation; `Commit` writes `status=committed` then deletes; `Recover` rolls back anything left open at the next locked start.
-
-**`manifest.Package.Validate()`:**
-- Purpose: The one gate that decides whether a manifest is a candidate, experimental/installable/verified, and safe to act on.
-- Examples: `internal/manifest/manifest.go`; called by `Load`/`Decode`, `catalog.Build`/`Load`, and `installer.checkPreconditions`
-- Pattern: Accumulate-all-problems then sort and join, so a review sees every issue at once
-
-**`input.Mapping` + `input.Session`:**
-- Purpose: Name actions independently of physical buttons, and store bindings per device/controller identity.
-- Examples: `internal/input/mapping.go`, `internal/input/session.go`
-- Pattern: A semantic-action map validated for required coverage and button conflicts, plus a mode machine (`Normal`, `Setup`, `Paging`, `Blocked`, `Settings`, `Calibrating`, `Review`, `Preview`)
-
-**`installer.StatusCache`:**
-- Purpose: Make a whole-catalogue read affordable without weakening content verification.
-- Examples: `internal/installer/cache.go`
-- Pattern: Cache key is the SHA-256 of the canonical installed-state encoding, so a changed record invalidates itself even if a caller forgets.
+- **`appstore.Backend`:** Four methods (`Items`, `Execute`, `ExportDiagnostics`, `SetPlatform`) separate presentation from the real service; UI tests use a fake (`internal/appstore/service.go`, `internal/ui/model_test.go`).
+- **`Verdict`:** Typed state/reasons/actions, not parsed display strings. Untested devices still get actions when runtime checks pass (`internal/appstore/verdict.go`).
+- **`Guard` and `Transaction`:** Virtual-path policy plus write-ahead snapshots; reverse rollback and startup recovery preserve mutations as one unit (`internal/safefs/guard.go`, `internal/safefs/transaction.go`).
+- **`Mapping` and `Session`:** Logical SDL/keyboard actions plus Normal/Blocked connection state. Old mapping files are ignored and untouched (`internal/input/mapping.go`, `internal/input/session.go`).
+- **`StoreUpdate`:** A pinned official release handled separately from reviewed package manifests and installed-package records (`internal/installer/selfupdate.go`).
 
 ## Entry Points
 
-**`cmd/knulli-app`:**
-- Location: `cmd/knulli-app/main.go`
-- Triggers: manual/scripted device use; the packaged `Knulli App Store.sh` calls it (`catalogue` path); CI determinism check
-- Responsibilities: `validate`, `catalogue` (build/write/sign/generate key), `install`/`adopt`/`update`/`repair`, `uninstall`. Platform flags (`-root`, `-firmware`, `-firmware-version`, `-arch`, `-device`, `-resolution`) override detection. Prints `game list refresh accepted` or `restart required to update game list`.
-
-**`cmd/knulli-app-ui`:**
-- Location: `cmd/knulli-app-ui/main.go` (whole file is `//go:build sdl`)
-- Triggers: the packaged launcher script on device; `make gui` and `make walkthrough` on desktop
-- Responsibilities: resolve root/platform, open the diagnostics log, open `appstore.Service` bound to `installer.Manager`, run the SDL loop. Flags: `-catalog`, `-root`, platform overrides, `-windowed`, `-screenshot`, `-input`, `-keys`, `-shot-dir`, `-walk-timeout`.
-
-**`cmd/check-updates`:**
-- Location: `cmd/check-updates/main.go`
-- Triggers: weekly `catalogue-updates.yml`, or manual `go run ./cmd/check-updates -output build/catalogue-update-report`
-- Responsibilities: build the index, compare each package to upstream GitHub releases, write `.json` + `.md`. Never edits a manifest.
-
-**`scripts/device-build.sh`:**
-- Location: `scripts/device-build.sh`
-- Triggers: `.github/workflows/check.yml` (`device-artifact`) and `release.yml` (`tag-build`)
-- Responsibilities: install the cross toolchain if missing, generate and use an ed25519 catalogue key, cross-compile both binaries with the public key in ldflags, assert the GUI needs exactly two shared libraries and no glibc symbol newer than 2.34, then hand off to `scripts/package-device.sh`.
+- `cmd/knulli-app/main.go`: validate, catalogue build/sign, install/adopt/update/repair, uninstall, recover, register-store-menu. Calls `installer.Manager` directly.
+- `cmd/knulli-app-ui/main.go`: SDL-tagged flag wiring, platform/log/service initialization, canonical-location self-update gate, SDL run.
+- `cmd/check-updates/main.go`: read-only JSON/Markdown review report, invoked manually or weekly.
+- `scripts/device-build.sh`: signed cross-build and ABI checks; `scripts/package-device.sh`: seven-file device ZIP.
 
 ## Error Handling
 
-**Strategy:** Fail closed, report provenance, and keep committed work committed.
+**Strategy:** Refuse unsafe inputs, roll back failed transactions, and distinguish committed outcomes from follow-up failures.
 
 **Patterns:**
-- Validation accumulates all problems and returns them sorted (`manifest.Validate`), never the first one only.
-- Compatibility failures carry raw value, normalized value, source, and the full detected matrix (`platform.compatibilityError`, `platform.Summary`).
-- Security refusals are plain errors that abort before any mutation: unsafe archive path, symlinked write path, non-regular destination entry, non-HTTPS redirect, SHA-256 mismatch.
-- Cancellation is reported as the context's own error, unwrapped through every layer: `archive.Extract` returns `ctx.Err()` and `installer.stage` wraps it with `%w`, so `errors.Is(err, context.Canceled)` holds at the operator's boundary. A cancelled operation needs no rollback because it stops before the commit phase.
-- Transactional rollback: `commit.go`'s `rollback` defer restores snapshots in reverse and appends a rollback failure to the original error rather than masking it.
-- Outcome failures are not operation failures: a rejected loopback reload is reported as `RestartRequired` with the operation still committed (`installer/refresh.go`).
-- GUI distinction: a failure stays in `Model.Error` until answered; a completion becomes a `Model.Toasts` notice that expires after three seconds (`internal/ui/model.go`, `internal/ui/toast.go`).
-- Health issues are structured, not prose: `HealthIssue{Path, Check, Expected, Actual}` with a `String()` renderer (`internal/installer/status.go`).
-- Retry context is persisted so an operation is retried as itself, never as a different one (`internal/installer/lifecycle.go`, `appstore.validRetryAction`).
+- Manifest validation accumulates, sorts, and joins all problems (`internal/manifest/manifest.go`).
+- Wrapped errors retain `%w`; archive extraction honors context between entries and during transfers (`internal/archive/archive.go`, `internal/installer/stage.go`).
+- Deferred rollback retains rollback errors; failed recovery retains evidence for a later attempt (`internal/installer/commit.go`, `internal/safefs/transaction.go`).
+- Compatibility errors include detected values and provenance; device/resolution absence is not itself a runtime refusal (`internal/platform/platform.go`).
+- Game list acceptance is not completion; Store completion instead requires exit/reopen (`internal/installer/refresh.go`, `internal/appstore/selfupdate.go`).
 
 ## Cross-Cutting Concerns
 
-**Logging:** `internal/diagnostics.Log.Event(name, fields...)` emits `event=` lines with redacted values into a 512 KiB bounded, rotating log. Every module takes an optional `*diagnostics.Log` and `Manager.event` no-ops on nil, so tests run without I/O.
+**Logging:** Bounded rotating, redacted event logs and user-triggered exports (`internal/diagnostics/log.go`).
 
-**Validation:** Three concentric gates — JSON Schema (`schema/package-manifest-v1.schema.json`) for shape, `manifest.Validate()` for semantic policy, `platform.Check()` for the detected machine. The installer re-runs both `Validate` and `checkPreconditions` before every operation even though `catalog.Load` already validated the package.
+**Validation:** JSON Schema documents manifest shape; Go decoding and `Validate` enforce runtime policy, followed by platform checks. The runtime does not invoke a JSON Schema engine (`schema/package-manifest-v1.schema.json`, `internal/manifest/load.go`).
 
-**Authentication:** Not a user concern. Integrity rests on the ed25519-signed catalogue index plus per-release size and SHA-256. Device identity is explicit per device and never inferred from a SoC family.
-
-**Redaction:** `diagnostics.Redact` is applied at write time and again on export, and on the existing log file at `Open`, so a format change cannot leak a token that an older build wrote.
+**Authentication:** No user identity service. Catalogue signatures are per build; asset size/hash checks establish release integrity, and Store update metadata comes from the official GitHub HTTPS API (`internal/catalog/sign.go`, `internal/installer/selfupdate.go`).
 
 ---
 
-*Architecture analysis: 2026-09-21*
+*Architecture analysis: 2026-10-21*
