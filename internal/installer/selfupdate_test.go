@@ -151,6 +151,43 @@ func TestStoreUpdatePreservesAppsAndRollsBackUnsafeReleases(t *testing.T) {
 	}
 }
 
+func TestRecoveryDiscardsOnlyAbandonedStaging(t *testing.T) {
+	root := t.TempDir()
+	manager := Manager{Root: root}
+	base := strings.TrimPrefix(manifest.ManagerStatePath, "/")
+	for _, name := range []string{"work-interrupted", "store-update-interrupted", "originals", "recovery-backups"} {
+		writeRootFile(t, root, base+"/"+name+"/release", "keep until recovery")
+	}
+	// A similarly named symlink is not installer staging and must not be followed.
+	link := filepath.Join(root, base, "work-link")
+	if err := os.Symlink(filepath.Join(root, base, "originals"), link); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := acquireLock(filepath.Join(root, base, "lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = manager.RecoverTransactions()
+	releaseLock(lock)
+	if err == nil {
+		t.Fatal("recovery ran while an operation held the manager lock")
+	}
+	assertRootFile(t, root, base+"/work-interrupted/release", "keep until recovery")
+	assertRootFile(t, root, base+"/store-update-interrupted/release", "keep until recovery")
+	for range 2 {
+		if err := manager.RecoverTransactions(); err != nil {
+			t.Fatal(err)
+		}
+		assertMissing(t, root, base+"/work-interrupted")
+		assertMissing(t, root, base+"/store-update-interrupted")
+		assertRootFile(t, root, base+"/originals/release", "keep until recovery")
+		assertRootFile(t, root, base+"/recovery-backups/release", "keep until recovery")
+		if info, err := os.Lstat(link); err != nil || info.Mode()&os.ModeSymlink == 0 {
+			t.Fatalf("recovery changed a non-staging symlink: %v, %v", info, err)
+		}
+	}
+}
+
 func TestRecoverInterruptedStoreUpdate(t *testing.T) {
 	root := t.TempDir()
 	manager := Manager{Root: root}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	storearchive "github.com/jellydn/knulli-app-store/internal/archive"
@@ -45,6 +46,22 @@ func (m Manager) acquireManager() (*managerSession, error) {
 	if err := safefs.Recover(m.root(), host); err != nil {
 		releaseLock(lock)
 		return nil, err
+	}
+	// Only the lock holder can own staging. After journal recovery, these
+	// directories can only be leftovers from a process that exited early.
+	entries, err := os.ReadDir(host)
+	if err != nil {
+		releaseLock(lock)
+		return nil, err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || (!strings.HasPrefix(entry.Name(), "work-") && !strings.HasPrefix(entry.Name(), "store-update-")) {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(host, entry.Name())); err != nil {
+			releaseLock(lock)
+			return nil, fmt.Errorf("remove abandoned staging %s: %w", entry.Name(), err)
+		}
 	}
 	return &managerSession{guard: guard, managerHost: host, lock: lock}, nil
 }
