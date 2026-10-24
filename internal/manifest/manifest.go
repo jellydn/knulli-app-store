@@ -82,6 +82,7 @@ type Release struct {
 	InstalledSize int64  `json:"installed_size"`
 	Format        string `json:"format"`
 	Immutable     bool   `json:"immutable"`
+	Base64Offset  int64  `json:"base64_offset,omitempty"`
 }
 
 type Compatibility struct {
@@ -192,8 +193,13 @@ func (p Package) Validate() error {
 	}
 	if p.Installable() {
 		problems = append(problems, p.validateInstallable()...)
-	} else if p.Release != nil || p.Compatibility != nil || p.Install != nil {
-		problems = append(problems, "candidate packages must not contain actionable release or install metadata")
+	} else {
+		if p.Release != nil {
+			problems = append(problems, p.validateRelease()...)
+		}
+		if p.Compatibility != nil || p.Install != nil {
+			problems = append(problems, "candidate packages must not contain compatibility or install metadata")
+		}
 	}
 	if len(problems) > 0 {
 		sort.Strings(problems)
@@ -206,6 +212,16 @@ func (p Package) validateInstallable() []string {
 	var problems []string
 	if p.Version == "" || p.Repository == "" || p.License == "" {
 		problems = append(problems, "installable packages require version, repository, and license")
+	}
+	problems = append(problems, p.validateRelease()...)
+	problems = append(problems, p.validateInstallation()...)
+	return problems
+}
+
+func (p Package) validateRelease() []string {
+	var problems []string
+	if p.Version == "" || p.Repository == "" {
+		problems = append(problems, "release metadata requires version and repository")
 	}
 	if p.Release == nil {
 		problems = append(problems, "installable packages require release metadata")
@@ -225,7 +241,15 @@ func (p Package) validateInstallable() []string {
 		if !oneOf(p.Release.Format, "zip", "tar.gz") {
 			problems = append(problems, "release format must be zip or tar.gz")
 		}
+		if p.Release.Base64Offset < 0 || p.Release.Base64Offset >= p.Release.Size || (p.Release.Base64Offset > 0 && p.Release.Format != "tar.gz") {
+			problems = append(problems, "base64_offset must be inside the release and is supported only for tar.gz")
+		}
 	}
+	return problems
+}
+
+func (p Package) validateInstallation() []string {
+	var problems []string
 	if p.Compatibility == nil {
 		problems = append(problems, "installable packages require compatibility metadata")
 	} else {
@@ -244,7 +268,7 @@ func (p Package) validateInstallable() []string {
 			}
 		} else if p.Compatibility.DeviceScope != "" {
 			problems = append(problems, "device_scope must be any when set")
-		} else if len(p.Compatibility.Devices) == 0 {
+		} else if len(p.Compatibility.Devices) == 0 && !p.Experimental() {
 			problems = append(problems, "at least one declared device or experimental broad device scope is required")
 		}
 		if p.Compatibility.DisplayBounds != nil {
@@ -255,7 +279,7 @@ func (p Package) validateInstallable() []string {
 			if bounds.MinimumWidth < 320 || bounds.MinimumHeight < 200 || bounds.MaximumWidth < bounds.MinimumWidth || bounds.MaximumHeight < bounds.MinimumHeight || bounds.MaximumWidth > 7680 || bounds.MaximumHeight > 4320 {
 				problems = append(problems, "display_bounds must be ordered within 320x200 and 7680x4320")
 			}
-		} else if len(p.Compatibility.Resolutions) == 0 {
+		} else if len(p.Compatibility.Resolutions) == 0 && !p.Experimental() {
 			problems = append(problems, "at least one declared resolution or experimental display bound is required")
 		}
 		if len(p.Compatibility.ABIs) == 0 {

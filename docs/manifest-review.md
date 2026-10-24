@@ -2,8 +2,8 @@
 
 ## States
 
-- `candidate`: informative metadata only. The schema rejects release and install instructions in this state.
-- `experimental`: actionable on any device when Knulli, architecture, ABI, and runtime dependencies pass. Device identity and display size do not block installation. Declared devices/resolutions or broad bounds record reviewed scope only. An explicit warning is required; a minimum firmware version may be omitted when no evidence supports one.
+- `candidate`: read-only metadata with an optional validated, pinned release. Compatibility and install instructions are rejected. Review can retain checksums and archive sizes without granting installation permission.
+- `experimental`: actionable on any device when Knulli, architecture, ABI, and runtime dependencies pass. Device identity and display size do not block installation. Device lists, resolutions and broad bounds are optional; do not invent them to pass validation. An explicit warning is required; a minimum firmware version may be omitted when no evidence supports one.
 - `installable`: two reviewers have checked all evidence and the package can be used by the installer.
 - `verified`: `installable` plus linked real-device test evidence for every declared device and resolution.
 
@@ -15,13 +15,13 @@
 
 1. Confirm the repository belongs to the project or documented maintainer.
 2. Read the repository license file and record a valid SPDX expression.
-3. Select a version-tagged release URL. Reject branch archives, `latest` aliases, and remote installer scripts.
+3. Select a version-tagged release URL. Reject branch archives and `latest` aliases. Never execute a remote installer. A release containing a base64 `tar.gz` payload can use `release.base64_offset`: the exact byte offset after its marker line. Verify the full release's size and checksum, and inspect the decoded archive. No script prefix is executed.
 4. Obtain the SHA-256 from the publisher through a channel separate from the downloaded asset. Record compressed and installed byte sizes.
 5. Inspect the complete archive. It must contain regular files only and one declared launcher.
 6. Review source or packaged behavior for network use and filesystem writes.
 7. List the narrowest `/userdata` destination, menu file, preserved configuration, and allowed write paths.
 8. Establish the Knulli version evidence, architecture, dynamic ABI, minimum glibc version, and runtime libraries. Missing runtime facts must block with the exact reason. Record device scope and resolutions as advisory evidence, not an installation allowlist.
-9. Have a second reviewer reproduce the checksum, archive inspection, and manifest validation.
+9. Have a second reviewer reproduce the checksum, archive inspection, and manifest validation before `installable` status. An authorized `experimental` review can be completed by one maintainer; it must still pass release, runtime and lifecycle safety controls.
 10. Use `experimental` for an authorized, clearly warned hardware test when mandatory release and path controls pass but compatibility evidence is incomplete. Promote to `installable` after review. Add `real-device-test` evidence and promote to `verified` only after the exact matrix passes on hardware.
 
 For ROM-download software, record a visible copyright warning and review every provider and self-update path. Approval does not establish that a ROM download is lawful. The user must have the required rights and comply with local law.

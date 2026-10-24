@@ -1,10 +1,13 @@
 package installer
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -1498,13 +1501,68 @@ func TestRecoveryStatusDistinguishesInterruptedAndActiveTransactions(t *testing.
 }
 
 func TestCandidateCannotBeInstalled(t *testing.T) {
-	pkg := testPackage("https://example.com/releases/download/v1/demo.zip", []byte("x"), "1.0.0")
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", []byte("x"), "1.0.0")
 	pkg.Review.Status = "candidate"
-	pkg.Release = nil
 	pkg.Compatibility = nil
 	pkg.Install = nil
-	if _, err := (Manager{}).Apply(context.Background(), OpInstall, pkg); err == nil || !strings.Contains(err.Error(), "candidate") {
-		t.Fatalf("expected candidate rejection, got %v", err)
+	for _, op := range []Op{OpInstall, OpAdopt, OpUpdate, OpRepair, OpForceReinstall} {
+		if _, err := (Manager{Root: t.TempDir()}).Apply(context.Background(), op, pkg); err == nil || !strings.Contains(err.Error(), "candidate") {
+			t.Fatalf("expected candidate rejection for %s, got %v", op, err)
+		}
+	}
+}
+
+func TestEmbeddedArchiveLifecycleDoesNotRunInstaller(t *testing.T) {
+	var compressed bytes.Buffer
+	gz := gzip.NewWriter(&compressed)
+	tw := tar.NewWriter(gz)
+	for _, file := range []struct{ name, body string }{{"launch.sh", "reviewed launcher"}, {"config.ini", "default"}} {
+		if err := tw.WriteHeader(&tar.Header{Name: file.name, Mode: 0644, Size: int64(len(file.body))}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write([]byte(file.body)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	sentinel := filepath.Join(root, "installer-was-run")
+	prefix := "#!/bin/sh\ntouch '" + sentinel + "'\nexit 1\nPAYLOAD\n"
+	asset := []byte(prefix + base64.StdEncoding.EncodeToString(compressed.Bytes()))
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.sh", asset, "1.0.0")
+	pkg.Release.Format, pkg.Release.Base64Offset = "tar.gz", int64(len(prefix))
+	pkg.Release.InstalledSize = int64(len("reviewed launcher") + len("default"))
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	for _, op := range []Op{OpInstall, OpRepair, OpUpdate} {
+		if op == OpUpdate {
+			pkg.Version = "2.0.0"
+		}
+		if _, err := manager.Apply(context.Background(), op, pkg); err != nil {
+			t.Fatalf("%s: %v", op, err)
+		}
+		assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "reviewed launcher")
+		if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
+			t.Fatalf("%s left an unhealthy installation: %#v, %v", op, status, err)
+		}
+		if op != OpInstall {
+			assertRootFile(t, root, "userdata/roms/tools/demo/config.ini", "user settings")
+		}
+		writeRootFile(t, root, "userdata/roms/tools/demo/config.ini", "user settings")
+	}
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/config.ini", "user settings")
+	assertMissing(t, root, "userdata/roms/tools/demo/launch.sh")
+	if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
+		t.Fatalf("installer prefix was executed: %v", err)
 	}
 }
 

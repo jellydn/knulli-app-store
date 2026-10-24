@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -100,6 +101,32 @@ func extractTarGZ(ctx context.Context, archivePath, destination string, stripCom
 		return nil, err
 	}
 	defer input.Close()
+	return extractTarGZReader(ctx, input, destination, stripComponents, maximumBytes)
+}
+
+// ExtractBase64TarGZ reads an embedded archive as data. The caller verifies the
+// complete release before calling this; no part of its script prefix is run.
+func ExtractBase64TarGZ(ctx context.Context, archivePath string, offset int64, destination string, stripComponents int, maximumBytes int64) ([]File, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	input, err := os.Open(archivePath)
+	if err != nil {
+		return nil, err
+	}
+	defer input.Close()
+	info, err := input.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if offset <= 0 || offset >= info.Size() {
+		return nil, fmt.Errorf("base64 payload offset must be inside the release")
+	}
+	reader := base64.NewDecoder(base64.StdEncoding.Strict(), io.NewSectionReader(input, offset, info.Size()-offset))
+	return extractTarGZReader(ctx, reader, destination, stripComponents, maximumBytes)
+}
+
+func extractTarGZReader(ctx context.Context, input io.Reader, destination string, stripComponents int, maximumBytes int64) ([]File, error) {
 	gzipReader, err := gzip.NewReader(input)
 	if err != nil {
 		return nil, err

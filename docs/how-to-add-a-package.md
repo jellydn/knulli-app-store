@@ -11,13 +11,13 @@ Package code runs with access to user files. A complete review protects ROMs, sa
 ## How
 
 1. Open an issue with the project link, maintainer, purpose, target devices, and known risks.
-2. Select an immutable versioned release asset. Do not use `latest`, a branch archive, or an unrestricted remote install script.
+2. Select a version-pinned release asset. Do not use `latest` or a branch archive. The Store never runs a remote installer. A self-extracting release can declare `release.base64_offset` for a reviewed base64 `tar.gz` payload; the full asset is size- and hash-verified before data-only decoding.
 3. Record its exact compressed size, extracted size, SHA-256, supported ZIP or `tar.gz` format, license SPDX expression, and evidence URLs.
 4. Inspect every archive entry. Reject absolute paths, traversal, links, devices, pipes, duplicate names, and undeclared launchers.
-5. Record architecture, ABI, minimum glibc symbols, and every dynamic dependency. Test firmware, device ID, and every resolution separately. Broad experimental device scope needs a known device identity and evidence-based display bounds. A shared chip does not prove compatibility.
+5. Record architecture, ABI, minimum glibc symbols, and every dynamic dependency. Experimental packages need no device or display claims. Add only evidence-based optional lists or bounds. Missing exact device reports show UNTESTED, not blocked. A shared chip does not prove compatibility.
 6. Declare the narrowest install destination and allowed `/userdata` writes. List user data and configuration in preserve paths. List each launcher or binary that needs execute mode and explain why.
 7. Review runtime writes, network use, self-updaters, uninstall behavior, menu integration, and rollback. Updates must stay inside App Store checksum and transaction controls.
-8. Add manifest, compatibility, archive, install, repeated-install, repair, uninstall, preserved-data, and rollback tests. Add GUI layout tests for each target resolution.
+8. Use the existing manifest, compatibility, archive and lifecycle tests. Add a focused regression only for new behavior they do not cover. Validate the actual release in a disposable fixture root; never run its installer or launcher there. Check install, repair, update, uninstall, preserved data and rollback when their layout changes.
 9. Run:
 
    ```sh
@@ -33,7 +33,9 @@ Package code runs with access to user files. A complete review protects ROMs, sa
    `make catalogue-check` builds the index twice and requires the two builds to be byte-identical. Use it instead of a `git diff` on the generated index: `build/` is gitignored, so git reports that path as clean whatever it contains.
 
 10. Open a pull request with the security review, archive inventory, exact commands, checksums, dependency output, screenshots at each target size, and this checklist.
-11. Use `experimental` only for a clear, user-authorized hardware test after all mandatory release and path controls pass. Record tester, date, firmware, device, architecture, resolution, package version, and exact lifecycle results. Use `verified` only for the exact matrix proven on real hardware.
+11. Use `experimental` for a clear, authorized hardware test after all mandatory release, runtime and lifecycle controls pass. One maintainer can complete this review; a second review is required for `installable`. Record tester, date, firmware, device, architecture, resolution, package version, and exact lifecycle results when tests occur. Use `verified` only for the exact matrix proven on real hardware.
+
+A `candidate` can retain validated `release` metadata without `compatibility` or `install`. This lets later review reuse pinned bytes without exposing any lifecycle action. To promote it, add the reviewed runtime and installation definitions and an experimental warning. Do not treat the candidate's checksum as proof that its runtime is safe.
 
 For an update, repeat the full release, archive, dependency, security, lifecycle, and device review. Never copy values from the weekly report without verification. For removal or deprecation, remove the catalogue and product references, regenerate the index, and retain only generic orphan-state handling for old manager state.
 
