@@ -1,0 +1,36 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "org.retroshelf.knulli",
+  "name": "retroshelf",
+  "version": "0.5.5",
+  "type": "integration",
+  "summary": "Records Knulli play sessions and syncs them to your retroshelf account.",
+  "repository": "https://github.com/retroshelf-org/linux",
+  "review": {
+    "status": "candidate",
+    "notes": [
+      "Requires a retroshelf account and Wi-Fi for linking and syncing. Upstream documents offline session queuing and a game-session hook installed on first launch.",
+      "Review on 2026-10-23 verified the version-pinned Knulli v0.5.5 ZIP against the GitHub asset digest: 18970733 bytes, SHA-256 927abed445f487cd31faee77809561bf09b390e166c13194cc1958146dcdeb1e. No packaged code was executed.",
+      "The packaged launcher applies staged updates and can execute a staged sync engine. Store-managed updates must remain within the Store's pinned checksum and transaction controls; these paths need review and disabling before installation can be enabled.",
+      "A redistributable license has not been verified. The public release repository links to a source repository that returned HTTP 404 during review. Runtime dependencies, write containment, preserved credentials and session data, hook ownership, and uninstall behavior remain unverified.",
+      "Upstream installs under /userdata/roms/tools/retroshelf and records game sessions through hooks under /userdata/system/scripts. Its uninstall instructions require bin/retroshelf-uninstall.sh before deleting the app folder. Safe hook cleanup and data preservation need lifecycle review; no device compatibility or lifecycle results are claimed."
+    ],
+    "evidence": [
+      {
+        "kind": "setup-guide",
+        "url": "https://www.retroshelf.org/help/plugins/knulli",
+        "note": "Documents account linking, offline queuing, Tools installation, session hooks, and uninstall order. Device support is an upstream claim, not Store device-test evidence."
+      },
+      {
+        "kind": "repository",
+        "url": "https://github.com/retroshelf-org/linux/tree/fb36d651fed371535d1de41c2490daab9a619d68",
+        "note": "Public release repository at the v0.5.5 tag; README links to https://github.com/ruigomeseu/retroshelf, which returned HTTP 404 during review. No license was verified."
+      },
+      {
+        "kind": "release-asset",
+        "url": "https://github.com/retroshelf-org/linux/releases/download/v0.5.5/retroshelf-knulli-v0.5.5.zip",
+        "note": "Downloaded ZIP matches the GitHub asset size and SHA-256. Launcher inspection found staged-update application, staged-engine execution, and automatic hook repair. Archive integrity alone does not establish runtime safety."
+      }
+    ]
+  }
+}

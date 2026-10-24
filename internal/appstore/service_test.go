@@ -44,8 +44,8 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 6 {
-		t.Fatalf("expected six catalogue items, got %d", len(items))
+	if len(items) != 7 {
+		t.Fatalf("expected seven catalogue items, got %d", len(items))
 	}
 	experimental := 0
 	verified := 0

@@ -17,11 +17,12 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first.Packages) != 6 || len(second.Packages) != 6 {
-		t.Fatalf("expected six packages, got %d and %d", len(first.Packages), len(second.Packages))
+	if len(first.Packages) != 7 || len(second.Packages) != 7 {
+		t.Fatalf("expected seven packages, got %d and %d", len(first.Packages), len(second.Packages))
 	}
 	// RetSend now uses upstream releases, but its recorded approval remains
 	// the maintainer's decision rather than community or device verification.
+	// An empty provenance requires no approval record.
 	provenance := map[string]string{
 		"app.romm.grout":                         "community",
 		"io.github.jellydn.random-game-picker":   "maintainer",
@@ -29,6 +30,7 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 		"io.github.misantronic.raofflineproxy":   "community",
 		"io.github.tomtombombadil.pocketcurator": "community",
 		"io.github.unitreign.playtime":           "community",
+		"org.retroshelf.knulli":                  "",
 	}
 	experimental := 0
 	verified := 0
@@ -45,8 +47,20 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 		}
 		approval := first.Packages[index].Package.Review.Approval
 		wanted, known := provenance[first.Packages[index].ID]
-		if !known || approval == nil || approval.Provenance != wanted {
+		if !known {
+			t.Fatalf("unexpected package: %s", first.Packages[index].ID)
+		}
+		if wanted == "" {
+			if approval != nil {
+				t.Fatalf("unapproved package gained approval: %s", first.Packages[index].ID)
+			}
+		} else if approval == nil || approval.Provenance != wanted {
 			t.Fatalf("unexpected approval state: %s", first.Packages[index].ID)
+		}
+		if pkg := first.Packages[index].Package; pkg.ID == "org.retroshelf.knulli" {
+			if pkg.Review.Status != "candidate" || pkg.Release != nil || pkg.Compatibility != nil || pkg.Install != nil {
+				t.Fatal("retroshelf must remain a candidate without actionable metadata")
+			}
 		}
 	}
 	if experimental != 4 || verified != 0 {
