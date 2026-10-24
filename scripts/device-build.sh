@@ -38,11 +38,12 @@ case "$TARGET" in
   *) echo "unsupported device target: $TARGET" >&2; exit 2 ;;
 esac
 
-if ! command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
+if ! command -v aarch64-linux-gnu-gcc >/dev/null 2>&1 ||
+  ! PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig pkg-config --exists sdl2 SDL2_image SDL2_ttf SDL2_gfx; then
   dpkg --add-architecture arm64
   rm -rf /var/lib/apt/lists/*
   apt-get update -qq
-  apt-get install -y -qq binutils file gcc-aarch64-linux-gnu libc6-dev-arm64-cross libsdl2-dev:arm64 pkg-config zip
+  apt-get install -y -qq binutils file gcc-aarch64-linux-gnu libc6-dev-arm64-cross libsdl2-dev:arm64 libsdl2-image-dev:arm64 libsdl2-ttf-dev:arm64 libsdl2-gfx-dev:arm64 pkg-config zip
 fi
 
 WORK=$(mktemp -d)
@@ -69,15 +70,19 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
   go build -buildvcs=false -trimpath -ldflags="$LDFLAGS" -o "$WORK/knulli-app" ./cmd/knulli-app
 
 PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig \
+  CGO_LDFLAGS="-Wl,-Bstatic -lSDL2_gfx -Wl,-Bdynamic -lm" \
   CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc \
   go build -buildvcs=false -tags sdl -trimpath -ldflags="$LDFLAGS" -o "$WORK/knulli-app-ui" ./cmd/knulli-app-ui
 
-# The GUI may link only SDL and glibc, and no glibc symbol newer than the oldest
-# supported Knulli image provides.
+# Gabagool initializes SDL_image and SDL_ttf as well as SDL2. SDL2_gfx is
+# linked statically: do not assume that firmware supplies it or replace system
+# libraries. Keep an exact allowlist and retain the existing glibc floor.
 file "$WORK/knulli-app" "$WORK/knulli-app-ui" >&2
-readelf -d "$WORK/knulli-app-ui" | grep -F 'Shared library: [libSDL2-2.0.so.0]' >&2
-if [ "$(readelf -d "$WORK/knulli-app-ui" | grep -c '(NEEDED)')" -ne 2 ]; then
-  echo "the GUI must need exactly two shared libraries" >&2
+needed=$(readelf -d "$WORK/knulli-app-ui" | sed -n 's/.*Shared library: \[\(.*\)\]/\1/p' | LC_ALL=C sort)
+expected=$(printf '%s\n' ld-linux-aarch64.so.1 libSDL2-2.0.so.0 libSDL2_image-2.0.so.0 libSDL2_ttf-2.0.so.0 libc.so.6 libm.so.6 | LC_ALL=C sort)
+printf 'GUI shared libraries:\n%s\n' "$needed" >&2
+if [ "$needed" != "$expected" ]; then
+  echo "unexpected GUI shared libraries; expected SDL2, SDL2_image, SDL2_ttf and glibc (libc/libm/loader) only" >&2
   exit 1
 fi
 versions=$(readelf --version-info "$WORK/knulli-app-ui")

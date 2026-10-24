@@ -381,6 +381,7 @@ func detectDependencies(root string) []string {
 		"sdl2":       {"usr/lib/libSDL2-2.0.so.0", "lib/libSDL2-2.0.so.0"},
 		"sdl2-image": {"usr/lib/libSDL2_image-2.0.so.0", "lib/libSDL2_image-2.0.so.0"},
 		"sdl2-ttf":   {"usr/lib/libSDL2_ttf-2.0.so.0", "lib/libSDL2_ttf-2.0.so.0"},
+		"sdl2-gfx":   {"usr/lib/libSDL2_gfx-1.0.so.0", "lib/libSDL2_gfx-1.0.so.0"},
 		"libc":       {"lib/libc.so.6", "lib64/libc.so.6", "usr/lib/libc.so.6"},
 		"libresolv":  {"lib/libresolv.so.2", "lib64/libresolv.so.2", "usr/lib/libresolv.so.2"},
 		"libpthread": {"lib/libpthread.so.0", "lib64/libpthread.so.0", "usr/lib/libpthread.so.0"},

@@ -7,8 +7,8 @@ explicit overrides, not measurements from a real device.
 
 ## Prerequisites and interactive run
 
-Install SDL2 development libraries (`brew install sdl2` or
-`sudo apt install libsdl2-dev`), then run:
+Install SDL2 development libraries (`brew install sdl2 sdl2_image sdl2_ttf sdl2_gfx` or
+`sudo apt install libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-gfx-dev`), then run:
 
 ```sh
 make gui
@@ -29,7 +29,11 @@ scripts/desktop-fixture.sh trimui-smart-pro "$PWD/build/scratch-root"
 ```
 
 Keep `-resolution` to pin the target size. Add `-screenshot out.png` to render
-one real SDL frame and exit.
+one real SDL frame and exit. The gabagool-backed frontend reads the renderer
+backbuffer before Present, so these captures include texture upload and
+letterboxing rather than only the source canvas. It retains a software renderer
+fallback when acceleration is unavailable. `INPUT_CAPTURE` is refused: the
+toolkit's developer mapping wizard is not part of the Store.
 
 ## Automatic controls
 
@@ -62,7 +66,7 @@ used. Update the binary and launcher together. Legacy
 ```sh
 make walkthrough
 # Without a window server:
-SDL_VIDEODRIVER=dummy make walkthrough
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy make walkthrough
 # Other device:
 WALK_DEVICE=magicx-zero-28 WALK_RESOLUTION=640x480 make walkthrough
 # Optional network-backed lifecycle flows:

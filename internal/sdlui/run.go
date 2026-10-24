@@ -2,26 +2,6 @@
 
 package sdlui
 
-/*
-#cgo pkg-config: sdl2
-#include <stdlib.h>
-#include <SDL2/SDL.h>
-
-static Uint32 event_type(SDL_Event *event) { return event->type; }
-static SDL_Keycode event_key(SDL_Event *event) { return event->key.keysym.sym; }
-static Uint8 event_key_repeat(SDL_Event *event) { return event->key.repeat; }
-static Uint8 event_controller_button(SDL_Event *event) { return event->cbutton.button; }
-static SDL_JoystickID event_controller_which(SDL_Event *event) { return event->cbutton.which; }
-static SDL_JoystickID event_device_which(SDL_Event *event) { return event->cdevice.which; }
-static void controller_guid(SDL_GameController *controller, char *output, int size) {
-    SDL_JoystickGetGUIDString(SDL_JoystickGetGUID(SDL_GameControllerGetJoystick(controller)), output, size);
-}
-static Uint8 controller_button(SDL_GameController *controller, int button) {
-    return SDL_GameControllerGetButton(controller, (SDL_GameControllerButton)button);
-}
-*/
-import "C"
-
 import (
 	"context"
 	"fmt"
@@ -33,11 +13,13 @@ import (
 	"time"
 	"unsafe"
 
+	gaba "github.com/BrandonKowalski/gabagool/v2/pkg/gabagool"
 	"github.com/jellydn/knulli-app-store/internal/appstore"
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
 	storeinput "github.com/jellydn/knulli-app-store/internal/input"
 	"github.com/jellydn/knulli-app-store/internal/platform"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
+	"github.com/veandco/go-sdl2/sdl"
 	xdraw "golang.org/x/image/draw"
 )
 
@@ -71,33 +53,46 @@ type Options struct {
 const walkSettleFrames = 3
 
 func Run(ctx context.Context, backend appstore.Backend, options Options) error {
+	// The toolkit's developer wizard writes mappings and exits the process.
+	// It is not part of the Store's automatic, non-persistent input contract.
+	if os.Getenv("INPUT_CAPTURE") != "" {
+		return fmt.Errorf("INPUT_CAPTURE is not supported; unset it to use automatic KNULLI controls")
+	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-	if C.SDL_Init(C.SDL_INIT_VIDEO|C.SDL_INIT_GAMECONTROLLER|C.SDL_INIT_EVENTS) != 0 {
-		return sdlError("initialize SDL2")
+	if err := prepareRenderer(); err != nil {
+		return err
 	}
-	defer C.SDL_Quit()
-	flags := C.Uint32(C.SDL_WINDOW_SHOWN)
-	if !options.Windowed {
-		flags |= C.SDL_WINDOW_FULLSCREEN_DESKTOP
+	// Use gabagool's advanced renderer API rather than its blocking screens:
+	// those screens add Start-to-confirm and a second input/transition policy.
+	// The Store's card, confirmations and asynchronous operations share one
+	// event loop and retain their existing semantic controls.
+	frameworkOptions := gaba.Options{
+		WindowTitle: "Knulli App Store",
+		LogPath:     "/dev/stderr",
+		DisabledInputSources: gaba.DisabledInputSources{
+			Keyboard: true, Controller: true, Joystick: true,
+		},
 	}
-	title := C.CString("Knulli App Store")
-	defer C.free(unsafe.Pointer(title))
-	window := C.SDL_CreateWindow(title, C.SDL_WINDOWPOS_UNDEFINED, C.SDL_WINDOWPOS_UNDEFINED, windowWidth, windowHeight, flags)
-	if window == nil {
-		return sdlError("create SDL2 window")
+	frameworkOptions.WindowOptions.FullscreenDesktop = !options.Windowed
+	// Do not load a firmware-specific raw joystick map or a saved assignment.
+	// KNULLI's SDL GameController mapping is resolved by internal/input once.
+	gaba.SetInputMappingBytes([]byte(`{}`))
+	gaba.Init(frameworkOptions)
+	defer gaba.Close()
+	window := gaba.GetWindow().Window
+	renderer := gaba.GetWindow().Renderer
+	if options.Windowed {
+		width, height := selectedOutputSize(options.Platform.Resolution)
+		window.SetSize(int32(width), int32(height))
 	}
-	defer C.SDL_DestroyWindow(window)
-	renderer := C.SDL_CreateRenderer(window, -1, C.SDL_RENDERER_ACCELERATED|C.SDL_RENDERER_PRESENTVSYNC)
-	if renderer == nil {
-		renderer = C.SDL_CreateRenderer(window, -1, C.SDL_RENDERER_SOFTWARE)
+	// The framework initializes a display-sized logical viewport. The Store
+	// handles letterboxing explicitly so window and framebuffer sizes agree.
+	if err := renderer.SetLogicalSize(0, 0); err != nil {
+		return fmt.Errorf("reset renderer viewport: %w", err)
 	}
-	if renderer == nil {
-		return sdlError("create SDL2 renderer")
-	}
-	defer C.SDL_DestroyRenderer(renderer)
 	runtimeCandidates := runtimeResolutionCandidates(window, renderer)
 	allCandidates := append([]platform.ResolutionCandidate(nil), runtimeCandidates...)
 	if options.Platform.Evidence(platform.FieldResolution).Location == "command-line override" {
@@ -110,13 +105,18 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	backend.SetPlatform(options.Platform)
 	platformHeader := platform.DisplayHeader(options.Platform, 0, 0)
 	outputWidth, outputHeight := selectedOutputSize(options.Platform.Resolution)
-	destination := outputRectangle(outputWidth, outputHeight)
-	sdlDestination := C.SDL_Rect{x: C.int(destination.Min.X), y: C.int(destination.Min.Y), w: C.int(destination.Dx()), h: C.int(destination.Dy())}
-	texture := C.SDL_CreateTexture(renderer, C.SDL_PIXELFORMAT_ABGR8888, C.SDL_TEXTUREACCESS_STREAMING, canvasWidth, canvasHeight)
-	if texture == nil {
-		return sdlError("create SDL2 texture")
+	canvas, err := newConsoleCanvas(logicalWidth(outputWidth, outputHeight))
+	if err != nil {
+		return err
 	}
-	defer C.SDL_DestroyTexture(texture)
+	defer canvas.close()
+	destination := outputRectangle(outputWidth, outputHeight)
+	sdlDestination := sdl.Rect{X: int32(destination.Min.X), Y: int32(destination.Min.Y), W: int32(destination.Dx()), H: int32(destination.Dy())}
+	texture, err := renderer.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STREAMING, int32(canvas.width), canvasHeight)
+	if err != nil {
+		return fmt.Errorf("create card texture: %w", err)
+	}
+	defer texture.Destroy()
 
 	model := storeui.New(backend)
 	if err := model.Load(ctx); err != nil {
@@ -139,7 +139,7 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	}
 	defer func() {
 		if controller != nil {
-			C.SDL_GameControllerClose(controller.handle)
+			controller.handle.Close()
 		}
 	}()
 	walk := NewWalkRunner(options.Keys, walkSettleFrames)
@@ -157,9 +157,8 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	exitRequested := false
 	var repeat NavRepeat
 	for {
-		var event C.SDL_Event
-		for C.SDL_PollEvent(&event) != 0 {
-			if handleEvent(ctx, model, &event, &controller, controls, options.Diagnostics, options.Input) {
+		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+			if handleEvent(ctx, model, event, &controller, controls, options.Diagnostics, options.Input) {
 				return nil
 			}
 		}
@@ -167,23 +166,37 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 			repeatHeldDirection(ctx, model, controls, controller, options.Diagnostics, &repeat)
 		}
 		model.Poll()
-		frame := draw(model, platformHeader, controls)
-		if C.SDL_UpdateTexture(texture, nil, unsafe.Pointer(&frame.Pix[0]), C.int(frame.Stride)) != 0 {
-			return sdlError("upload UI frame")
+		frame := canvas.draw(model, platformHeader, controls)
+		if err := texture.Update(nil, unsafe.Pointer(&frame.Pix[0]), frame.Stride); err != nil {
+			return fmt.Errorf("upload card frame: %w", err)
 		}
-		C.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255)
-		C.SDL_RenderClear(renderer)
-		if C.SDL_RenderCopy(renderer, texture, nil, &sdlDestination) != 0 {
-			return sdlError("render UI frame")
+		renderer.SetDrawColor(palette.background.R, palette.background.G, palette.background.B, 255)
+		renderer.Clear()
+		if err := renderer.Copy(texture, nil, &sdlDestination); err != nil {
+			return fmt.Errorf("render card frame: %w", err)
 		}
-		C.SDL_RenderPresent(renderer)
+		// Capture the actual renderer before Present invalidates its backbuffer,
+		// not just the source bitmap: viewport or texture regressions must show
+		// up in the desktop walkthrough evidence.
+		var rendered *image.RGBA
+		if options.Screenshot != "" || walkLog != nil {
+			width, height, err := renderer.GetOutputSize()
+			if err != nil {
+				return err
+			}
+			rendered = image.NewRGBA(image.Rect(0, 0, int(width), int(height)))
+			if err := renderer.ReadPixels(nil, sdl.PIXELFORMAT_ABGR8888, unsafe.Pointer(&rendered.Pix[0]), rendered.Stride); err != nil {
+				return fmt.Errorf("capture rendered frame: %w", err)
+			}
+		}
+		gaba.GetWindow().Present()
 		if options.Screenshot != "" {
-			return saveOutputScreenshot(options.Screenshot, frame, outputWidth, outputHeight)
+			return savePNG(options.Screenshot, rendered)
 		}
 		if walk != nil {
 			shot, capture := walk.Capture(WalkState(model, controls), model.Busy)
 			if capture && walkLog != nil {
-				if err := saveOutputScreenshot(filepath.Join(options.ShotDir, shot.File), frame, outputWidth, outputHeight); err != nil {
+				if err := savePNG(filepath.Join(options.ShotDir, shot.File), rendered); err != nil {
 					return err
 				}
 				if _, err := walkLog.WriteString(WalkRecord(shot, WalkDetail(model, controls))); err != nil {
@@ -221,6 +234,30 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	}
 }
 
+// Gabagool requires an accelerated renderer unless SDL's driver hint selects
+// software. Probe first to retain the Store's software fallback (also used by
+// dummy-video walkthroughs), rather than letting the toolkit exit the process.
+func prepareRenderer() error {
+	if err := sdl.InitSubSystem(sdl.INIT_VIDEO); err != nil {
+		return fmt.Errorf("initialize video: %w", err)
+	}
+	defer sdl.QuitSubSystem(sdl.INIT_VIDEO)
+	window, err := sdl.CreateWindow("Renderer check", 0, 0, windowWidth, windowHeight, sdl.WINDOW_HIDDEN)
+	if err != nil {
+		return fmt.Errorf("check video window: %w", err)
+	}
+	defer window.Destroy()
+	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED|sdl.RENDERER_PRESENTVSYNC|sdl.RENDERER_TARGETTEXTURE)
+	if err != nil {
+		renderer, err = sdl.CreateRenderer(window, -1, sdl.RENDERER_SOFTWARE|sdl.RENDERER_TARGETTEXTURE)
+		if err != nil {
+			return fmt.Errorf("check software renderer: %w", err)
+		}
+		sdl.SetHint(sdl.HINT_RENDER_DRIVER, "software")
+	}
+	return renderer.Destroy()
+}
+
 // openWalkLog creates the walkthrough evidence record. A run without a scripted
 // sequence, or without an evidence directory, writes no record.
 func openWalkLog(walk *WalkRunner, directory string) (*os.File, error) {
@@ -255,24 +292,26 @@ func walkFinished(options Options, walk *WalkRunner) {
 	}
 }
 
-func runtimeResolutionCandidates(window *C.SDL_Window, renderer *C.SDL_Renderer) []platform.ResolutionCandidate {
+func runtimeResolutionCandidates(window *sdl.Window, renderer *sdl.Renderer) []platform.ResolutionCandidate {
 	var candidates []platform.ResolutionCandidate
-	var width, height C.int
-	result := C.SDL_GetRendererOutputSize(renderer, &width, &height)
+	width, height, err := renderer.GetOutputSize()
 	rendererCandidate := platform.ResolutionCandidate{Source: "SDL renderer output", Width: int(width), Height: int(height)}
-	if result != 0 {
-		rendererCandidate.Error = "SDL_GetRendererOutputSize failed: " + C.GoString(C.SDL_GetError())
+	if err != nil {
+		rendererCandidate.Error = "SDL_GetRendererOutputSize failed: " + err.Error()
 	}
 	candidates = append(candidates, rendererCandidate)
-	width, height = 0, 0
-	C.SDL_GetWindowSize(window, &width, &height)
+	width, height = window.GetSize()
 	candidates = append(candidates, platform.ResolutionCandidate{Source: "SDL window size", Width: int(width), Height: int(height)})
-	displayIndex := C.SDL_GetWindowDisplayIndex(window)
-	var mode C.SDL_DisplayMode
-	if displayIndex >= 0 && C.SDL_GetCurrentDisplayMode(displayIndex, &mode) == 0 {
-		candidates = append(candidates, platform.ResolutionCandidate{Source: "SDL current display mode", Width: int(mode.w), Height: int(mode.h)})
-	} else {
-		candidates = append(candidates, platform.ResolutionCandidate{Source: "SDL current display mode", Error: "SDL display mode query failed: " + C.GoString(C.SDL_GetError())})
+	displayIndex, err := window.GetDisplayIndex()
+	if err == nil {
+		var mode sdl.DisplayMode
+		mode, err = sdl.GetCurrentDisplayMode(displayIndex)
+		if err == nil {
+			candidates = append(candidates, platform.ResolutionCandidate{Source: "SDL current display mode", Width: int(mode.W), Height: int(mode.H)})
+		}
+	}
+	if err != nil {
+		candidates = append(candidates, platform.ResolutionCandidate{Source: "SDL current display mode", Error: "SDL display mode query failed: " + err.Error()})
 	}
 	return candidates
 }
@@ -285,46 +324,53 @@ func logResolutionCandidates(logger *diagnostics.Log, assessments []platform.Res
 	logger.Event("platform_detected", "details", platform.Summary(selected))
 }
 
-func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, controller **controllerState, controls *storeinput.Session, logger *diagnostics.Log, input InputMode) bool {
-	eventType := C.event_type(event)
-	if input.IsKeyboard() && (eventType == C.SDL_CONTROLLERBUTTONDOWN || eventType == C.SDL_CONTROLLERDEVICEREMOVED || eventType == C.SDL_CONTROLLERDEVICEADDED) {
+func handleEvent(ctx context.Context, model *storeui.Model, event sdl.Event, controller **controllerState, controls *storeinput.Session, logger *diagnostics.Log, input InputMode) bool {
+	eventType := event.GetType()
+	if input.IsKeyboard() && (eventType == sdl.CONTROLLERBUTTONDOWN || eventType == sdl.CONTROLLERDEVICEREMOVED || eventType == sdl.CONTROLLERDEVICEADDED) {
 		// A desktop run keeps the keyboard as its only source, so attaching a
 		// controller cannot replace it mid-flow.
 		return false
 	}
-	switch eventType {
-	case C.SDL_QUIT:
+	switch event := event.(type) {
+	case *sdl.QuitEvent:
 		return Handle(ctx, model, controls, logger, Event{Kind: EventQuit}).Exit
-	case C.SDL_KEYDOWN:
+	case *sdl.KeyboardEvent:
+		if event.Type == sdl.KEYUP {
+			switch event.Keysym.Sym {
+			case sdl.K_TAB, sdl.K_F5:
+				return Handle(ctx, model, controls, logger, Event{Kind: EventChordAnchor, Held: false}).Exit
+			}
+			return false
+		}
 		// The quit chord's anchor is held state, not an action: Tab (or F5, the
 		// key a desktop hand reaches for) turns the next Y into the quit, the
 		// way holding Select does on a pad. It is handled before the translation
 		// below, which drops a repeated anchor.
-		if C.event_key_repeat(event) == 0 {
-			switch C.event_key(event) {
-			case C.SDLK_TAB, C.SDLK_F5:
+		if event.Repeat == 0 {
+			switch event.Keysym.Sym {
+			case sdl.K_TAB, sdl.K_F5:
 				return Handle(ctx, model, controls, logger, Event{Kind: EventChordAnchor, Held: true}).Exit
 			}
 		}
 		var key Key
-		switch C.event_key(event) {
-		case C.SDLK_UP:
+		switch event.Keysym.Sym {
+		case sdl.K_UP:
 			key = KeyUp
-		case C.SDLK_LEFT:
+		case sdl.K_LEFT:
 			key = KeyLeft
-		case C.SDLK_DOWN:
+		case sdl.K_DOWN:
 			key = KeyDown
-		case C.SDLK_RIGHT:
+		case sdl.K_RIGHT:
 			key = KeyRight
-		case C.SDLK_PAGEUP:
+		case sdl.K_PAGEUP:
 			key = KeyPageUp
-		case C.SDLK_PAGEDOWN:
+		case sdl.K_PAGEDOWN:
 			key = KeyPageDown
-		case C.SDLK_RETURN, C.SDLK_SPACE:
+		case sdl.K_RETURN, sdl.K_SPACE:
 			key = KeyConfirm
-		case C.SDLK_ESCAPE:
+		case sdl.K_ESCAPE:
 			key = KeyBack
-		case C.SDLK_y:
+		case sdl.K_y:
 			key = KeyDiagnostics
 		}
 		if key == KeyNone {
@@ -332,39 +378,26 @@ func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, 
 		}
 		// A key repeat reaches Handle marked as one, which lets only navigation
 		// answer it: a held Enter must not confirm twice.
-		return Handle(ctx, model, controls, logger, Event{Kind: EventKey, Key: key, Repeat: C.event_key_repeat(event) != 0}).Exit
-	case C.SDL_KEYUP:
-		switch C.event_key(event) {
-		case C.SDLK_TAB, C.SDLK_F5:
-			return Handle(ctx, model, controls, logger, Event{Kind: EventChordAnchor, Held: false}).Exit
-		}
-		return false
-	case C.SDL_CONTROLLERBUTTONDOWN:
-		if *controller == nil || C.event_controller_which(event) != (*controller).instanceID {
+		return Handle(ctx, model, controls, logger, Event{Kind: EventKey, Key: key, Repeat: event.Repeat != 0}).Exit
+	case *sdl.ControllerButtonEvent:
+		if *controller == nil || event.Which != (*controller).instanceID {
 			return false
 		}
-		button := int(C.event_controller_button(event))
+		button := int(event.Button)
 		if button == chordAnchorButton {
-			return Handle(ctx, model, controls, logger, Event{Kind: EventChordAnchor, Held: true}).Exit
+			return Handle(ctx, model, controls, logger, Event{Kind: EventChordAnchor, Held: event.Type == sdl.CONTROLLERBUTTONDOWN}).Exit
 		}
-		return Handle(ctx, model, controls, logger, Event{Kind: EventButton, Button: button}).Exit
-	case C.SDL_CONTROLLERBUTTONUP:
-		if *controller == nil || C.event_controller_which(event) != (*controller).instanceID {
-			return false
+		if event.Type == sdl.CONTROLLERBUTTONDOWN {
+			return Handle(ctx, model, controls, logger, Event{Kind: EventButton, Button: button}).Exit
 		}
-		if int(C.event_controller_button(event)) == chordAnchorButton {
-			return Handle(ctx, model, controls, logger, Event{Kind: EventChordAnchor, Held: false}).Exit
-		}
-		return false
-	case C.SDL_CONTROLLERDEVICEREMOVED:
-		if *controller != nil && C.event_device_which(event) == (*controller).instanceID {
+	case *sdl.ControllerDeviceEvent:
+		if event.Type == sdl.CONTROLLERDEVICEREMOVED && *controller != nil && event.Which == (*controller).instanceID {
 			logger.Event("controller_disconnected", "name", (*controller).identity.Name, "guid", (*controller).identity.GUID)
-			C.SDL_GameControllerClose((*controller).handle)
+			(*controller).handle.Close()
 			*controller = nil
 			Handle(ctx, model, controls, logger, Event{Kind: EventControllerRemoved})
 		}
-	case C.SDL_CONTROLLERDEVICEADDED:
-		if *controller == nil {
+		if event.Type == sdl.CONTROLLERDEVICEADDED && *controller == nil {
 			*controller = openController()
 			connectController(ctx, model, controls, *controller, logger)
 		}
@@ -373,22 +406,20 @@ func handleEvent(ctx context.Context, model *storeui.Model, event *C.SDL_Event, 
 }
 
 type controllerState struct {
-	handle     *C.SDL_GameController
+	handle     *sdl.GameController
 	identity   storeinput.Identity
-	instanceID C.SDL_JoystickID
+	instanceID sdl.JoystickID
 }
 
 func openController() *controllerState {
-	for index := C.int(0); index < C.SDL_NumJoysticks(); index++ {
-		if C.SDL_IsGameController(index) == C.SDL_TRUE {
-			handle := C.SDL_GameControllerOpen(index)
+	for index := 0; index < sdl.NumJoysticks(); index++ {
+		if sdl.IsGameController(index) {
+			handle := sdl.GameControllerOpen(index)
 			if handle == nil {
 				continue
 			}
-			var guid [33]C.char
-			C.controller_guid(handle, &guid[0], C.int(len(guid)))
-			joystick := C.SDL_GameControllerGetJoystick(handle)
-			return &controllerState{handle: handle, identity: storeinput.Identity{GUID: C.GoString(&guid[0]), Name: C.GoString(C.SDL_GameControllerName(handle))}, instanceID: C.SDL_JoystickInstanceID(joystick)}
+			joystick := handle.Joystick()
+			return &controllerState{handle: handle, identity: storeinput.Identity{GUID: sdl.JoystickGetGUIDString(joystick.GUID()), Name: handle.Name()}, instanceID: joystick.InstanceID()}
 		}
 	}
 	return nil
@@ -416,7 +447,7 @@ func heldDirection(controller *controllerState, mapping storeinput.Mapping) stor
 		if !ok {
 			continue
 		}
-		if C.controller_button(controller.handle, C.int(button)) != 0 {
+		if controller.handle.Button(sdl.GameControllerButton(button)) != 0 {
 			return action
 		}
 	}
@@ -452,10 +483,11 @@ func selectedOutputSize(resolution string) (int, int) {
 
 func outputRectangle(width, height int) image.Rectangle {
 	scaleWidth := width
-	scaleHeight := scaleWidth * canvasHeight / canvasWidth
+	logical := logicalWidth(width, height)
+	scaleHeight := scaleWidth * canvasHeight / logical
 	if scaleHeight > height {
 		scaleHeight = height
-		scaleWidth = scaleHeight * canvasWidth / canvasHeight
+		scaleWidth = scaleHeight * logical / canvasHeight
 	}
 	x := (width - scaleWidth) / 2
 	y := (height - scaleHeight) / 2
@@ -464,25 +496,21 @@ func outputRectangle(width, height int) image.Rectangle {
 
 func renderOutput(frame *image.RGBA, width, height int) *image.RGBA {
 	output := image.NewRGBA(image.Rect(0, 0, width, height))
+	fill(output, output.Bounds(), palette.background)
 	xdraw.NearestNeighbor.Scale(output, outputRectangle(width, height), frame, frame.Bounds(), xdraw.Src, nil)
 	return output
 }
 
-func sdlError(operation string) error {
-	return fmt.Errorf("%s: %s", operation, C.GoString(C.SDL_GetError()))
-}
-
-func saveScreenshot(path string, frame *image.RGBA) error {
-	return saveOutputScreenshot(path, frame, windowWidth, windowHeight)
-}
-
 func saveOutputScreenshot(path string, frame *image.RGBA, width, height int) error {
-	scaled := renderOutput(frame, width, height)
+	return savePNG(path, renderOutput(frame, width, height))
+}
+
+func savePNG(path string, frame image.Image) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err
 	}
-	if err := png.Encode(file, scaled); err != nil {
+	if err := png.Encode(file, frame); err != nil {
 		file.Close()
 		return err
 	}

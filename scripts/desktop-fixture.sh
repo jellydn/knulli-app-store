@@ -72,6 +72,7 @@ printf 'GLIBC_2.17\nGLIBC_2.34\nGLIBC_2.40\n' >"$ROOT/lib/libc.so.6"
 : >"$ROOT/usr/lib/libSDL2-2.0.so.0"
 : >"$ROOT/usr/lib/libSDL2_image-2.0.so.0"
 : >"$ROOT/usr/lib/libSDL2_ttf-2.0.so.0"
+: >"$ROOT/usr/lib/libSDL2_gfx-1.0.so.0"
 : >"$ROOT/lib/libresolv.so.2"
 : >"$ROOT/lib/libpthread.so.0"
 mkdir -p "$ROOT/usr/bin" \

@@ -44,6 +44,9 @@ install -m 0644 "$CATALOG" "$APP/catalog-index.json"
 install -m 0644 "$SIG" "$APP/catalog-index.json.sig"
 install -m 0755 "packaging/$TARGET/Knulli App Store.sh" "$PORTS/Knulli App Store.sh"
 install -m 0644 "packaging/$TARGET/README.txt" "$PORTS/knulli-app-store/README.txt"
+# Keep notices in the already managed README; do not widen self-update paths.
+printf '\nEmbedded DejaVu Sans font notice\n\n' >>"$APP/README.txt"
+cat "internal/sdlui/assets/DejaVuSans-LICENSE.txt" >>"$APP/README.txt"
 install -m 0644 "$ICON" "$PORTS/images/Knulli App Store.png"
 
 ARCHIVE="$OUTPUT_DIR/knulli-app-store-$TARGET-experimental-$VERSION.zip"

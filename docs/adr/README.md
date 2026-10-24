@@ -13,5 +13,8 @@ Accepted decisions for Knulli App Store. New records use the next number and kee
 | [0007](0007-go127-language-baseline.md) | Raise the language baseline to Go 1.27 | accepted |
 | [0008](0008-catalog-index-signing.md) | Sign the device catalogue index with ed25519 | accepted |
 | [0009](0009-advisory-device-compatibility.md) | Allow untested devices and displays | accepted |
+| [0010](0010-gabagool-knulli-frontend.md) | Use a gabagool-backed Go frontend, KNULLI first | accepted |
 
 ADR 0007 supersedes ADR 0006's Go 1.19 baseline. ADR 0009 supersedes its device/display installation gate. ADR 0006's static CLI and firmware detection decisions still apply.
+
+ADR 0010 supersedes only ADR 0004's renderer choice, not its backend, build-tag or input policy.

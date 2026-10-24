@@ -10,7 +10,7 @@ make build      # CGO-free CLI -> build/knulli-app
 make catalogue  # deterministic index -> build/catalog-index.json
 make catalogue-check  # required after catalogue-affecting changes: two builds must match byte for byte
 make cover      # coverage gate: every prod-Go package needs a test file AND total >= 70%
-go test -tags sdl ./...  # SDL GUI compile + layout tests; needs libsdl2-dev (brew install sdl2 / apt install libsdl2-dev)
+go test -race -tags sdl ./...  # SDL GUI + input tests; needs SDL2, SDL2_image, SDL2_ttf and SDL2_gfx development libraries
 make gui        # desktop GUI with keyboard input + scratch fixture root (no device)
 make walkthrough            # offline GUI evidence; add WALK_FLAGS=--install for network-backed lifecycle flows
 ```
@@ -22,6 +22,7 @@ make walkthrough            # offline GUI evidence; add WALK_FLAGS=--install for
 ## Architecture
 
 - Installer owns policy and side effects. Frontends (`cmd/knulli-app`, `cmd/knulli-app-ui`) call `installer.Manager` / `appstore.Backend` and never extract archives, edit XML, or shell out.
+- Gabagool/v2 owns GUI window/renderer lifetime through its advanced API. Keep its input processor disabled: the semantic mapper and typed model own controls/transitions. The Library canvas uses a compact list with an expanded selected row and Random Game Picker 0.2.0's shared responsive 480-high layout, expanding width with the output aspect ratio (minimum 640), with software fallback. Only KNULLI is implemented; see ADR 0010.
 - Module map: `manifest` (contract + policy) → `catalog` (deterministic index, ed25519 sig) → `platform` (detection/compat) → `archive` (bounded ZIP/tar.gz staging) → `safefs` (path policy, snapshots) → `installer` (lifecycle, state, gamelist) → `ui` (pure-Go state machine) / `input` (mappings) / `sdlui` (SDL render, behind `sdl` build tag so CLI stays static).
 - Vocabulary in `CONTEXT.md` is normative (adopt = Manage existing, external = files not dirs, outcome = accepted-not-completed). Use its terms in code and docs.
 

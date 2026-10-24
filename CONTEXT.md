@@ -24,7 +24,7 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Tab** — One view of the catalogue: the whole list, the packages with something to act on, or the packages installed on this device. A tab filters on a package's typed state, never on its rendered state label.
 
-**Card browsing** — Moving one app at a time with left/right (up/down also work). The default view shows all apps and a position counter. Y opens More for details and secondary actions. A opens confirmation for the first permitted action; an issue opens its health check first.
+**Library browsing** — Moving through a compact package list with up/down (left/right also work). The selected row expands to show its version, summary and state; neighbouring packages stay visible. Y opens More for details and secondary actions. A opens confirmation for the first permitted action; an issue opens its health check first.
 
 **Filtering** — Switching All, Ready and Installed with L1/R1 (Page Up/Page Down on a keyboard). Each view remembers the selected package. An empty filter still permits switching to another view.
 

@@ -1,6 +1,6 @@
 # prek hooks for knulli-app-store. Mirrors .github/workflows/check.yml.
 # Fast checks run on pre-commit; slow checks run on pre-push.
-# SDL hooks need headers: `brew install sdl2` / `apt install libsdl2-dev`.
+# SDL hooks need SDL2, SDL2_image, SDL2_ttf and SDL2_gfx development files.
 #:schema https://www.schemastore.org/prek.json
 
 default_install_hook_types = ["pre-commit", "pre-push"]
@@ -12,7 +12,7 @@ hooks = [
     { id = "end-of-file-fixer" },
     { id = "check-yaml" },
     { id = "check-json" },
-    { id = "check-added-large-files" },
+    { id = "check-added-large-files", exclude = "^internal/sdlui/assets/DejaVuSans\\.ttf$" },
     { id = "check-merge-conflict" },
     { id = "mixed-line-ending", args = ["--fix=lf"] },
 ]
@@ -32,7 +32,7 @@ hooks = [
         name = "go vet",
         language = "system",
         entry = "go vet ./...",
-        files = "\\.go$",
+        files = "(\\.go$|(^|/)go\\.(mod|sum)$)",
         pass_filenames = false,
     },
     {
@@ -40,7 +40,7 @@ hooks = [
         name = "go vet -tags sdl",
         language = "system",
         entry = "go vet -tags sdl ./...",
-        files = "\\.go$",
+        files = "(\\.go$|(^|/)go\\.(mod|sum)$)",
         pass_filenames = false,
     },
     # The hook calls the make target rather than repeating its shell, so the
@@ -60,7 +60,16 @@ hooks = [
         name = "go test -race",
         language = "system",
         entry = "go test -race ./...",
-        files = "\\.go$",
+        files = "(\\.go$|(^|/)go\\.(mod|sum)$)",
+        pass_filenames = false,
+        stages = ["pre-push"],
+    },
+    {
+        id = "go-test-race-sdl",
+        name = "go test -race -tags sdl",
+        language = "system",
+        entry = "go test -race -tags sdl ./...",
+        files = "(\\.go$|(^|/)go\\.(mod|sum)$)",
         pass_filenames = false,
         stages = ["pre-push"],
     },
@@ -68,8 +77,8 @@ hooks = [
         id = "staticcheck",
         name = "staticcheck",
         language = "system",
-        entry = "go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...",
-        files = "\\.go$",
+        entry = "env GOTOOLCHAIN=go1.27.1 go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...",
+        files = "(\\.go$|(^|/)go\\.(mod|sum)$)",
         pass_filenames = false,
         stages = ["pre-push"],
     },
@@ -77,8 +86,8 @@ hooks = [
         id = "staticcheck-sdl",
         name = "staticcheck -tags sdl",
         language = "system",
-        entry = "go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 -tags sdl ./...",
-        files = "\\.go$",
+        entry = "env GOTOOLCHAIN=go1.27.1 go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 -tags sdl ./...",
+        files = "(\\.go$|(^|/)go\\.(mod|sum)$)",
         pass_filenames = false,
         stages = ["pre-push"],
     },

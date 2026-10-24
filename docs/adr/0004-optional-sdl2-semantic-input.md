@@ -2,6 +2,8 @@
 
 - Status: accepted
 - Date: 2026-09-15
+- Renderer choice superseded by [ADR 0010](0010-gabagool-knulli-frontend.md).
+  The optional build tag, backend and semantic input boundaries still apply.
 
 ## Context
 

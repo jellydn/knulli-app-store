@@ -891,10 +891,28 @@ func TestRandomPickerLifecyclePreservesStateAndOtherPorts(t *testing.T) {
 	})
 	server := serveAsset(t, asset)
 	defer server.Close()
+	goAsset := zipBytesWithModes(t, map[string]zipFixture{
+		"RandomGamePicker.sh":   {body: "Go launcher", mode: 0755},
+		"random-game-picker":    {body: "Go binary", mode: 0755},
+		"assets/DejaVuSans.ttf": {body: "font", mode: 0644},
+		"licenses/font.txt":     {body: "font notice", mode: 0644},
+		"LICENSE":               {body: "license", mode: 0644},
+		"README.md":             {body: "readme", mode: 0644},
+		"THIRD_PARTY.md":        {body: "notices", mode: 0644},
+	})
+	goServer := serveAsset(t, goAsset)
+	defer goServer.Close()
 	pkg, err := manifest.Load("../../catalogue/packages/io.github.jellydn.random-game-picker.json")
 	if err != nil {
 		t.Fatal(err)
 	}
+	stable := pkg
+	// Keep the legacy contract independent of the live catalogue version.
+	legacyCompatibility := *pkg.Compatibility
+	legacyCompatibility.MinimumGLIBC = "2.36"
+	legacyCompatibility.Dependencies = []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc"}
+	pkg.Compatibility = &legacyCompatibility
+	pkg.Version = "0.1.1"
 	digest := sha256.Sum256(asset)
 	pkg.Release.SHA256 = hex.EncodeToString(digest[:])
 	pkg.Release.Size = int64(len(asset))
@@ -933,9 +951,22 @@ func TestRandomPickerLifecyclePreservesStateAndOtherPorts(t *testing.T) {
 			if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
 				t.Fatalf("repair health: %#v, %v", status, err)
 			}
-			updated := pkg
-			updated.Version += "-fixture-update"
+			updated := stable
+			updated.Release = testPackage(pkg.Release.URL, goAsset, updated.Version).Release
+			if _, err := manager.Apply(context.Background(), OpUpdate, updated); err == nil {
+				t.Fatal("Go update accepted without SDL2_gfx")
+			}
+			assertRootFile(t, root, base+"random-game-picker", "reviewed aarch64 binary")
+			current.Dependencies = append(current.Dependencies, "sdl2-gfx")
+			manager = manager.WithPlatform(current)
+			manager.Client = rewriteClient(t, goServer)
 			if _, err := manager.Apply(context.Background(), OpUpdate, updated); err != nil {
+				t.Fatal(err)
+			}
+			assertRootFile(t, root, base+"random-game-picker", "Go binary")
+			assertRootFile(t, root, base+"assets/DejaVuSans.ttf", "font")
+			writeRootFile(t, root, base+"state/ui.log", "Go UI session")
+			if _, err := manager.Apply(context.Background(), OpRepair, updated); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
@@ -948,6 +979,7 @@ func TestRandomPickerLifecyclePreservesStateAndOtherPorts(t *testing.T) {
 			assertRootFile(t, root, "userdata/roms/ports/Other/Other.sh", "other port")
 			assertRootFile(t, root, base+"state/settings.json", `{"favorites":true}`)
 			assertRootFile(t, root, base+"state/last-run.log", "one session")
+			assertRootFile(t, root, base+"state/ui.log", "Go UI session")
 		})
 	}
 	t.Run("menu-failure-rolls-back", func(t *testing.T) {
