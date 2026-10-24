@@ -16,7 +16,7 @@
 1. Confirm the repository belongs to the project or documented maintainer.
 2. Read the repository license file and record a valid SPDX expression. Only an authorized upstream-managed experimental direct download may omit an unverified license, with a visible license warning and no asset redistribution.
 3. Select a version-tagged release URL. Reject branch archives and `latest` aliases. Never execute a remote installer. A release containing a base64 `tar.gz` payload can use `release.base64_offset`: the exact byte offset after its marker line. Verify the full release's size and checksum, and inspect the decoded archive. No script prefix is executed.
-4. Obtain the SHA-256 from the publisher through a channel separate from the downloaded asset. Record compressed and installed byte sizes.
+4. Obtain the SHA-256 from the publisher through a channel separate from the downloaded asset. For upstream-managed experimental packages only, a GitHub release asset digest may replace a missing publisher checksum: record its API evidence, hash the downloaded asset independently, and disclose the missing publisher checksum in the install warning. This trusts the publisher's GitHub account and GitHub, not independent publisher authentication. Pin the reviewed digest and sizes; never obtain a replacement expected digest during installation. Record compressed and installed byte sizes.
 5. Inspect the complete archive. It must contain regular files only and one declared launcher.
 6. Review source or packaged behavior for network use and filesystem writes.
 7. List the narrowest `/userdata` destination, menu file, preserved configuration, and allowed write paths.

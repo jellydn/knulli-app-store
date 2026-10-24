@@ -16,6 +16,8 @@ Upstream package code runs later when the user launches it. The installer does n
 
 Explicitly authorized `upstream_managed` packages remain experimental. The Store verifies their original publisher download and installation transaction, but leaves first-launch setup, runtime writes, runtime acquisition and app updates to upstream. Such updates do not inherit Store checksum approval. Health checks report changed managed bytes; Repair restores the pinned release after confirmation. A missing license is allowed only for this experimental direct-download model with a visible license warning; assets are not mirrored or redistributed. A warning is not a runtime sandbox or a license grant.
 
+For upstream-managed experimental packages only, a missing publisher checksum may be replaced by the GitHub release asset's API digest, independently compared with the download and pinned in the reviewed manifest. The install warning must disclose this limitation. This trusts the publisher's GitHub account and GitHub, not independent publisher authentication: a compromised account can publish malicious bytes with a matching digest before review. Installation still requires the exact reviewed hash and size; it never fetches a new expected digest. This exception does not permit promotion beyond experimental.
+
 ## Store self-update
 
 The Store card checks `api.github.com/repos/jellydn/knulli-app-store/releases` only after confirmation. It includes CI pre-releases and selects the asset for the packaged build target. A separate Update confirmation uses the pinned official release URL, byte size, and SHA-256 returned by GitHub. Missing digests, download mismatches, unsafe archive paths, unexpected file inventories, symlinks, and insufficient space reject the update.

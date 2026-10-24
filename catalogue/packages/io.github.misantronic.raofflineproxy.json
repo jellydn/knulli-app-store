@@ -14,6 +14,7 @@
     },
     "notes": [
       "Review on 2026-10-20 verified the Knulli v2.2.0-alpha1 shell asset against the GitHub digest: 1377625 bytes, SHA-256 94d1d2de7d213300463dc6e4f4fd28ce9ba25344e3b2fe9c7371f7b4f9a06f0b. No installer was executed.",
+      "No separate publisher checksum is published in this release. The calculated download hash matches the GitHub release asset API digest. The upstream-managed experimental exception trusts the publisher's GitHub account and GitHub, not independent publisher authentication. Installation remains pinned to the reviewed hash and size; it never fetches a new expected digest.",
       "Rechecked 2026-10-24: data-only decoding at byte offset 1173 after the unique __RAOFFLINEPROXY_PAYLOAD_BELOW__ marker yielded a 1018930-byte tar.gz with 66 regular files, 9 directories, and 2340621 regular-file bytes. No duplicate paths, traversal, absolute paths, or special-file entries were found. Store base64_offset support removes the need for a separately published archive; it never executes the shell prefix.",
       "Authorized upstream-managed experimental installation: the Store only verifies and extracts the bundle, maps launchers into bin, and creates a Tools entry. It does not run the installer or configure the proxy. Launch the app to set up emulator integration and optional autostart. Runtime writes and upstream updates are not sandboxed or checksum-controlled by the Store.",
       "Stop the proxy, disable autostart, then run bin/raofflineproxy remove-boot-hook before Store removal. Read-only removal checks reject remaining boot/game hooks, a service PID file, or the default proxy address in known emulator/frontend configs. Saved patch state is retained because upstream Stop may leave it after restoring emulator settings. The Store never removes shared hooks or persistent config/cache data. Do not use upstream Uninstall if you need cached credentials or queued awards; it deletes them. Custom proxy addresses and configuration paths require manual review.",
@@ -28,6 +29,11 @@
         "kind": "tagged-release",
         "url": "https://github.com/misantronic/RAOfflineProxy/releases/tag/v2.2.0-alpha1",
         "note": "Downloaded Knulli shell asset matches the GitHub API size and SHA-256. Embedded archive was read as data only; extraction safety does not establish runtime safety or device compatibility."
+      },
+      {
+        "kind": "release-integrity",
+        "url": "https://api.github.com/repos/misantronic/RAOfflineProxy/releases/tags/v2.2.0-alpha1",
+        "note": "Knulli asset digest sha256:94d1d2de7d213300463dc6e4f4fd28ce9ba25344e3b2fe9c7371f7b4f9a06f0b matches the calculated download hash; size 1377625. GitHub-hosted integrity evidence only, with no separate publisher checksum or independent publisher authentication."
       },
       {
         "kind": "filesystem-and-network-review",
@@ -68,7 +74,7 @@
     "executables": ["bin/raofflineproxy", "bin/raofflineproxy-uninstall"],
     "upstream_managed": true,
     "menu_command": ["/userdata/system/raofflineproxy/bin/raofflineproxy", "menu"],
-    "warning": "Untested. App controls setup and updates. Close app before Store Repair; it restores pinned code. Before removal: stop proxy, disable autostart, run bin/raofflineproxy remove-boot-hook. Config and awards stay. Upstream Uninstall deletes data. Check custom proxy/config paths yourself.",
+    "warning": "Untested; GitHub digest only, no publisher checksum. App controls setup and updates. Close app before Store Repair; it restores pinned code. Before removal: stop proxy, disable autostart, run bin/raofflineproxy remove-boot-hook. Config and awards stay. Upstream Uninstall deletes data. Check custom proxy/config paths yourself.",
     "menu": {
       "gamelist": "/userdata/roms/tools/gamelist.xml",
       "path": "./RAOfflineProxy.sh",

@@ -6,7 +6,7 @@ Read [How to add a package](docs/how-to-add-a-package.md) before you open a pack
 
 1. Open an issue that identifies the upstream repository and the package owner.
 2. Add or update one file in `catalogue/packages/`.
-3. Attach evidence for the license, immutable release asset, publisher checksum, Knulli compatibility, install paths, preserved files, network use, and every write path.
+3. Attach evidence for the license, immutable release asset, publisher checksum, Knulli compatibility, install paths, preserved files, network use, and every write path. Upstream-managed experimental packages may use a pinned GitHub asset digest when no publisher checksum exists; record the API evidence and disclose this in the install warning. This does not provide independent publisher authentication.
 4. Keep the entry at `candidate` while runtime or lifecycle safety is unresolved. Candidates can retain validated release metadata, but no compatibility or install definition.
 5. Use `experimental` for a warned, authorized test after release, runtime and lifecycle review. One maintainer can complete this review. Use `installable` only after the full two-reviewer checklist passes. Device and display declarations are optional for experimental packages; missing exact device evidence does not block installation.
    An authorized `install.upstream_managed` package can use verified download/extraction while leaving runtime setup and updates to the app. It must stay experimental, disclose these risks, preserve user data, and declare cleanup checks for external hooks. An unverified license needs a visible warning and direct upstream download without redistribution. See [upstream-managed installation](docs/how-to-add-a-package.md#upstream-managed-installation).
