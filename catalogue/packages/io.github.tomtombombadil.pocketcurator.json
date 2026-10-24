@@ -15,10 +15,10 @@
     "notes": [
       "Rechecked 2026-10-24: stable v1.1.2 ZIP matches the publisher sidecar and GitHub digest: 5903925 compressed bytes, 19915921 regular-file bytes, 211 files and 21 directories. No duplicate paths, traversal, absolute paths, or special-file entries were found.",
       "Authorized upstream-managed experimental installation. The Store verifies and extracts the original ZIP into a private PocketCurator directory under Ports, keeping the launcher beside pocketcurator as upstream requires. It does not run an installer. Settings stay through repair, update and removal; unrelated Ports files are never adopted.",
-      "The original launcher hardcodes GAMEDIR to /$directory/ports/pocketcurator, outside the Store's private PocketCurator directory. A verified same-length staging patch sets GAMEDIR to $SCRIPT_DIR/pocketcurator. Offset 8083, exact source/replacement bytes and the final launcher SHA-256 are pinned. Existing Store installations can apply this manifest correction through Repair without moving or deleting settings. Upstream updates can replace this patched launcher; use Store Repair to restore the path fix if that happens.",
+      "The original launcher hardcodes GAMEDIR to /$directory/ports/pocketcurator, outside the Store's private PocketCurator directory. A verified same-length staging patch derives GAMEDIR directly from dirname of the launcher path. PortMaster device_info.txt unsets SCRIPT_DIR, so that variable cannot locate the payload after control.txt loads. Offset 8083, exact source/replacement bytes and the final launcher SHA-256 are pinned. Existing Store installations can apply this manifest correction through Repair without moving or deleting settings. Upstream updates can replace this patched launcher; use Store Repair to restore the path fix if that happens.",
       "ROM deletion is an intentional upstream feature with a confirmation screen. Back up ROMs and scraped media before using it. App runtime writes are not sandboxed by the Store. Fetch only content you have the right to use from a server you trust; the Store supplies no ROM provider.",
       "The packaged updater and netsync download executable code outside Store transactions. PC_SKIP_UPDATE only skips launcher application of staged updates; it does not disable these downloads. The launcher can also acquire and mount a PortMaster runtime.",
-      "Upstream-managed mode leaves the app's updater and PortMaster runtime acquisition available under the user's control. These are not Store-verified updates. Current PortMaster is required; system Python/pygame is preferred on Knulli. Close the app before Store operations. No exact device test is claimed."
+      "Upstream-managed mode leaves the app's updater and PortMaster runtime acquisition available under the user's control. These are not Store-verified updates. Current PortMaster is required; system Python/pygame is preferred on Knulli. Close the app before Store operations. Native launch with the corrected patch was confirmed on TrimUI Smart Pro, Knulli beta 2026/09/21 21:25, aarch64, 1280x720. A complete device lifecycle is not verified."
     ],
     "evidence": [
       {
@@ -44,6 +44,11 @@
         "kind": "compatibility-claim",
         "url": "https://github.com/tomtombombadil/PocketCurator/blob/main/README.md",
         "note": "Upstream lists TrimUI Smart Pro, but does not tie that claim to Knulli, v1.1.2, or a lifecycle result."
+      },
+      {
+        "kind": "device-launch",
+        "url": "https://ampcode.com/threads/T-01a16c63-4ffd-76be-a50c-c62af0494ee4",
+        "note": "2026-10-24: corrected launcher b6c0085e0d714a9994e97945ec3e755e5f58befdc5608328e25084e34521a66c launched v1.1.2 on TrimUI Smart Pro, Knulli beta 2026/09/21 21:25, aarch64, 1280x720, PortMaster 2026.06.23-0015. Inspected framebuffer screenshot and native log confirm system-browser startup; owner confirmed it works. No deletion functions used. Clean exit, relaunch and native lifecycle operations were not completed; see docs/real-device-tests.md."
       }
     ]
   },
@@ -81,8 +86,8 @@
         "path": "Pocket Curator.sh",
         "offset": 8083,
         "before_hex": "47414d454449523d222f246469726563746f72792f706f7274732f706f636b657463757261746f7222",
-        "after_hex": "47414d454449523d22245343524950545f4449522f706f636b657463757261746f7222202020202020",
-        "sha256": "09ac528ecd73005e3f2befd7f1d56ffa788b8a1ca7ddf882f2988fc48c48579f"
+        "after_hex": "47414d454449523d2224286469726e616d652022243022292f706f636b657463757261746f72222020",
+        "sha256": "b6c0085e0d714a9994e97945ec3e755e5f58befdc5608328e25084e34521a66c"
       }
     ]
   }
