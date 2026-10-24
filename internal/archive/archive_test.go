@@ -6,12 +6,60 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestEmbeddedTarRetainsArchiveSafetyAndLimits(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		header    tar.Header
+		limit     int64
+		wantError bool
+	}{
+		{"regular", tar.Header{Name: "bundle/run.sh", Mode: 0755, Size: 7}, 7, false},
+		{"traversal before stripping", tar.Header{Name: "../run.sh", Mode: 0755, Size: 7}, 7, true},
+		{"link", tar.Header{Name: "bundle/run.sh", Typeflag: tar.TypeSymlink, Linkname: "/etc/passwd"}, 7, true},
+		{"over budget", tar.Header{Name: "bundle/run.sh", Mode: 0755, Size: 7}, 6, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			body := "payload"
+			if test.header.Typeflag == tar.TypeSymlink {
+				body = ""
+			}
+			archive := makeTarGZ(t, &test.header, body)
+			data, err := os.ReadFile(archive)
+			if err != nil {
+				t.Fatal(err)
+			}
+			prefix := "#!/bin/sh\nexit 99\n"
+			encoded := filepath.Join(t.TempDir(), "installer.sh")
+			if err := os.WriteFile(encoded, []byte(prefix+base64.StdEncoding.EncodeToString(data)), 0600); err != nil {
+				t.Fatal(err)
+			}
+			files, err := ExtractBase64TarGZ(context.Background(), encoded, int64(len(prefix)), t.TempDir(), 1, test.limit)
+			if (err != nil) != test.wantError {
+				t.Fatalf("files=%v error=%v", files, err)
+			}
+			if !test.wantError {
+				if len(files) != 1 || files[0].Relative != "run.sh" {
+					t.Fatalf("unexpected inventory: %v", files)
+				}
+				got, err := os.ReadFile(files[0].Path)
+				if err != nil || string(got) != "payload" {
+					t.Fatalf("payload=%q error=%v", got, err)
+				}
+			}
+			if _, err := ExtractBase64TarGZ(context.Background(), encoded, 1, t.TempDir(), 1, 7); err == nil {
+				t.Fatal("wrong offset accepted")
+			}
+		})
+	}
+}
 
 func TestExtractZIPRejectsTraversalAndLinks(t *testing.T) {
 	for name, mode := range map[string]os.FileMode{

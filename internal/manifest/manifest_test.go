@@ -10,11 +10,50 @@ import (
 	"testing"
 )
 
-func TestCandidateCannotContainActionableRelease(t *testing.T) {
+func TestCandidateCanRecordPinnedReleaseButNotInstallation(t *testing.T) {
 	pkg := validPackage()
+	pkg.Review.Status = "candidate"
+	pkg.Compatibility, pkg.Install = nil, nil
+	if err := pkg.Validate(); err != nil || pkg.Installable() {
+		t.Fatalf("pinned candidate must validate and stay read-only: %v", err)
+	}
+	pkg.Release.SHA256 = "unreviewed"
+	if err := pkg.Validate(); err == nil {
+		t.Fatal("candidate accepted invalid release data")
+	}
+	pkg = validPackage()
 	pkg.Review.Status = "candidate"
 	if err := pkg.Validate(); err == nil || !strings.Contains(err.Error(), "candidate packages") {
 		t.Fatalf("expected candidate metadata rejection, got %v", err)
+	}
+}
+
+func TestExperimentalDoesNotRequireDeviceOrDisplayClaims(t *testing.T) {
+	pkg := validPackage()
+	pkg.Review.Status = "experimental"
+	pkg.Install.Warning = "Untested; runtime requirements still apply."
+	pkg.Compatibility.Devices, pkg.Compatibility.Resolutions = nil, nil
+	if err := pkg.Validate(); err != nil {
+		t.Fatalf("experimental package required speculative device claims: %v", err)
+	}
+}
+
+func TestEmbeddedPayloadRequiresTarAndAnInteriorOffset(t *testing.T) {
+	pkg := validPackage()
+	pkg.Release.Format = "tar.gz"
+	pkg.Release.Base64Offset = 1
+	if err := pkg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, offset := range []int64{-1, pkg.Release.Size, pkg.Release.Size + 1} {
+		pkg.Release.Base64Offset = offset
+		if err := pkg.Validate(); err == nil {
+			t.Fatalf("accepted invalid payload offset %d", offset)
+		}
+	}
+	pkg.Release.Base64Offset, pkg.Release.Format = 1, "zip"
+	if err := pkg.Validate(); err == nil {
+		t.Fatal("accepted base64 ZIP payload")
 	}
 }
 

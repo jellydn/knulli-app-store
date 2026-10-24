@@ -58,8 +58,8 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 			t.Fatalf("unexpected approval state: %s", first.Packages[index].ID)
 		}
 		if pkg := first.Packages[index].Package; pkg.ID == "org.retroshelf.knulli" {
-			if pkg.Review.Status != "candidate" || pkg.Release != nil || pkg.Compatibility != nil || pkg.Install != nil {
-				t.Fatal("retroshelf must remain a candidate without actionable metadata")
+			if pkg.Review.Status != "candidate" || pkg.Release == nil || pkg.Compatibility != nil || pkg.Install != nil {
+				t.Fatal("retroshelf must retain its reviewed release without installation metadata")
 			}
 		}
 	}

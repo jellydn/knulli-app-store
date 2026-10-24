@@ -37,7 +37,7 @@ make walkthrough            # offline GUI evidence; add WALK_FLAGS=--install for
 
 ## Catalogue contributions
 
-- One file per package in `catalogue/packages/`. Statuses: `candidate` (not actionable, no release/compat/install fields) → `installable` (review checklist passed) → `verified` (linked report on exact device/firmware/arch/resolution).
+- One file per package in `catalogue/packages/`. Statuses: `candidate` (not actionable; optional validated release, no compat/install fields) → `experimental` (warned test after release/runtime/lifecycle review) → `installable` (review checklist passed) → `verified` (linked report on exact device/firmware/arch/resolution).
 - Required evidence: license, immutable asset, publisher checksum, Knulli compat, install paths, preserved files, network use, every write path. A README claim is not evidence. No shell-piped installers, no unrestricted writes, no ROM-download sources.
 - Read-only checker: `go run ./cmd/check-updates -output build/catalogue-update-report` writes `.json`+`.md` for manual review; never edits manifests. `GITHUB_TOKEN` optional locally, never in reports.
 

@@ -2,7 +2,7 @@
   "schema": "org.knulli.app-store/package-manifest/v1",
   "id": "org.retroshelf.knulli",
   "name": "retroshelf",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "type": "integration",
   "summary": "Records Knulli play sessions and syncs them to your retroshelf account.",
   "repository": "https://github.com/retroshelf-org/linux",
@@ -10,9 +10,9 @@
     "status": "candidate",
     "notes": [
       "Requires a retroshelf account and Wi-Fi for linking and syncing. Upstream documents offline session queuing and a game-session hook installed on first launch.",
-      "Review on 2026-10-23 verified the version-pinned Knulli v0.5.5 ZIP against the GitHub asset digest: 18970733 bytes, SHA-256 927abed445f487cd31faee77809561bf09b390e166c13194cc1958146dcdeb1e. No packaged code was executed.",
+      "Review on 2026-10-24 verified the version-pinned Knulli v0.5.6 ZIP against the publisher checksums.txt and GitHub asset digest: 19393643 compressed bytes, 41864615 regular-file bytes, SHA-256 bb60de30f256e9f187e755b2cc84b6df2ffb6b5d04a2be63f8421fdbec18c8bb. All eight files and four directories were inspected; no packaged code was executed. Pinned release metadata does not enable installation.",
       "The packaged launcher applies staged updates and can execute a staged sync engine. Store-managed updates must remain within the Store's pinned checksum and transaction controls; these paths need review and disabling before installation can be enabled.",
-      "A redistributable license has not been verified. The public release repository links to a source repository that returned HTTP 404 during review. Runtime dependencies, write containment, preserved credentials and session data, hook ownership, and uninstall behavior remain unverified.",
+      "A redistributable license has not been verified. The public release repository links to a source repository that returned HTTP 404 during review. ELF inspection establishes AArch64 and a glibc 2.17 symbol floor for the UI; the sync engine has no dynamic NEEDED entries. Actual device loading, write containment, preserved credentials and session data, hook ownership, and uninstall behavior remain unverified.",
       "Upstream installs under /userdata/roms/tools/retroshelf and records game sessions through hooks under /userdata/system/scripts. Its uninstall instructions require bin/retroshelf-uninstall.sh before deleting the app folder. Safe hook cleanup and data preservation need lifecycle review; no device compatibility or lifecycle results are claimed."
     ],
     "evidence": [
@@ -23,14 +23,31 @@
       },
       {
         "kind": "repository",
-        "url": "https://github.com/retroshelf-org/linux/tree/fb36d651fed371535d1de41c2490daab9a619d68",
-        "note": "Public release repository at the v0.5.5 tag; README links to https://github.com/ruigomeseu/retroshelf, which returned HTTP 404 during review. No license was verified."
+        "url": "https://github.com/retroshelf-org/linux/tree/d4168bc51277810235d84ebbd38a39d59cc9c2bd",
+        "note": "Public release repository at the v0.5.6 tag; README links to https://github.com/ruigomeseu/retroshelf, which still returned HTTP 404 on 2026-10-24. No license was verified."
       },
       {
         "kind": "release-asset",
-        "url": "https://github.com/retroshelf-org/linux/releases/download/v0.5.5/retroshelf-knulli-v0.5.5.zip",
+        "url": "https://github.com/retroshelf-org/linux/releases/download/v0.5.6/retroshelf-knulli-v0.5.6.zip",
         "note": "Downloaded ZIP matches the GitHub asset size and SHA-256. Launcher inspection found staged-update application, staged-engine execution, and automatic hook repair. Archive integrity alone does not establish runtime safety."
+      },
+      {
+        "kind": "publisher-checksum",
+        "url": "https://github.com/retroshelf-org/linux/releases/download/v0.5.6/checksums.txt"
+      },
+      {
+        "kind": "runtime-dependency-review",
+        "url": "https://github.com/retroshelf-org/linux/releases/download/v0.5.6/retroshelf-knulli-v0.5.6.zip",
+        "note": "readelf on the downloaded binaries: ELF64 AArch64. UI NEEDED: SDL2, SDL2_image, SDL2_ttf, SDL2_gfx, libpthread, libresolv, libc; highest GLIBC symbol 2.17. Only SDL2_gfx is bundled. Sync engine has no dynamic NEEDED entries. Static inspection is not proof of device runtime compatibility."
       }
     ]
+  },
+  "release": {
+    "url": "https://github.com/retroshelf-org/linux/releases/download/v0.5.6/retroshelf-knulli-v0.5.6.zip",
+    "sha256": "bb60de30f256e9f187e755b2cc84b6df2ffb6b5d04a2be63f8421fdbec18c8bb",
+    "size": 19393643,
+    "installed_size": 41864615,
+    "format": "zip",
+    "immutable": true
   }
 }

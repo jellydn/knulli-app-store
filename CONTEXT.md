@@ -8,13 +8,15 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Manifest** — The reviewed JSON contract for one package. A README statement is not evidence; the manifest plus its evidence URLs are.
 
-**Candidate** — A manifest that has not completed technical review. It declares no release, compatibility, or install fields, and it is never actionable.
+**Candidate** — A manifest that has not completed technical review. It can retain a validated, pinned release for incremental review, but declares no compatibility or install fields and is never actionable.
 
 **Community approval** — The record that a package's provenance was accepted by the community. Kept separate from technical status; one cannot substitute for the other.
 
 **Technical status** — The review state that gates whether anything can be done to a package. Only statuses that passed technical review are actionable.
 
 **Release** — One pinned, immutable version of a package: an HTTPS URL, exact byte size, SHA-256, and archive format. Mutable or aliased assets are not releases.
+
+**Embedded archive** — A base64-encoded `tar.gz` payload at a reviewed byte offset in a pinned release. The whole release is size- and checksum-verified before decoding. The prefix is data, never an installer to execute. Normal archive path, type, byte-budget, and cancellation checks still apply.
 
 **Catalogue index** — The deterministic, signable build of all reviewed manifests.
 

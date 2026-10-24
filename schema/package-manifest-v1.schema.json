@@ -22,7 +22,7 @@
   "allOf": [
     {
       "if": { "properties": { "review": { "properties": { "status": { "const": "candidate" } } } } },
-      "then": { "not": { "anyOf": [{ "required": ["release"] }, { "required": ["compatibility"] }, { "required": ["install"] }] } },
+      "then": { "not": { "anyOf": [{ "required": ["compatibility"] }, { "required": ["install"] }] } },
       "else": { "required": ["version", "repository", "license", "release", "compatibility", "install"] }
     },
     {
@@ -31,7 +31,11 @@
     },
     {
       "if": { "properties": { "review": { "properties": { "status": { "enum": ["installable", "verified"] } } } } },
-      "then": { "properties": { "compatibility": { "required": ["minimum_version"] } } }
+      "then": { "properties": { "compatibility": { "required": ["minimum_version", "devices", "resolutions"] } } }
+    },
+    {
+      "if": { "required": ["release"] },
+      "then": { "required": ["version", "repository"] }
     }
   ],
   "$defs": {
@@ -88,8 +92,10 @@
         "size": { "type": "integer", "minimum": 1, "maximum": 536870912 },
         "installed_size": { "type": "integer", "minimum": 1, "maximum": 536870912 },
         "format": { "enum": ["zip", "tar.gz"] },
+        "base64_offset": { "type": "integer", "minimum": 0, "maximum": 536870911, "description": "Positive byte offset of a base64-encoded tar.gz payload in the verified release; zero or absent means a normal archive. The prefix is never executed. Must be less than size." },
         "immutable": { "const": true }
-      }
+      },
+      "allOf": [{ "if": { "required": ["base64_offset"], "properties": { "base64_offset": { "minimum": 1 } } }, "then": { "properties": { "format": { "const": "tar.gz" } } } }]
     },
     "compatibility": {
       "type": "object",
@@ -106,9 +112,7 @@
         "device_scope": { "const": "any" },
         "resolutions": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[0-9]+x[0-9]+$" } },
         "display_bounds": { "$ref": "#/$defs/displayBounds" }
-      },
-      "anyOf": [{ "required": ["devices"] }, { "required": ["device_scope"] }],
-      "allOf": [{ "anyOf": [{ "required": ["resolutions"] }, { "required": ["display_bounds"] }] }]
+      }
     },
     "displayBounds": {
       "type": "object",

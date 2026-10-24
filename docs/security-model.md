@@ -26,11 +26,12 @@ This trusts the official GitHub repository and HTTPS API, not an independent upd
 
 ## Installer controls
 
-- Reject candidate manifests and unknown manifest fields.
+- Reject lifecycle actions on candidate manifests and reject unknown manifest fields. Candidates can retain validated release metadata without installation permission.
 - Match firmware, minimum version, architecture, ABI, and required runtime libraries before download. Device and display scope are advisory; missing exact device-test evidence shows **UNTESTED**, not a blocked action.
 - Accept only HTTPS, version-pinned release URLs and require exact compressed size and SHA-256.
 - Limit compressed and installed size to 512 MiB and check free space before download.
 - Stage extraction before package writes.
+- Decode a reviewed embedded base64 `tar.gz` only after verifying the full release size and checksum. The prefix is never executed; normal archive safety and installed-size bounds still apply.
 - Reject absolute paths, traversal, duplicate archive names, links, devices, pipes, and other non-regular entries.
 - Install archive files only below one declared destination.
 - Permit menu changes only at a declared path below `/userdata`.
@@ -58,7 +59,7 @@ This trusts the official GitHub repository and HTTPS API, not an independent upd
 - Empty directories can remain after rollback or uninstall. They are inert: external detection counts files, so a leftover skeleton does not block a fresh install or offer adoption.
 - Device detection reads the Knulli board identifier (`/boot/boot/knulli.board`), then `/etc/knulli-device`, then Batocera's board file. An unrecognized board shows `UNKNOWN DEVICE` but is not blocked. Missing or out-of-scope display metadata also does not block installation; runtime controls remain enforced.
 - The GUI has one community-reported TrimUI Smart Pro test. The Grout result applies to 5.1.0.0, not the current 5.2.0.0 release. The report did not itemize lifecycle steps.
-- All packaged apps, including Random Game Picker, can install on any device when Knulli, architecture, glibc ABI, and required runtime libraries match. Device lists and display bounds do not restrict installation. Exact package-version device evidence controls the tested badge. PocketCurator and RAOfflineProxy remain candidates without actionable install definitions; hardware evidence is not their blocker.
+- All packaged apps, including Random Game Picker, can install on any device when Knulli, architecture, glibc ABI, and required runtime libraries match. Optional device lists and display bounds do not restrict experimental installation. Exact package-version device evidence controls the tested badge. PocketCurator, RAOfflineProxy and retroshelf remain candidates without install definitions; runtime code downloads and shared-file lifecycle safety, not missing hardware evidence, block promotion.
 - Grout's reviewed staging patch replaces its only updater metadata URL with a reserved `.invalid` URL and verifies the transformed binary hash. A mismatch stops installation before any transaction write.
 - Health checks use the observed destination mode after transactional copy or adoption mode normalization, and require that mode to keep the owner read, write, and execute permissions the installer set. A wider mode from a normalizing filesystem is not a health failure; a lost owner permission is. They compare the full SHA-256 of every manager-owned immutable file on every check. Unmanaged external files show their full reviewed and actual hashes for Repair instead of being treated as reviewed bytes.
 - Force reinstall is offered only after a recoverable adoption ownership failure or a validated stale transaction journal. An active transaction blocks all recovery actions. Compatibility, free-space, signature, checksum, archive, path, and licensing failures stay blocked and show their exact reason; force mode cannot disable those checks.

@@ -14,7 +14,7 @@
     },
     "notes": [
       "Review on 2026-10-20 verified the Knulli v2.2.0-alpha1 shell asset against the GitHub digest: 1377625 bytes, SHA-256 94d1d2de7d213300463dc6e4f4fd28ce9ba25344e3b2fe9c7371f7b4f9a06f0b. No installer was executed.",
-      "Data-only decoding after the unique __RAOFFLINEPROXY_PAYLOAD_BELOW__ marker yielded a 1018930-byte tar.gz with 66 regular files, 9 directories, and 2340621 regular-file bytes. No duplicate paths, traversal, absolute paths, or special-file entries were found. A separately published reviewed archive is still needed by the Store's ZIP/tar.gz contract.",
+      "Rechecked 2026-10-24: data-only decoding at byte offset 1173 after the unique __RAOFFLINEPROXY_PAYLOAD_BELOW__ marker yielded a 1018930-byte tar.gz with 66 regular files, 9 directories, and 2340621 regular-file bytes. No duplicate paths, traversal, absolute paths, or special-file entries were found. Store base64_offset support removes the need for a separately published archive; it never executes the shell prefix.",
       "The packaged updater downloads a Knulli shell asset without a pinned size or checksum; the menu invokes its installation. These paths must be disabled in a Store-managed package.",
       "Runtime integration writes shared boot and emulator configuration, including /userdata/system/custom.sh. Configured path overrides and hook removal need containment and ownership review. readelf inspection of both bundled native libraries confirms ELF64 AArch64, libc/libpthread dependencies, and a highest GLIBC symbol requirement of 2.17. The SQLite extension targets CPython 3.12; target Python/pygame availability and runtime loading remain unverified. Missing device-test evidence alone will not block a safe package."
     ],
@@ -39,5 +39,14 @@
         "note": "GPL-3.0 license reviewed."
       }
     ]
+  },
+  "release": {
+    "url": "https://github.com/misantronic/RAOfflineProxy/releases/download/v2.2.0-alpha1/RAOfflineProxy-Knulli-v2.2.0-alpha1-Install.sh",
+    "sha256": "94d1d2de7d213300463dc6e4f4fd28ce9ba25344e3b2fe9c7371f7b4f9a06f0b",
+    "size": 1377625,
+    "installed_size": 2340621,
+    "format": "tar.gz",
+    "immutable": true,
+    "base64_offset": 1173
   }
 }

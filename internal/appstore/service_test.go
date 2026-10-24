@@ -77,7 +77,7 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 func TestApprovedCandidateRemainsReadOnly(t *testing.T) {
 	pkg := installablePackage()
 	pkg.Review = manifest.Review{Status: "candidate", Approval: &manifest.Approval{Provenance: "community"}}
-	pkg.Release, pkg.Compatibility, pkg.Install = nil, nil, nil
+	pkg.Compatibility, pkg.Install = nil, nil
 	verdict := assess(pkg, platform.Info{}, installer.Status{}, false)
 	if verdict.State != StateCandidate || verdict.Message() != "Community approved; installation is blocked by technical review" {
 		t.Fatalf("unexpected approved candidate state: %#v", verdict)

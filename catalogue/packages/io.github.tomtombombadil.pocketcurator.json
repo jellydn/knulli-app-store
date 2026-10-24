@@ -13,7 +13,7 @@
       "provenance": "community"
     },
     "notes": [
-      "Review on 2026-10-20 verified the stable v1.1.2 ZIP against the publisher sidecar and GitHub digest: 5903925 compressed bytes, 19915921 regular-file bytes, 211 files and 21 directories. No duplicate paths, traversal, absolute paths, or special-file entries were found. Release mutability alone is not the remaining blocker when exact bytes are pinned.",
+      "Rechecked 2026-10-24: stable v1.1.2 ZIP matches the publisher sidecar and GitHub digest: 5903925 compressed bytes, 19915921 regular-file bytes, 211 files and 21 directories. No duplicate paths, traversal, absolute paths, or special-file entries were found. Pinned release metadata is now retained on this read-only candidate; release mutability and device-test evidence are not the remaining blockers.",
       "Blocked by runtime policy: user-selected ROM, media, and gamelist writes lack reviewed /userdata containment and symlink-parent checks. A disposable-fixture probe of the packaged delete_paths function confirmed it deletes a supplied regular file outside the fixture userdata directory. This is a write-boundary test, not proof that every UI path can supply that file.",
       "The packaged updater and netsync download executable code outside Store transactions. PC_SKIP_UPDATE only skips launcher application of staged updates; it does not disable these downloads. The launcher can also acquire and mount a PortMaster runtime.",
       "A reviewed package must disable executable-code downloads and runtime acquisition, constrain every write path, and resolve the ROM-fetch provider policy before promotion. Missing exact device evidence will show UNTESTED, not block installation once these package controls pass."
@@ -44,5 +44,13 @@
         "note": "Upstream lists TrimUI Smart Pro, but does not tie that claim to Knulli, v1.1.2, or a lifecycle result."
       }
     ]
+  },
+  "release": {
+    "url": "https://github.com/tomtombombadil/PocketCurator/releases/download/v1.1.2/pocketcurator_port-v1.01.2.zip",
+    "sha256": "bb1907289bb5e22c6d24c39b9fae6dac0c17b75821a6565d77fcba3cce9af664",
+    "size": 5903925,
+    "installed_size": 19915921,
+    "format": "zip",
+    "immutable": true
   }
 }
