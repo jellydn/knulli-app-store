@@ -33,9 +33,10 @@ import (
 func TestPocketCuratorLauncherFindsPrivatePayloadAfterInstallAndRepair(t *testing.T) {
 	// Only reproduce the launcher's directory selection, not its downloads,
 	// mounts, cleanup or application code.
-	header := "#!/bin/bash\nSCRIPT_DIR=\"$(dirname \"$0\")\"\ndirectory=\"$1\"\n"
+	// PortMaster's device_info.txt clears SCRIPT_DIR before GAMEDIR is set.
+	header := "#!/bin/bash\nSCRIPT_DIR=\"$(dirname \"$0\")\"\ndirectory=\"$1\"\nunset SCRIPT_DIR\n"
 	before := "GAMEDIR=\"/$directory/ports/pocketcurator\""
-	after := "GAMEDIR=\"$SCRIPT_DIR/pocketcurator\"      "
+	after := "GAMEDIR=\"$(dirname \"$0\")/pocketcurator\"  "
 	footer := "\ntest -f \"$GAMEDIR/main.py\" || exit 1\nprintf '%s' \"$GAMEDIR\"\n"
 	asset := zipBytes(t, map[string]string{
 		"Pocket Curator.sh":           header + before + footer,
@@ -56,14 +57,21 @@ func TestPocketCuratorLauncherFindsPrivatePayloadAfterInstallAndRepair(t *testin
 	}
 	for _, operation := range []Op{OpInstall, OpRepair} {
 		t.Run(string(operation), func(t *testing.T) {
-			root := t.TempDir()
+			root := filepath.Join(t.TempDir(), "root with spaces")
+			if err := os.Mkdir(root, 0o755); err != nil {
+				t.Fatal(err)
+			}
 			detected := testPlatform()
 			detected.Dependencies = append(detected.Dependencies, "portmaster")
 			manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(detected)
 			if operation == OpRepair {
 				legacy := pkg
 				install := *pkg.Install
-				install.BinaryPatches = nil
+				install.BinaryPatches = append([]manifest.BinaryPatch(nil), pkg.Install.BinaryPatches...)
+				previous := "GAMEDIR=\"$SCRIPT_DIR/pocketcurator\"      "
+				digest := sha256.Sum256([]byte(header + previous + footer))
+				install.BinaryPatches[0].AfterHex = hex.EncodeToString([]byte(previous))
+				install.BinaryPatches[0].SHA256 = hex.EncodeToString(digest[:])
 				legacy.Install = &install
 				if _, err := manager.Apply(context.Background(), OpInstall, legacy); err != nil {
 					t.Fatal(err)
