@@ -8,15 +8,17 @@
   "repository": "https://github.com/misantronic/RAOfflineProxy",
   "license": "GPL-3.0-only",
   "review": {
-    "status": "candidate",
+    "status": "experimental",
     "approval": {
       "provenance": "community"
     },
     "notes": [
       "Review on 2026-10-20 verified the Knulli v2.2.0-alpha1 shell asset against the GitHub digest: 1377625 bytes, SHA-256 94d1d2de7d213300463dc6e4f4fd28ce9ba25344e3b2fe9c7371f7b4f9a06f0b. No installer was executed.",
+      "No separate publisher checksum is published in this release. The calculated download hash matches the GitHub release asset API digest. The upstream-managed experimental exception trusts the publisher's GitHub account and GitHub, not independent publisher authentication. Installation remains pinned to the reviewed hash and size; it never fetches a new expected digest.",
       "Rechecked 2026-10-24: data-only decoding at byte offset 1173 after the unique __RAOFFLINEPROXY_PAYLOAD_BELOW__ marker yielded a 1018930-byte tar.gz with 66 regular files, 9 directories, and 2340621 regular-file bytes. No duplicate paths, traversal, absolute paths, or special-file entries were found. Store base64_offset support removes the need for a separately published archive; it never executes the shell prefix.",
-      "The packaged updater downloads a Knulli shell asset without a pinned size or checksum; the menu invokes its installation. These paths must be disabled in a Store-managed package.",
-      "Runtime integration writes shared boot and emulator configuration, including /userdata/system/custom.sh. Configured path overrides and hook removal need containment and ownership review. readelf inspection of both bundled native libraries confirms ELF64 AArch64, libc/libpthread dependencies, and a highest GLIBC symbol requirement of 2.17. The SQLite extension targets CPython 3.12; target Python/pygame availability and runtime loading remain unverified. Missing device-test evidence alone will not block a safe package."
+      "Authorized upstream-managed experimental installation: the Store only verifies and extracts the bundle, maps launchers into bin, and creates a Tools entry. It does not run the installer or configure the proxy. Launch the app to set up emulator integration and optional autostart. Runtime writes and upstream updates are not sandboxed or checksum-controlled by the Store.",
+      "Stop the proxy, disable autostart, then run bin/raofflineproxy remove-boot-hook before Store removal. Read-only removal checks reject remaining boot/game hooks, a service PID file, or the default proxy address in known emulator/frontend configs. Saved patch state is retained because upstream Stop may leave it after restoring emulator settings. The Store never removes shared hooks or persistent config/cache data. Do not use upstream Uninstall if you need cached credentials or queued awards; it deletes them. Custom proxy addresses and configuration paths require manual review.",
+      "Both bundled native libraries are ELF64 AArch64 with a glibc 2.17 symbol floor. The SQLite extension targets CPython 3.12. Python 3.12 and pygame must already be present; no runtime is installed by the Store. Actual device loading remains untested."
     ],
     "evidence": [
       {
@@ -27,6 +29,11 @@
         "kind": "tagged-release",
         "url": "https://github.com/misantronic/RAOfflineProxy/releases/tag/v2.2.0-alpha1",
         "note": "Downloaded Knulli shell asset matches the GitHub API size and SHA-256. Embedded archive was read as data only; extraction safety does not establish runtime safety or device compatibility."
+      },
+      {
+        "kind": "release-integrity",
+        "url": "https://api.github.com/repos/misantronic/RAOfflineProxy/releases/tags/v2.2.0-alpha1",
+        "note": "Knulli asset digest sha256:94d1d2de7d213300463dc6e4f4fd28ce9ba25344e3b2fe9c7371f7b4f9a06f0b matches the calculated download hash; size 1377625. GitHub-hosted integrity evidence only, with no separate publisher checksum or independent publisher authentication."
       },
       {
         "kind": "filesystem-and-network-review",
@@ -48,5 +55,43 @@
     "format": "tar.gz",
     "immutable": true,
     "base64_offset": 1173
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "minimum_glibc": "2.17",
+    "dependencies": ["libc", "libpthread", "python3.12", "pygame"]
+  },
+  "install": {
+    "destination": "/userdata/system/raofflineproxy",
+    "strip_components": 1,
+    "file_mappings": {
+      "scripts/launcher-raofflineproxy": "bin/raofflineproxy",
+      "scripts/launcher-raofflineproxy-uninstall": "bin/raofflineproxy-uninstall"
+    },
+    "launcher": "bin/raofflineproxy",
+    "executables": ["bin/raofflineproxy", "bin/raofflineproxy-uninstall"],
+    "upstream_managed": true,
+    "menu_command": ["/userdata/system/raofflineproxy/bin/raofflineproxy", "menu"],
+    "warning": "Untested; GitHub digest only, no publisher checksum. App controls setup and updates. Close app before Store Repair; it restores pinned code. Before removal: stop proxy, disable autostart, run bin/raofflineproxy remove-boot-hook. Config and awards stay. Upstream Uninstall deletes data. Check custom proxy/config paths yourself.",
+    "menu": {
+      "gamelist": "/userdata/roms/tools/gamelist.xml",
+      "path": "./RAOfflineProxy.sh",
+      "name": "RAOfflineProxy",
+      "description": "Offline casual RetroAchievements. Launch to configure; stop proxy and disable autostart before Store removal."
+    },
+    "network": true,
+    "allowed_write_paths": ["/userdata/system/raofflineproxy", "/userdata/roms/tools/RAOfflineProxy.sh", "/userdata/roms/tools/gamelist.xml"],
+    "uninstall_checks": [
+      {"path": "/userdata/system/custom.sh", "contains": "raofflineproxy", "message": "Stop proxy, disable autostart, then run /userdata/system/raofflineproxy/bin/raofflineproxy remove-boot-hook before retrying. Shared boot files are never edited by the Store."},
+      {"path": "/userdata/system/scripts", "contains": "raofflineproxy", "message": "Remove the RAOfflineProxy game hook through the app before retrying."},
+      {"path": "/userdata/system/.config/raofflineproxy/service.pid", "message": "Stop RAOfflineProxy before retrying. The Store never stops or kills the proxy."},
+      {"path": "/userdata/system/knulli.conf", "contains": "127.0.0.1:8080", "message": "Stop the proxy and restore emulator settings through RAOfflineProxy before retrying. Keep your config/cache directory."},
+      {"path": "/userdata/system/batocera.conf", "contains": "127.0.0.1:8080", "message": "Restore the default proxy redirect in batocera.conf through RAOfflineProxy before retrying."},
+      {"path": "/userdata/system/configs/retroarch/retroarchcustom.cfg", "contains": "127.0.0.1:8080", "message": "Stop the proxy and restore RetroArch settings through RAOfflineProxy before retrying."},
+      {"path": "/userdata/system/configs/retroarch/retroarch.cfg", "contains": "127.0.0.1:8080", "message": "Restore the default proxy redirect in retroarch.cfg through RAOfflineProxy before retrying."},
+      {"path": "/userdata/system/.config/retroarch/retroarch.cfg", "contains": "127.0.0.1:8080", "message": "Restore the default proxy redirect in .config/retroarch/retroarch.cfg through RAOfflineProxy before retrying."}
+    ]
   }
 }

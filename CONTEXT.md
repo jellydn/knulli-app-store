@@ -54,6 +54,10 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Managed file** — A file the installer owns and verifies.
 
+**Upstream-managed package** — An explicitly warned experimental package installed by verified download and extraction. The app, not the Store, controls first-launch setup, runtime writes, runtime downloads and its own updates. Store Repair restores pinned release files and keeps declared user data. Health checks disclose upstream-modified files; they do not claim those bytes were reviewed.
+
+**Uninstall check** — A read-only check for a shared hook reference or an existing service-state path. A match blocks removal before any package mutation and explains the required manual cleanup. The Store does not execute the cleanup or remove shared hooks.
+
 **Preserved file** — A file in the release inventory whose contents belong to the user at runtime (databases, settings, hooks). Written once, never overwritten by a later operation.
 
 **Unmanaged file** — An adopted file whose content did not match the reviewed release. Tracked so it is never claimed as owned, never verified, never removed.

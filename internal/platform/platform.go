@@ -384,6 +384,9 @@ func detectDependencies(root string) []string {
 		"libc":       {"lib/libc.so.6", "lib64/libc.so.6", "usr/lib/libc.so.6"},
 		"libresolv":  {"lib/libresolv.so.2", "lib64/libresolv.so.2", "usr/lib/libresolv.so.2"},
 		"libpthread": {"lib/libpthread.so.0", "lib64/libpthread.so.0", "usr/lib/libpthread.so.0"},
+		"python3.12": {"usr/bin/python3.12"},
+		"pygame":     {"usr/lib/python3.12/site-packages/pygame/__init__.py", "userdata/roms/pygame/pygame/__init__.py"},
+		"portmaster": {"opt/system/Tools/PortMaster/control.txt", "opt/tools/PortMaster/control.txt", "userdata/system/.local/share/PortMaster/control.txt", "roms/ports/PortMaster/control.txt"},
 	}
 	var found []string
 	for dependency, paths := range wanted {

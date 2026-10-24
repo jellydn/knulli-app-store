@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -28,6 +29,110 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/platform"
 	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
+
+func TestUpstreamManagedInstallRepairAndGuardedRemoval(t *testing.T) {
+	root := t.TempDir()
+	asset := zipBytes(t, map[string]string{"launch.sh": "upstream launcher", "settings.json": "defaults"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	pkg.Review.Status = "experimental"
+	pkg.Install.UpstreamManaged = true
+	pkg.Install.Warning = "App controls updates; close it before Store repair."
+	pkg.Install.Destination = "/userdata/system/demo"
+	pkg.Install.Preserve = []string{"settings.json"}
+	pkg.Install.AllowedWritePaths = []string{"/userdata/system/demo", "/userdata/roms/tools/demo.sh", "/userdata/roms/tools/gamelist.xml"}
+	pkg.Install.Menu = &manifest.Menu{Gamelist: "/userdata/roms/tools/gamelist.xml", Path: "./demo.sh", Name: "Demo"}
+	pkg.Install.MenuCommand = []string{"/userdata/system/demo/launch.sh", "menu", "a'b; $(exit 9)"}
+	pkg.Install.UninstallChecks = []manifest.UninstallCheck{{Path: "/userdata/system/scripts", Contains: "demo/launch.sh", Message: "Remove the Demo hook first; keep data."}}
+	writeRootFile(t, root, "userdata/roms/tools/demo.sh", "original menu launcher")
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+		t.Fatal(err)
+	}
+	// Intercept exec so the real generated script exposes its arguments without
+	// launching package code. Shell metacharacters must remain literal data.
+	output, err := exec.Command("bash", "-c", `exec() { printf '%s\n' "$@"; }; . "$1"`, "test", filepath.Join(root, "userdata/roms/tools/demo.sh")).CombinedOutput()
+	if err != nil || string(output) != "/userdata/system/demo/launch.sh\nmenu\na'b; $(exit 9)\n" {
+		t.Fatalf("menu launcher changed command arguments: %q, %v", output, err)
+	}
+	status, err := manager.Status(pkg.ID)
+	if err != nil || !status.Healthy {
+		t.Fatalf("generated launcher must be a healthy managed file: %#v, %v", status, err)
+	}
+	writeRootFile(t, root, "userdata/system/demo/settings.json", "my settings")
+	writeRootFile(t, root, "userdata/system/demo/launch.sh", "upstream-updated launcher")
+	writeRootFile(t, root, "userdata/system/demo/session.db", "session history")
+	status, err = manager.Status(pkg.ID)
+	if err != nil || status.Healthy || len(status.Issues) != 1 || !strings.Contains(status.Issues[0].Check, "upstream-managed") {
+		t.Fatalf("upstream change was not disclosed: %#v, %v", status, err)
+	}
+	if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, "userdata/system/demo/launch.sh", "upstream launcher")
+	assertRootFile(t, root, "userdata/system/demo/settings.json", "my settings")
+	for _, test := range []struct{ name, data string }{
+		{"hook", "#!/bin/sh\nexec /userdata/system/DEMO/launch.sh\n"},
+		{"oversized hook", strings.Repeat("#", (1<<20)+1)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			writeRootFile(t, root, "userdata/system/scripts/game.sh", test.data)
+			if _, err := manager.Uninstall(context.Background(), pkg.ID); err == nil {
+				t.Fatal("unsafe hook allowed removal")
+			}
+			assertRootFile(t, root, "userdata/system/demo/launch.sh", "upstream launcher")
+			assertRootFile(t, root, "userdata/system/scripts/game.sh", test.data)
+			assertContains(t, root, "userdata/roms/tools/gamelist.xml", "./demo.sh")
+		})
+	}
+	if err := os.Remove(filepath.Join(root, "userdata/system/scripts/game.sh")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("/etc/passwd", filepath.Join(root, "userdata/system/scripts/link.sh")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err == nil {
+		t.Fatal("symlink hook allowed removal")
+	}
+	if err := os.Remove(filepath.Join(root, "userdata/system/scripts/link.sh")); err != nil {
+		t.Fatal(err)
+	}
+	writeRootFile(t, root, "userdata/system/scripts/other.sh", "unrelated hook")
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo.sh", "original menu launcher")
+	assertRootFile(t, root, "userdata/system/demo/settings.json", "my settings")
+	assertRootFile(t, root, "userdata/system/demo/session.db", "session history")
+	assertRootFile(t, root, "userdata/system/scripts/other.sh", "unrelated hook")
+	assertMissing(t, root, "userdata/system/demo/launch.sh")
+}
+
+func TestUninstallPresenceCheckLeavesPackageIntactUntilCleanup(t *testing.T) {
+	root := t.TempDir()
+	asset := zipBytes(t, map[string]string{"launch.sh": "launcher"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	pkg.Install.UninstallChecks = []manifest.UninstallCheck{{Path: "/userdata/system/demo.pid", Message: "Stop Demo first."}}
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+		t.Fatal(err)
+	}
+	writeRootFile(t, root, "userdata/system/demo.pid", "123")
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err == nil || !strings.Contains(err.Error(), "Stop Demo first") {
+		t.Fatalf("expected cleanup instruction, got %v", err)
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "launcher")
+	if err := os.Remove(filepath.Join(root, "userdata/system/demo.pid")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	assertMissing(t, root, "userdata/roms/tools/demo/launch.sh")
+}
 
 func TestManageExistingRepairUpdateAndUninstallEndToEnd(t *testing.T) {
 	root := t.TempDir()
@@ -131,11 +236,15 @@ func TestFailedGamelistUpdateRollsBackFiles(t *testing.T) {
 	server := serveAsset(t, asset)
 	defer server.Close()
 	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	pkg.Install.Menu.Path = "./demo-menu.sh"
+	pkg.Install.MenuCommand = []string{"/userdata/roms/tools/demo/launch.sh", "menu"}
+	pkg.Install.AllowedWritePaths = append(pkg.Install.AllowedWritePaths, "/userdata/roms/tools/demo-menu.sh")
 	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
 	if _, err := manager.Apply(context.Background(), OpAdopt, pkg); err == nil || !strings.Contains(err.Error(), "parse gamelist") {
 		t.Fatalf("expected gamelist failure, got %v", err)
 	}
 	assertRootFile(t, root, "userdata/roms/tools/demo/launch.sh", "original")
+	assertMissing(t, root, "userdata/roms/tools/demo-menu.sh")
 	assertMissing(t, root, "userdata/system/knulli-app-store/installed/org.example.demo.json")
 	assertMissing(t, root, strings.TrimPrefix(originalPath(pkg.ID, "/userdata/roms/tools/demo/launch.sh"), "/"))
 }

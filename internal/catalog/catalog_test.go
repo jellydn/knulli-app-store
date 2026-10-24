@@ -58,13 +58,13 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 			t.Fatalf("unexpected approval state: %s", first.Packages[index].ID)
 		}
 		if pkg := first.Packages[index].Package; pkg.ID == "org.retroshelf.knulli" {
-			if pkg.Review.Status != "candidate" || pkg.Release == nil || pkg.Compatibility != nil || pkg.Install != nil {
-				t.Fatal("retroshelf must retain its reviewed release without installation metadata")
+			if !pkg.Experimental() || pkg.Install == nil || !pkg.Install.UpstreamManaged || pkg.License != "" {
+				t.Fatal("retroshelf must be upstream-managed and experimental without an invented license")
 			}
 		}
 	}
-	if experimental != 4 || verified != 0 {
-		t.Fatalf("expected four experimental packages and no current device-verified release, got %d and %d", experimental, verified)
+	if experimental != 7 || verified != 0 {
+		t.Fatalf("expected seven experimental packages and no current device-verified release, got %d and %d", experimental, verified)
 	}
 }
 

@@ -7,13 +7,14 @@
   "summary": "Records Knulli play sessions and syncs them to your retroshelf account.",
   "repository": "https://github.com/retroshelf-org/linux",
   "review": {
-    "status": "candidate",
+    "status": "experimental",
     "notes": [
       "Requires a retroshelf account and Wi-Fi for linking and syncing. Upstream documents offline session queuing and a game-session hook installed on first launch.",
-      "Review on 2026-10-24 verified the version-pinned Knulli v0.5.6 ZIP against the publisher checksums.txt and GitHub asset digest: 19393643 compressed bytes, 41864615 regular-file bytes, SHA-256 bb60de30f256e9f187e755b2cc84b6df2ffb6b5d04a2be63f8421fdbec18c8bb. All eight files and four directories were inspected; no packaged code was executed. Pinned release metadata does not enable installation.",
-      "The packaged launcher applies staged updates and can execute a staged sync engine. Store-managed updates must remain within the Store's pinned checksum and transaction controls; these paths need review and disabling before installation can be enabled.",
+      "Review on 2026-10-24 verified the version-pinned Knulli v0.5.6 ZIP against the publisher checksums.txt and GitHub asset digest: 19393643 compressed bytes, 41864615 regular-file bytes, SHA-256 bb60de30f256e9f187e755b2cc84b6df2ffb6b5d04a2be63f8421fdbec18c8bb. All eight files and four directories were inspected; no packaged code was executed.",
+      "Authorized upstream-managed experimental installation follows the Knulli guide: extract into /userdata/roms/tools/retroshelf, register the launcher, then let the user launch and link. First launch installs session hooks. Runtime writes and upstream updates are not sandboxed or checksum-controlled by the Store.",
       "A redistributable license has not been verified. The public release repository links to a source repository that returned HTTP 404 during review. ELF inspection establishes AArch64 and a glibc 2.17 symbol floor for the UI; the sync engine has no dynamic NEEDED entries. Actual device loading, write containment, preserved credentials and session data, hook ownership, and uninstall behavior remain unverified.",
-      "Upstream installs under /userdata/roms/tools/retroshelf and records game sessions through hooks under /userdata/system/scripts. Its uninstall instructions require bin/retroshelf-uninstall.sh before deleting the app folder. Safe hook cleanup and data preservation need lifecycle review; no device compatibility or lifecycle results are claimed."
+      "The Store links directly to the publisher's release; it does not mirror or redistribute the ZIP. License remains unverified and is disclosed before installation. This exception is limited to upstream-managed experimental packages; no license identifier or device-test result is invented.",
+      "Before Store removal, close the app and run /userdata/roms/tools/retroshelf/bin/retroshelf-uninstall.sh --keep-data to remove its hooks while preserving the linked device and sync history. A read-only check of /userdata/system/scripts refuses removal while any hook still references retroshelf. The Store never runs that script or removes shared hooks or runtime-created data."
     ],
     "evidence": [
       {
@@ -49,5 +50,32 @@
     "installed_size": 41864615,
     "format": "zip",
     "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "minimum_glibc": "2.17",
+    "dependencies": ["sdl2", "sdl2-image", "sdl2-ttf", "libc", "libpthread", "libresolv"]
+  },
+  "install": {
+    "destination": "/userdata/roms/tools/retroshelf",
+    "strip_components": 1,
+    "launcher": "retroshelf.sh",
+    "executables": ["retroshelf.sh", "retroshelf-app", "retroshelf-sync", "bin/retroshelf-uninstall.sh"],
+    "upstream_managed": true,
+    "warning": "Untested; license unverified. Direct upstream download, not redistributed. App controls hooks and updates. Close app before Store operations; Repair restores pinned code. Before removal run bin/retroshelf-uninstall.sh --keep-data. Account and session data stay.",
+    "menu": {
+      "gamelist": "/userdata/roms/tools/gamelist.xml",
+      "path": "./retroshelf/retroshelf.sh",
+      "name": "retroshelf",
+      "description": "Track play sessions. Requires a retroshelf account and Wi-Fi to link and sync; offline sessions queue locally.",
+      "image": "./retroshelf/icons/retroshelf.png"
+    },
+    "network": true,
+    "allowed_write_paths": ["/userdata/roms/tools/retroshelf", "/userdata/roms/tools/gamelist.xml"],
+    "uninstall_checks": [
+      {"path": "/userdata/system/scripts", "contains": "retroshelf", "message": "Close retroshelf, then run /userdata/roms/tools/retroshelf/bin/retroshelf-uninstall.sh --keep-data before retrying. The Store never runs uninstall scripts or deletes shared hooks."}
+    ]
   }
 }
