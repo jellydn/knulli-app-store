@@ -1,0 +1,94 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "io.github.tomtombombadil.pocketcurator",
+  "name": "PocketCurator",
+  "version": "1.1.2",
+  "type": "utility",
+  "summary": "Manages a user's own ROM collection from an EmulationStation-style interface.",
+  "repository": "https://github.com/tomtombombadil/PocketCurator",
+  "license": "MIT",
+  "review": {
+    "status": "experimental",
+    "approval": {
+      "provenance": "community"
+    },
+    "notes": [
+      "Rechecked 2026-10-24: stable v1.1.2 ZIP matches the publisher sidecar and GitHub digest: 5903925 compressed bytes, 19915921 regular-file bytes, 211 files and 21 directories. No duplicate paths, traversal, absolute paths, or special-file entries were found.",
+      "Authorized upstream-managed experimental installation. The Store verifies and extracts the original ZIP into a private PocketCurator directory under Ports, keeping the launcher beside pocketcurator as upstream requires. It does not run an installer. Settings stay through repair, update and removal; unrelated Ports files are never adopted.",
+      "The original launcher hardcodes GAMEDIR to /$directory/ports/pocketcurator, outside the Store's private PocketCurator directory. A verified same-length staging patch derives GAMEDIR directly from dirname of the launcher path. PortMaster device_info.txt unsets SCRIPT_DIR, so that variable cannot locate the payload after control.txt loads. Offset 8083, exact source/replacement bytes and the final launcher SHA-256 are pinned. Existing Store installations can apply this manifest correction through Repair without moving or deleting settings. Upstream updates can replace this patched launcher; use Store Repair to restore the path fix if that happens.",
+      "ROM deletion is an intentional upstream feature with a confirmation screen. Back up ROMs and scraped media before using it. App runtime writes are not sandboxed by the Store. Fetch only content you have the right to use from a server you trust; the Store supplies no ROM provider.",
+      "The packaged updater and netsync download executable code outside Store transactions. PC_SKIP_UPDATE only skips launcher application of staged updates; it does not disable these downloads. The launcher can also acquire and mount a PortMaster runtime.",
+      "Upstream-managed mode leaves the app's updater and PortMaster runtime acquisition available under the user's control. These are not Store-verified updates. Current PortMaster is required; system Python/pygame is preferred on Knulli. Close the app before Store operations. Native launch with the corrected patch was confirmed on TrimUI Smart Pro, Knulli beta 2026/09/21 21:25, aarch64, 1280x720. A complete device lifecycle is not verified."
+    ],
+    "evidence": [
+      {
+        "kind": "repository",
+        "url": "https://github.com/tomtombombadil/PocketCurator"
+      },
+      {
+        "kind": "tagged-release",
+        "url": "https://github.com/tomtombombadil/PocketCurator/releases/tag/v1.1.2",
+        "note": "Downloaded stable ZIP SHA-256 bb1907289bb5e22c6d24c39b9fae6dac0c17b75821a6565d77fcba3cce9af664 matches the publisher sidecar and GitHub API digest. ZIP CRC and entry inspection passed. Only the inspected deletion module was exercised with disposable files; no launcher or installer was executed."
+      },
+      {
+        "kind": "filesystem-and-network-review",
+        "url": "https://github.com/tomtombombadil/PocketCurator/blob/21fa3229ce4ce515b9825fad5ddf7620df07629a/pocketcurator/curator/netsync.py",
+        "note": "Packaged netsync.py downloads .sh/.zip/.py over HTTP into the parent Ports directory after a developer-network DNS gate. Packaged updater.py conditionally checks a publisher checksum; neither path uses Store transactions."
+      },
+      {
+        "kind": "license",
+        "url": "https://github.com/tomtombombadil/PocketCurator/blob/main/LICENSE",
+        "note": "MIT project license and bundled dependency notices reviewed."
+      },
+      {
+        "kind": "compatibility-claim",
+        "url": "https://github.com/tomtombombadil/PocketCurator/blob/main/README.md",
+        "note": "Upstream lists TrimUI Smart Pro, but does not tie that claim to Knulli, v1.1.2, or a lifecycle result."
+      },
+      {
+        "kind": "device-launch",
+        "url": "https://ampcode.com/threads/T-01a16c63-4ffd-76be-a50c-c62af0494ee4",
+        "note": "2026-10-24: corrected launcher b6c0085e0d714a9994e97945ec3e755e5f58befdc5608328e25084e34521a66c launched v1.1.2 on TrimUI Smart Pro, Knulli beta 2026/09/21 21:25, aarch64, 1280x720, PortMaster 2026.06.23-0015. Inspected framebuffer screenshot and native log confirm system-browser startup; owner confirmed it works. No deletion functions used. Clean exit, relaunch and native lifecycle operations were not completed; see docs/real-device-tests.md."
+      }
+    ]
+  },
+  "release": {
+    "url": "https://github.com/tomtombombadil/PocketCurator/releases/download/v1.1.2/pocketcurator_port-v1.01.2.zip",
+    "sha256": "bb1907289bb5e22c6d24c39b9fae6dac0c17b75821a6565d77fcba3cce9af664",
+    "size": 5903925,
+    "installed_size": 19915921,
+    "format": "zip",
+    "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "dependencies": ["libc", "portmaster"]
+  },
+  "install": {
+    "destination": "/userdata/roms/ports/PocketCurator",
+    "launcher": "Pocket Curator.sh",
+    "executables": ["Pocket Curator.sh"],
+    "upstream_managed": true,
+    "warning": "Untested. Requires current PortMaster. App controls runtime downloads and updates; upstream updates may replace the launch-path fix. Close app and use Store Repair to restore it. ROM deletion is permanent: back up first. Fetch only content you may legally use. Settings stay after removal.",
+    "preserve": ["pocketcurator/settings.json"],
+    "menu": {
+      "gamelist": "/userdata/roms/ports/gamelist.xml",
+      "path": "./PocketCurator/Pocket Curator.sh",
+      "name": "Pocket Curator",
+      "description": "Curate your own ROM collection. Deletions are permanent; back up first. Requires current PortMaster."
+    },
+    "network": true,
+    "allowed_write_paths": ["/userdata/roms/ports/PocketCurator", "/userdata/roms/ports/gamelist.xml"],
+    "binary_patches": [
+      {
+        "path": "Pocket Curator.sh",
+        "offset": 8083,
+        "before_hex": "47414d454449523d222f246469726563746f72792f706f7274732f706f636b657463757261746f7222",
+        "after_hex": "47414d454449523d2224286469726e616d652022243022292f706f636b657463757261746f72222020",
+        "sha256": "b6c0085e0d714a9994e97945ec3e755e5f58befdc5608328e25084e34521a66c"
+      }
+    ]
+  }
+}

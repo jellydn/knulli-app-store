@@ -1,0 +1,263 @@
+package main
+
+import (
+	"context"
+	"encoding/hex"
+	"flag"
+	"fmt"
+	"net/http"
+	"os"
+	"runtime"
+	"strings"
+
+	"github.com/jellydn/knulli-app-store/internal/catalog"
+	"github.com/jellydn/knulli-app-store/internal/diagnostics"
+	"github.com/jellydn/knulli-app-store/internal/installer"
+	"github.com/jellydn/knulli-app-store/internal/manifest"
+	"github.com/jellydn/knulli-app-store/internal/platform"
+)
+
+const usage = `Knulli App Store installer core
+
+Usage:
+  knulli-app validate MANIFEST
+  knulli-app catalogue [-dir catalogue/packages] [-output build/catalog-index.json]
+                     [-signing-key KEY] [-generate-signing-key KEY]
+  knulli-app install [platform flags] MANIFEST
+  knulli-app adopt [platform flags] MANIFEST
+  knulli-app update [platform flags] MANIFEST
+  knulli-app repair [platform flags] MANIFEST
+  knulli-app uninstall [-root /] PACKAGE_ID
+  knulli-app recover [-root /]
+  knulli-app register-store-menu [-root /]
+
+Platform flags override detected values:
+  -root, -firmware, -firmware-version, -arch, -device, -resolution
+`
+
+func main() {
+	if err := run(os.Args[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
+	}
+}
+
+func run(arguments []string) error {
+	if len(arguments) == 0 {
+		fmt.Print(usage)
+		return nil
+	}
+	switch arguments[0] {
+	case "help", "-h", "--help":
+		fmt.Print(usage)
+		return nil
+	case "recover", "register-store-menu":
+		flags := flag.NewFlagSet(arguments[0], flag.ContinueOnError)
+		root := flags.String("root", "/", "filesystem root")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 {
+			return fmt.Errorf("%s takes no positional arguments", arguments[0])
+		}
+		manager := installer.Manager{Root: *root}
+		if arguments[0] == "recover" {
+			return manager.RecoverTransactions()
+		}
+		_, err := manager.RegisterStoreMenu(context.Background())
+		return err
+	case "validate":
+		if len(arguments) != 2 {
+			return fmt.Errorf("validate requires one manifest path")
+		}
+		pkg, err := manifest.Load(arguments[1])
+		if err != nil {
+			return err
+		}
+		fmt.Printf("valid %s (%s)\n", pkg.ID, pkg.Review.Status)
+		return nil
+	case "catalogue":
+		flags := flag.NewFlagSet("catalogue", flag.ContinueOnError)
+		directory := flags.String("dir", "catalogue/packages", "manifest directory")
+		output := flags.String("output", "build/catalog-index.json", "index output path or -")
+		signingKey := flags.String("signing-key", "", "ed25519 private key hex file")
+		generateKey := flags.String("generate-signing-key", "", "write a new ed25519 key pair and sign the index")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if *signingKey != "" && *generateKey != "" {
+			return fmt.Errorf("use only one of -signing-key or -generate-signing-key")
+		}
+		if (*signingKey != "" || *generateKey != "") && *output == "-" {
+			return fmt.Errorf("cannot sign catalogue output written to stdout")
+		}
+		index, err := catalog.Build(*directory)
+		if err != nil {
+			return err
+		}
+		if err := catalog.Write(index, *output); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "wrote %d packages to %s\n", len(index.Packages), *output)
+		keyPath := *signingKey
+		if *generateKey != "" {
+			public, private, err := catalog.GenerateKey()
+			if err != nil {
+				return err
+			}
+			if err := writeNewFile(*generateKey, []byte(hex.EncodeToString(private)+"\n"), 0600); err != nil {
+				return err
+			}
+			if err := writeNewFile(*generateKey+".pub", []byte(hex.EncodeToString(public)+"\n"), 0644); err != nil {
+				os.Remove(*generateKey)
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "public key %s\n", hex.EncodeToString(public))
+			keyPath = *generateKey
+		}
+		if keyPath == "" {
+			return nil
+		}
+		raw, err := os.ReadFile(keyPath)
+		if err != nil {
+			return err
+		}
+		private, err := catalog.ParsePrivateKey(strings.TrimSpace(string(raw)))
+		if err != nil {
+			return err
+		}
+		if err := catalog.SignFile(*output, private); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "signed %s\n", catalog.SignaturePath(*output))
+		return nil
+	case "install", "adopt", "update", "repair":
+		return runApply(arguments[0], arguments[1:], applyDeps{})
+	case "uninstall":
+		return runUninstall(arguments[1:], applyDeps{})
+	default:
+		return fmt.Errorf("unknown command %q", arguments[0])
+	}
+}
+
+func writeNewFile(path string, data []byte, mode os.FileMode) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
+	if err != nil {
+		return err
+	}
+	if _, err := file.Write(data); err != nil {
+		file.Close()
+		os.Remove(path)
+		return err
+	}
+	if err := file.Close(); err != nil {
+		os.Remove(path)
+		return err
+	}
+	return nil
+}
+
+// applyDeps carries the two collaborators a lifecycle command can express
+// neither as a flag nor by reading the filesystem. A manifest pins its release
+// URL to github.com, so a test cannot redirect a download by rewriting the
+// manifest, and the game-list refresh address is a fixed loopback port. They
+// arrive as arguments the way cmd/check-updates takes a Checker: production
+// passes the zero value, which keeps the installer's own defaults, and a test
+// supplies its own instead of editing the code under test.
+type applyDeps struct {
+	client     *http.Client
+	refreshURL string
+}
+
+// newManager builds the manager one command operates through. A nil deps.client
+// and an empty deps.refreshURL select the installer's production defaults.
+func newManager(root string, log *diagnostics.Log, deps applyDeps) installer.Manager {
+	return installer.Manager{Root: root, Client: deps.client, RefreshURL: deps.refreshURL, Diagnostics: log}
+}
+
+// runUninstall removes an owned package and reports whether the game list could
+// be reloaded. It is separate from run so a test can supply its own refresh
+// address, which is otherwise a fixed loopback port.
+func runUninstall(arguments []string, deps applyDeps) error {
+	flags := flag.NewFlagSet("uninstall", flag.ContinueOnError)
+	root := flags.String("root", "/", "filesystem root")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if flags.NArg() != 1 {
+		return fmt.Errorf("uninstall requires one package id")
+	}
+	diagnosticLog, err := diagnostics.Open(*root)
+	if err != nil {
+		return fmt.Errorf("open diagnostics log: %w", err)
+	}
+	diagnosticLog.Event("startup", "component", "cli", "command", "uninstall")
+	outcome, err := newManager(*root, diagnosticLog, deps).Uninstall(context.Background(), flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	fmt.Printf("uninstalled %s\n", flags.Arg(0))
+	printGameListOutcome(outcome)
+	return nil
+}
+
+func runApply(operation string, arguments []string, deps applyDeps) error {
+	flags := flag.NewFlagSet(operation, flag.ContinueOnError)
+	root := flags.String("root", "/", "filesystem root")
+	firmware := flags.String("firmware", "", "firmware id")
+	version := flags.String("firmware-version", "", "firmware version")
+	arch := flags.String("arch", "", "CPU architecture")
+	device := flags.String("device", "", "device family")
+	resolution := flags.String("resolution", "", "display resolution")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if flags.NArg() != 1 {
+		return fmt.Errorf("%s requires one manifest path", operation)
+	}
+	diagnosticLog, err := diagnostics.Open(*root)
+	if err != nil {
+		return fmt.Errorf("open diagnostics log: %w", err)
+	}
+	diagnosticLog.Event("startup", "component", "cli", "command", operation)
+	current := platform.Resolve(*root,
+		platform.WithFirmware(*firmware),
+		platform.WithVersion(*version),
+		platform.WithArch(*arch),
+		platform.WithDevice(*device),
+		platform.WithResolutionOverride(*resolution),
+	)
+	if current.Arch == "" {
+		current.Arch = runtime.GOARCH
+	}
+	diagnosticLog.Event("platform_detected", "details", platform.Summary(current))
+	pkg, err := manifest.Load(flags.Arg(0))
+	if err != nil {
+		diagnosticLog.Event("catalogue_error", "path", flags.Arg(0), "error", err.Error())
+		return err
+	}
+	if pkg.Installable() && !pkg.DeviceTested(current.Firmware, current.Arch, current.Device, current.Resolution) {
+		fmt.Println("warning: untested on this device; the application may not run correctly")
+	}
+	ops := map[string]installer.Op{"install": installer.OpInstall, "adopt": installer.OpAdopt, "update": installer.OpUpdate, "repair": installer.OpRepair}
+	op, known := ops[operation]
+	if !known {
+		return fmt.Errorf("unknown operation %q", operation)
+	}
+	manager := newManager(*root, diagnosticLog, deps).WithPlatform(current)
+	outcome, err := manager.Apply(context.Background(), op, pkg)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s completed for %s %s\n", operation, pkg.ID, pkg.Version)
+	printGameListOutcome(outcome)
+	return nil
+}
+
+func printGameListOutcome(outcome installer.OperationOutcome) {
+	if outcome.GameListRefreshAccepted {
+		fmt.Println("game list refresh accepted")
+	} else if outcome.RestartRequired {
+		fmt.Println("restart required to update game list")
+	}
+}

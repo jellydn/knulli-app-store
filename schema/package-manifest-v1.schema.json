@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jellydn/knulli-app-store/blob/main/schema/package-manifest-v1.schema.json",
+  "title": "Knulli App Store package manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "name", "type", "summary", "review"],
+  "properties": {
+    "schema": { "const": "org.knulli.app-store/package-manifest/v1" },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(\\.[a-z0-9][a-z0-9-]*){2,}$" },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "minLength": 1 },
+    "type": { "enum": ["utility", "theme", "integration"] },
+    "summary": { "type": "string", "minLength": 1 },
+    "repository": { "type": "string", "format": "uri", "pattern": "^https://" },
+    "license": { "type": "string", "minLength": 1 },
+    "review": { "$ref": "#/$defs/review" },
+    "release": { "$ref": "#/$defs/release" },
+    "compatibility": { "$ref": "#/$defs/compatibility" },
+    "install": { "$ref": "#/$defs/install" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "review": { "properties": { "status": { "const": "candidate" } } } } },
+      "then": { "not": { "anyOf": [{ "required": ["compatibility"] }, { "required": ["install"] }] } },
+      "else": { "required": ["version", "repository", "release", "compatibility", "install"] }
+    },
+    {
+      "if": { "not": { "required": ["license"] } },
+      "then": { "properties": { "review": { "properties": { "status": { "enum": ["candidate", "experimental"] } } }, "install": { "required": ["upstream_managed"], "properties": { "upstream_managed": { "const": true } } } } }
+    },
+    {
+      "if": { "required": ["install"], "properties": { "install": { "required": ["upstream_managed"], "properties": { "upstream_managed": { "const": true } } } } },
+      "then": { "properties": { "review": { "properties": { "status": { "const": "experimental" } } } } }
+    },
+    {
+      "if": { "properties": { "review": { "properties": { "status": { "const": "experimental" } } } } },
+      "then": { "properties": { "install": { "required": ["warning"] } } }
+    },
+    {
+      "if": { "properties": { "review": { "properties": { "status": { "enum": ["installable", "verified"] } } } } },
+      "then": { "properties": { "compatibility": { "required": ["minimum_version", "devices", "resolutions"] } } }
+    },
+    {
+      "if": { "required": ["release"] },
+      "then": { "required": ["version", "repository"] }
+    }
+  ],
+  "$defs": {
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["candidate", "experimental", "installable", "verified"] },
+        "approval": { "$ref": "#/$defs/approval" },
+        "notes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provenance"],
+      "properties": {
+        "provenance": { "enum": ["community", "maintainer"] }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "url"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "note": { "type": "string" },
+        "tester": { "type": "string", "minLength": 1 },
+        "date": { "type": "string", "minLength": 1 },
+        "package_version": { "type": "string", "minLength": 1 },
+        "firmware": { "type": "string", "minLength": 1 },
+        "architecture": { "type": "string", "minLength": 1 },
+        "device": { "type": "string", "minLength": 1 },
+        "resolution": { "type": "string", "pattern": "^[0-9]+x[0-9]+$" },
+        "result": { "const": "passed" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "real-device-test" } } },
+          "then": { "required": ["tester", "date", "package_version", "firmware", "architecture", "device", "resolution", "result"] }
+        }
+      ]
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "sha256", "size", "installed_size", "format", "immutable"],
+      "properties": {
+        "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "size": { "type": "integer", "minimum": 1, "maximum": 536870912 },
+        "installed_size": { "type": "integer", "minimum": 1, "maximum": 536870912 },
+        "format": { "enum": ["zip", "tar.gz"] },
+        "base64_offset": { "type": "integer", "minimum": 0, "maximum": 536870911, "description": "Positive byte offset of a base64-encoded tar.gz payload in the verified release; zero or absent means a normal archive. The prefix is never executed. Must be less than size." },
+        "immutable": { "const": true }
+      },
+      "allOf": [{ "if": { "required": ["base64_offset"], "properties": { "base64_offset": { "minimum": 1 } } }, "then": { "properties": { "format": { "const": "tar.gz" } } } }]
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["firmware", "architectures", "abis", "dependencies"],
+      "properties": {
+        "firmware": { "const": "knulli" },
+        "minimum_version": { "type": "string", "minLength": 1 },
+        "architectures": { "type": "array", "contains": { "const": "aarch64" }, "items": { "type": "string" } },
+        "abis": { "type": "array", "minItems": 1, "items": { "type": "string" }, "uniqueItems": true },
+        "minimum_glibc": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+        "dependencies": { "type": "array", "minItems": 1, "items": { "type": "string" }, "uniqueItems": true },
+        "devices": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "device_scope": { "const": "any" },
+        "resolutions": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[0-9]+x[0-9]+$" } },
+        "display_bounds": { "$ref": "#/$defs/displayBounds" }
+      }
+    },
+    "displayBounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum_width", "minimum_height", "maximum_width", "maximum_height"],
+      "properties": {
+        "minimum_width": { "type": "integer", "minimum": 320, "maximum": 7680 },
+        "minimum_height": { "type": "integer", "minimum": 200, "maximum": 4320 },
+        "maximum_width": { "type": "integer", "minimum": 320, "maximum": 7680 },
+        "maximum_height": { "type": "integer", "minimum": 200, "maximum": 4320 }
+      }
+    },
+    "install": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["destination", "launcher", "network", "allowed_write_paths"],
+      "properties": {
+        "destination": { "type": "string", "pattern": "^/userdata/" },
+        "strip_components": { "type": "integer", "minimum": 0 },
+        "file_mappings": {
+          "type": "object",
+          "description": "Map extracted paths, after stripping and patching, to paths below the package destination.",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "launcher": { "type": "string", "minLength": 1 },
+        "executables": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "warning": { "type": "string", "minLength": 1 },
+        "upstream_managed": { "type": "boolean", "description": "Experimental direct-download package. First-launch setup, runtime writes and self-updates are controlled by the upstream app, not sandboxed by the Store." },
+        "uninstall_checks": { "type": "array", "items": { "$ref": "#/$defs/uninstallCheck" } },
+        "menu": { "$ref": "#/$defs/menu" },
+        "menu_command": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "Generate a shell-quoted menu launcher for this package's installed launcher and arguments. Never run during installation." },
+        "preserve": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "network": { "type": "boolean" },
+        "allowed_write_paths": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^/userdata/" }, "uniqueItems": true },
+        "binary_patches": { "type": "array", "items": { "$ref": "#/$defs/binaryPatch" } }
+      },
+      "allOf": [{ "if": { "required": ["upstream_managed"], "properties": { "upstream_managed": { "const": true } } }, "then": { "required": ["warning"] } }]
+    },
+    "uninstallCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "message"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^/userdata/" },
+        "contains": { "type": "string", "minLength": 1, "description": "Case-insensitive text to search in a file or directory tree. Without it, any existing path blocks removal." },
+        "message": { "type": "string", "minLength": 1 }
+      }
+    },
+    "binaryPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "offset", "before_hex", "after_hex", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "offset": { "type": "integer", "minimum": 0 },
+        "before_hex": { "type": "string", "pattern": "^[a-f0-9]+$" },
+        "after_hex": { "type": "string", "pattern": "^[a-f0-9]+$" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "menu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gamelist", "path", "name"],
+      "properties": {
+        "gamelist": { "type": "string", "pattern": "^/userdata/" },
+        "path": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "image": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

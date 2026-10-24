@@ -1,0 +1,331 @@
+package sdlui
+
+// Tests for the device-agnostic event router. This file has no build tag, so
+// it runs everywhere — the router is pure Go over the UI model and input
+// session; only the adapter translation needs SDL.
+
+import (
+	"context"
+	"testing"
+
+	"github.com/jellydn/knulli-app-store/internal/appstore"
+	"github.com/jellydn/knulli-app-store/internal/diagnostics"
+	storeinput "github.com/jellydn/knulli-app-store/internal/input"
+	"github.com/jellydn/knulli-app-store/internal/manifest"
+	"github.com/jellydn/knulli-app-store/internal/platform"
+	storeui "github.com/jellydn/knulli-app-store/internal/ui"
+)
+
+type routerBackend struct {
+	items   []appstore.Item
+	exports int
+}
+
+func (router *routerBackend) Items(context.Context) ([]appstore.Item, error) {
+	return router.items, nil
+}
+
+func (router *routerBackend) Execute(context.Context, string, appstore.Action, func(string)) error {
+	return nil
+}
+
+func (router *routerBackend) ExportDiagnostics(context.Context) (string, error) {
+	router.exports++
+	return "", nil
+}
+
+func (router *routerBackend) SetPlatform(platform.Info) {}
+
+func newRouterHarness(t *testing.T) (*storeui.Model, *storeinput.Session, *diagnostics.Log, *routerBackend) {
+	t.Helper()
+	logger, err := diagnostics.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &routerBackend{items: []appstore.Item{}}
+	model := storeui.New(backend)
+	if err := model.Load(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	controls := storeinput.NewSession(t.TempDir(), "test-device")
+	controls.Connect(storeinput.Identity{Name: "Test Pad"}, true)
+	if controls.Mode != storeinput.Normal {
+		t.Fatal("first connection did not open catalogue")
+	}
+	return model, controls, logger, backend
+}
+
+func TestHandleQuitExits(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventQuit})
+	if !effects.Exit {
+		t.Fatal("quit event did not exit")
+	}
+}
+
+func TestHandleButtonReportsSemanticAction(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: int(storeinput.AutoMapping()[storeinput.Down])})
+	if effects.Action != storeinput.Down {
+		t.Fatalf("down button reported %q, want %q", effects.Action, storeinput.Down)
+	}
+	if effects.Exit {
+		t.Fatal("navigation must not exit")
+	}
+}
+
+// Quitting is the held-Select chord: no single button ends a session, and the
+// trigger keeps its own action when the anchor is not held.
+func TestHandleQuitChordExitsOnlyWhileTheAnchorIsHeld(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	trigger := int(storeinput.AutoMapping()[storeinput.Diagnostics])
+
+	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: trigger})
+	if effects.Exit {
+		t.Fatal("the trigger quit without the anchor held")
+	}
+
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventChordAnchor, Held: true})
+	effects = Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: trigger})
+	if !effects.Exit {
+		t.Fatal("Select+Y did not exit")
+	}
+}
+
+func TestHandleReleasedAnchorHandsTheTriggerBack(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	trigger := int(storeinput.AutoMapping()[storeinput.Diagnostics])
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventChordAnchor, Held: true})
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventChordAnchor, Held: false})
+	if effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: trigger}); effects.Exit {
+		t.Fatal("a released anchor still quit")
+	}
+}
+
+// Key repeat drives navigation only: a held Confirm must not confirm twice and
+// a held Back must not unwind several screens.
+func TestHandleIgnoresRepeatsForEverythingButNavigation(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	if effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyDown, Repeat: true}); effects.Action != storeinput.Down {
+		t.Fatalf("repeated navigation reported %q, want %q", effects.Action, storeinput.Down)
+	}
+	model.Focus = storeui.Actions
+	if effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyConfirm, Repeat: true}); effects.Action != "" || model.Focus != storeui.Actions {
+		t.Fatalf("repeated confirm acted: action=%q focus=%v", effects.Action, model.Focus)
+	}
+	if effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyBack, Repeat: true}); effects.Action != "" || effects.Exit {
+		t.Fatalf("repeated back acted: action=%q exit=%v", effects.Action, effects.Exit)
+	}
+}
+
+func TestHandleBackReturnsThroughFocusWithoutLeavingTheApp(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	model.Focus = storeui.Actions
+	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: int(storeinput.AutoMapping()[storeinput.Back])})
+	if effects.Exit {
+		t.Fatal("back from the actions focus must return to browse, not exit")
+	}
+	effects = Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: int(storeinput.AutoMapping()[storeinput.Back])})
+	if effects.Exit {
+		t.Fatal("back from browse must not exit: quitting is the chord")
+	}
+}
+
+func TestHandleControllerRemovedDisconnects(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventControllerRemoved})
+	if controls.Connected {
+		t.Fatal("controller removal did not disconnect the session")
+	}
+}
+
+func TestHandleControllerConnected(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	controls.Disconnect()
+	identity := storeinput.Identity{Name: "Hotplug Pad", GUID: "guid"}
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventControllerConnected, Identity: identity, KnulliMapping: true})
+	if !controls.Connected || controls.Identity.Name != identity.Name || controls.Mode != storeinput.Normal || controls.Source != "Knulli SDL_GAMECONTROLLERCONFIG" {
+		t.Fatalf("controller connection was not routed: %#v", controls)
+	}
+}
+
+func TestHandleKeyUsesNonDefaultActiveMapping(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	controls.Mapping[storeinput.Up], controls.Mapping[storeinput.Down] = controls.Mapping[storeinput.Down], controls.Mapping[storeinput.Up]
+	effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyDown})
+	if effects.Action != storeinput.Down {
+		t.Fatalf("key used the default binding instead of the active mapping: action=%q", effects.Action)
+	}
+}
+
+// Browsing wraps between cards; shoulder keys filter without losing selection.
+func TestHandleFiltersAndBrowsesCards(t *testing.T) {
+	model, controls, logger, backend := newRouterHarness(t)
+	backend.items = []appstore.Item{
+		{Package: manifest.Package{ID: "org.example.alpha"}, Verdict: appstore.Verdict{State: appstore.StateAvailable}},
+		{Package: manifest.Package{ID: "org.example.beta"}, Verdict: appstore.Verdict{State: appstore.StateAvailable}},
+	}
+	if err := model.Load(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	model.Selected = 1
+
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyUp})
+	if model.Selected != 0 {
+		t.Fatalf("up selected row %d", model.Selected)
+	}
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyDown})
+	if model.Selected != 1 {
+		t.Fatalf("down selected row %d", model.Selected)
+	}
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyRight})
+	if model.Selected != 0 || model.Tab() != storeui.TabAll {
+		t.Fatal("right must wrap to the first card, not change its filter")
+	}
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyLeft})
+	if model.Selected != 1 {
+		t.Fatal("left must wrap to the last card")
+	}
+
+	// R1 steps onto the Ready tab, where both packages still have a row, so
+	// the selection follows the package the user was reading.
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown})
+	if model.Tab() != storeui.TabReady {
+		t.Fatalf("right landed on %q", model.Tab().Label())
+	}
+	if len(model.Items) != 2 || model.Items[model.Selected].Package.ID != "org.example.beta" {
+		t.Fatalf("the tab step lost the selected package: %d of %d rows", model.Selected, len(model.Items))
+	}
+
+	// L1 walks the bar back the way it came. One more L1 wraps past the
+	// front to the last tab: nothing is installed in this fixture, so that tab
+	// is empty, and the way out of it is the same key that got in.
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageUp})
+	if model.Tab() != storeui.TabAll || len(model.Items) != 2 {
+		t.Fatalf("left landed on %q with %d rows", model.Tab().Label(), len(model.Items))
+	}
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageUp})
+	if model.Tab() != storeui.TabInstalled || len(model.Items) != 0 {
+		t.Fatalf("left wrapped onto %q with %d rows", model.Tab().Label(), len(model.Items))
+	}
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown})
+	if model.Tab() != storeui.TabAll || len(model.Items) != 2 {
+		t.Fatalf("stepping out of the empty tab landed on %q with %d rows", model.Tab().Label(), len(model.Items))
+	}
+}
+
+// Filtering cannot change the package or operation awaiting confirmation.
+func TestFiltersDoNotChangeInsideConfirmation(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	model.Items = make([]appstore.Item, listRows*2+1)
+	model.Focus = storeui.Confirm
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown})
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageUp})
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown, Repeat: true})
+	if model.Selected != 0 || model.Tab() != storeui.TabAll || model.Focus != storeui.Confirm {
+		t.Fatal("filter keys changed the package under confirmation")
+	}
+}
+
+// The one-shot keys stay one-shot: only navigation answers a repeat, so a held
+// Confirm cannot confirm twice however long the key is held down.
+func TestHandleKeepsOneShotKeysOneShot(t *testing.T) {
+	model, controls, logger, _ := newRouterHarness(t)
+	model.Items = make([]appstore.Item, listRows+1)
+	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyConfirm, Repeat: true})
+	if model.Focus != storeui.Browse {
+		t.Fatalf("a repeated Confirm opened %v", model.Focus)
+	}
+}
+
+func TestHandleModeDependentButtons(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		prepare    func(*storeinput.Session)
+		button     int
+		wantMode   storeinput.Mode
+		wantExport bool
+	}{
+		{name: "blocked diagnostics", prepare: func(controls *storeinput.Session) { controls.Disconnect() }, button: storeinput.AutoMapping()[storeinput.Confirm], wantMode: storeinput.Blocked, wantExport: true},
+		{name: "direct diagnostics", prepare: func(controls *storeinput.Session) {}, button: storeinput.AutoMapping()[storeinput.Diagnostics], wantMode: storeinput.Normal, wantExport: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			model, controls, logger, backend := newRouterHarness(t)
+			test.prepare(controls)
+			effects := Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: test.button})
+			if controls.Mode != test.wantMode || effects.ExportedDiagnostics != test.wantExport || (backend.exports > 0) != test.wantExport {
+				t.Fatalf("mode=%q exported=%v calls=%d", controls.Mode, effects.ExportedDiagnostics, backend.exports)
+			}
+		})
+	}
+}
+
+// Literal SDL events from ES letters exercise the public router, rather than
+// deriving the test input from the binding under test.
+func TestAutomaticFaceActionsAndLifecycleSafety(t *testing.T) {
+	for _, layout := range []string{"knulli", "xbox", ""} {
+		t.Run(layout, func(t *testing.T) {
+			t.Setenv("STORE_CONTROLLER_LAYOUT", layout)
+			model, controls, logger, backend := newRouterHarness(t)
+			backend.items = []appstore.Item{{Package: manifest.Package{ID: "org.example.demo", Review: manifest.Review{Status: "installable"}}, Compatible: true, Actions: []appstore.Action{appstore.Install}}}
+			if err := model.Load(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			a, b, x, y := 0, 1, 2, 3
+			if layout == "knulli" {
+				a, b, x, y = 1, 0, 3, 2
+			}
+			press := func(button int) Effects {
+				return Handle(context.Background(), model, controls, logger, Event{Kind: EventButton, Button: button})
+			}
+			if controls.Mode != storeinput.Normal || model.Focus != storeui.Browse {
+				t.Fatal("first launch not ready")
+			}
+			press(x)
+			if backend.exports != 0 || model.Focus != storeui.Browse {
+				t.Fatal("ES X gained an action")
+			}
+			press(a)
+			if model.Focus != storeui.Confirm {
+				t.Fatal("ES A did not open confirmation")
+			}
+			press(b)
+			if model.Focus != storeui.Browse || model.Busy {
+				t.Fatal("ES B did not cancel safely")
+			}
+			press(b)
+			if model.Focus != storeui.Browse {
+				t.Fatal("ES B did not return to catalogue")
+			}
+			if effect := press(y); effect.ExportedDiagnostics || backend.exports != 0 || model.Focus != storeui.Actions {
+				t.Fatal("ES Y did not open More without exporting")
+			}
+			if effect := press(y); !effect.ExportedDiagnostics || backend.exports != 1 {
+				t.Fatal("Y inside More did not export diagnostics")
+			}
+			press(b)
+			model.Busy = true
+			press(a)
+			press(b)
+			press(y)
+			if model.Focus != storeui.Browse || backend.exports != 1 {
+				t.Fatal("busy operation accepted a face action")
+			}
+			model.Busy = false
+			Handle(context.Background(), model, controls, logger, Event{Kind: EventChordAnchor, Held: true})
+			Handle(context.Background(), model, controls, logger, Event{Kind: EventControllerRemoved})
+			press(a)
+			if model.Focus != storeui.Browse {
+				t.Fatal("disconnected input reached catalogue")
+			}
+			Handle(context.Background(), model, controls, logger, Event{Kind: EventControllerConnected, Identity: storeinput.Identity{Name: "Replacement"}})
+			if effect := press(y); effect.Exit || effect.ExportedDiagnostics || model.Focus != storeui.Actions {
+				t.Fatal("hotplug kept stale chord or lost Y")
+			}
+			Handle(context.Background(), model, controls, logger, Event{Kind: EventChordAnchor, Held: true})
+			if effect := press(y); !effect.Exit || effect.ExportedDiagnostics {
+				t.Fatal("Select+Y did not exclusively quit")
+			}
+		})
+	}
+}

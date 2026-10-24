@@ -1,0 +1,51 @@
+# AGENTS.md
+
+Go 1.27 module `github.com/jellydn/knulli-app-store`. Safe package manager for Knulli handhelds (TrimUI Smart Pro 1280×720, MagicX Zero 28 640×480).
+
+## Commands
+
+```sh
+make check      # fmt + vet (both tag sets) + go test -race ./... — fast local loop
+make build      # CGO-free CLI -> build/knulli-app
+make catalogue  # deterministic index -> build/catalog-index.json
+make catalogue-check  # required after catalogue-affecting changes: two builds must match byte for byte
+make cover      # coverage gate: every prod-Go package needs a test file AND total >= 70%
+go test -race -tags sdl ./...  # SDL GUI + input tests; needs SDL2, SDL2_image, SDL2_ttf and SDL2_gfx development libraries
+make gui        # desktop GUI with keyboard input + scratch fixture root (no device)
+make walkthrough            # offline GUI evidence; add WALK_FLAGS=--install for network-backed lifecycle flows
+```
+
+- Local-only `prek.toml` mirrors CI (`check.yml`): fast hooks on pre-commit, `go test -race` + `staticcheck` (both tag sets) on pre-push. Run the pre-push set before opening a PR.
+- `build/` is gitignored — never commit it; review the generated index locally instead. Because an ignored path is always reported clean, `git diff` cannot verify the index: `make catalogue-check` is the gate that can fail. Device CI signs `catalog-index.json` and bakes the public key into that build.
+- Device cross-compile: `GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o build/knulli-app-aarch64 ./cmd/knulli-app`. Full per-device path is `scripts/device-build.sh <target> <version> dist`.
+
+## Architecture
+
+- Installer owns policy and side effects. Frontends (`cmd/knulli-app`, `cmd/knulli-app-ui`) call `installer.Manager` / `appstore.Backend` and never extract archives, edit XML, or shell out.
+- Gabagool/v2 owns GUI window/renderer lifetime through its advanced API. Keep its input processor disabled: the existing semantic mapper and model own controls/transitions. Retain the one-card canvas and software fallback. Only KNULLI is implemented; see ADR 0010.
+- Module map: `manifest` (contract + policy) → `catalog` (deterministic index, ed25519 sig) → `platform` (detection/compat) → `archive` (bounded ZIP/tar.gz staging) → `safefs` (path policy, snapshots) → `installer` (lifecycle, state, gamelist) → `ui` (pure-Go state machine) / `input` (mappings) / `sdlui` (SDL render, behind `sdl` build tag so CLI stays static).
+- Vocabulary in `CONTEXT.md` is normative (adopt = Manage existing, external = files not dirs, outcome = accepted-not-completed). Use its terms in code and docs.
+
+## Hard constraints (do not break)
+
+- Writes stay below `/userdata` only; reject symlinks in existing write-path components. Use `-root` flag to redirect into a temp fixture root in tests.
+- Never run a remote install script; only copy regular files from a verified archive. Reject absolute paths, traversal, links, devices, non-regular entries.
+- Release = pinned HTTPS URL + exact byte size + SHA-256; archives ≤ 512 MiB compressed and installed. Mutable/aliased assets are not releases.
+- Transaction order: download → verify → stage → journal → mutate → installed-state-last. Roll back in reverse on failure.
+- Compatibility failures must report raw value, normalized value, source, and full detected matrix.
+- Record device identity and explicit WIDTHxHEIGHT without guessing. Device lists and display bounds are advisory: unknown or untested hardware must not block a packaged app. Exact device-test evidence controls the tested badge. Firmware, architecture, ABI, and dependencies still gate installation. Knulli identity = `OS_NAME="knulli"` in `/etc/os-release`, version from `/usr/share/knulli/knulli.version`.
+- Menu ownership: add only an absent exact launch path, remove only an unchanged entry this installer created. Game-list reload via loopback `GET 127.0.0.1:1234/reloadgames` means queued, not completed.
+
+## Catalogue contributions
+
+- One file per package in `catalogue/packages/`. Statuses: `candidate` (not actionable; optional validated release, no compat/install fields) → `experimental` (warned test after release/runtime/lifecycle review) → `installable` (review checklist passed) → `verified` (linked report on exact device/firmware/arch/resolution).
+- Required evidence: license, immutable asset, publisher checksum, Knulli compat, install paths, preserved files, network use, every Store write path. A README claim is not evidence. No shell-piped installers, no unrestricted Store writes, no ROM-download sources.
+- Authorized `install.upstream_managed` packages stay experimental: the Store verifies and extracts the publisher's release but does not sandbox runtime writes, first-launch setup, runtime acquisition, or upstream updates. Warn about these risks and rights for user-supplied ROM servers. A direct-download experimental package may omit an unverified license only with a visible license warning; never invent a license or redistribute the asset. Declare read-only `uninstall_checks` for shared hooks or active-service state; removal must fail before mutation until the user completes cleanup. Never execute upstream install/uninstall scripts.
+- For upstream-managed experimental packages only, a GitHub release asset digest may replace a missing publisher checksum. Record its API evidence and verify the downloaded bytes independently. Disclose the missing publisher checksum in the install warning. Pin size and SHA-256 in the reviewed manifest; do not fetch a new expected digest during installation. This trusts the publisher's GitHub account and GitHub, not independent publisher authentication, and does not permit promotion beyond experimental.
+- Read-only checker: `go run ./cmd/check-updates -output build/catalogue-update-report` writes `.json`+`.md` for manual review; never edits manifests. `GITHUB_TOKEN` optional locally, never in reports.
+
+## Code conventions
+
+- New filesystem behavior needs a temp-root integration test; new archive behavior needs an adversarial fixture where an unsafe impl would differ.
+- Comments explain design reasons the code cannot show, not what the code does.
+- Keep `internal/installer` independent of presentation code; GUI tests use an in-memory fake backend.

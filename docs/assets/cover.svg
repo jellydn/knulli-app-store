@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="Knulli App Store">
+  <title>Knulli App Store</title>
+  <defs>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="480" fill="#0E141F"/>
+  <g transform="translate(208 56) scale(0.4375)">
+    <rect width="512" height="512" rx="112" fill="#0E141F"/>
+    <rect width="512" height="512" rx="112" fill="url(#sheen)"/>
+    <rect x="22" y="22" width="468" height="468" rx="92" fill="none" stroke="#3FCDA8" stroke-width="16"/>
+    <rect x="96" y="96" width="146" height="146" rx="28" fill="#3FCDA8"/>
+    <rect x="270" y="96" width="146" height="146" rx="28" fill="none" stroke="#3FCDA8" stroke-width="12"/>
+    <rect x="96" y="270" width="146" height="146" rx="28" fill="none" stroke="#3FCDA8" stroke-width="12"/>
+    <rect x="270" y="270" width="146" height="146" rx="28" fill="none" stroke="#3FCDA8" stroke-width="12"/>
+  </g>
+  <text x="320" y="338" text-anchor="middle" fill="#EFF4FB" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="28" font-weight="700" letter-spacing="1.4">KNULLI APP STORE</text>
+  <text x="320" y="372" text-anchor="middle" fill="#99A9BE" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="500" letter-spacing="1.2">SAFE COMMUNITY PACKAGES</text>
+  <rect x="292" y="392" width="56" height="4" rx="2" fill="#3FCDA8"/>
+</svg>

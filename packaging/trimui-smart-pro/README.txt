@@ -1,0 +1,113 @@
+KNULLI APP STORE - TRIMUI SMART PRO EXPERIMENTAL BUILD
+
+The GUI was reported functional on one TrimUI Smart Pro. This build remains
+experimental until the exact Knulli release and repeatable test evidence are
+recorded. Package compatibility is reviewed separately.
+
+INSTALL
+
+1. On your computer, verify the ZIP against SHA256SUMS.txt.
+2. Extract the ZIP directly into /userdata/roms/ports on the Knulli card.
+3. Confirm these paths exist:
+   /userdata/roms/ports/Knulli App Store.sh
+   /userdata/roms/ports/knulli-app-store/knulli-app-ui
+   /userdata/roms/ports/images/Knulli App Store.png
+4. Safely eject the card, start Knulli, and refresh game lists or reboot.
+5. Open Knulli App Store from the Ports system. The Ports list uses the image
+   at images/Knulli App Store.png after a game list refresh.
+
+UPDATE
+
+Verify the new checksum, shut down Knulli, and extract the new ZIP into the
+same /userdata/roms/ports directory. Allow replacement of the old launcher
+and knulli-app-store files. Manager state under /userdata/system is retained.
+
+CONTROLS
+
+The first launch for each device/controller identity opens Controller Setup
+before the catalogue. Choose Use Detected Mapping, Test Detected Mapping,
+Customize, or Safe Exit. Every choice that builds a mapping asks one question
+first: whether this pad pages with the shoulder buttons. Paging is optional, so
+a pad without them answers SKIP PAGING and setup asks only for the required
+actions. Customize reviews each detected button and offers Select, Retry, Start
+Over, and Back. The preview is finished by the required actions, and an
+optional binding never pressed is left out of what is saved. No timeout skips
+setup.
+
+Later launches load the saved mapping. Settings can rerun setup, export
+diagnostics, or reset the active mapping. Hold the saved Back and Settings
+controls while launching to force setup. If no SDL GameController exists, a
+blocked screen shows log and diagnostic paths.
+
+The footer is the only place a screen shows controls. It names each available
+action beside its binding, for example Confirm (SOUTH)  Settings (NORTH)  Quit
+(SELECT + NORTH),
+and the same action name always means the same action. No screen repeats a
+control hint in its own text; the controller mapping summary uses the same
+names. Quitting is the one control no button carries alone: hold Select and
+press North. On the blocked screen, Confirm exports diagnostics and that chord is
+the way out.
+
+The catalogue opens on its whole list and carries a tab bar above the rows:
+ALL, READY, and INSTALLED, with the active view marked in the accent colour.
+Left and right step the bar, up and down step the rows, and the shoulders page
+a list longer than its window. A finished operation reports in a notice bar
+over the bottom of the panel and clears itself after three seconds; a failure
+is not a notice and keeps the status block until it is answered.
+
+Mappings are stored by device and controller identity under:
+  /userdata/system/configs/knulli-app-store/controller-mappings.json
+
+CURRENT SAFETY STATE
+
+STORE SELF-UPDATE: select the Knulli App Store card, confirm Check for updates,
+then select and confirm Update when offered. Exit and reopen after completion.
+Official experimental builds are included. Exact asset size and SHA-256 are
+verified before journaled replacement. Installed apps and settings stay intact.
+Requires the standard /userdata/roms/ports/knulli-app-store location. Older
+builds need one manual ZIP update to gain this feature.
+
+All packaged apps can install on any Knulli device when architecture, glibc
+ABI and runtime libraries pass. Device identity and display size do not block
+installation. Without an exact device report, the badge is UNTESTED.
+Only PlayTime 1.0.0 has exact current Smart Pro evidence. RetSend has no
+device report and needs local Wi-Fi.
+An existing copy shows EXTERNAL and offers Manage existing; that inventories
+and backs up uncertain files without reinstalling the reviewed release. Only
+files count, so an empty directory left by a rolled-back write still offers
+Install. A card that reports a wider file mode than requested is not a health
+failure. RAOfflineProxy and PocketCurator are read-only.
+
+The Store disables Grout's updater metadata URL and verifies the transformed
+binary. Use App Store Repair and reviewed updates only. Grout config stays
+under /userdata/roms/tools/Grout. PlayTime
+statistics stay under /userdata/system/configs/playtime. RetSend keeps its
+configuration and TLS identity under /userdata/system/configs/retsend and
+defaults to receiving files in /userdata/roms/retsend-inbox; both stay after
+uninstall. A verified launcher patch keeps these paths when updating from
+the fork; saved or selected receive routes can override the default inbox.
+Manager state and
+adoption backups are under /userdata/system/knulli-app-store. After Manage
+existing fails, Force reinstall needs two confirmations and keeps a complete
+timestamped backup under recovery-backups/<package-id>/. The app asks
+Knulli to reload game lists when it changes the menu; if it reports that a
+restart is required, reboot to see the new entry. Manual refresh still works.
+
+Health checks cover immutable managed release files. PlayTime runtime data does
+not cause Repair. If Repair appears, package details and the application log
+show the exact missing, changed, or mode-mismatched managed path.
+
+TROUBLESHOOTING
+
+If the app returns to EmulationStation, inspect:
+  /userdata/system/logs/knulli-app-store.log
+
+Use Settings > Export Diagnostics to export platform, catalogue, and capped
+redacted logs to /userdata/system/knulli-app-store/diagnostics. It does not
+include package credentials or private configuration files.
+
+The log records each SDL and framebuffer resolution candidate. On TrimUI
+Smart Pro it should select SDL renderer output 1280x720. Implausible values
+such as 1280x13107 are rejected. Terminal control sequences are removed.
+
+Do not replace Knulli's SDL library with a desktop or stock TrimUI copy.

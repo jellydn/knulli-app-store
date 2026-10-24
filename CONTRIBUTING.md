@@ -1,0 +1,34 @@
+# Contributing
+
+## Package changes
+
+Read [How to add a package](docs/how-to-add-a-package.md) before you open a package pull request.
+
+1. Open an issue that identifies the upstream repository and the package owner.
+2. Add or update one file in `catalogue/packages/`.
+3. Attach evidence for the license, immutable release asset, publisher checksum, Knulli compatibility, install paths, preserved files, network use, and every write path. Upstream-managed experimental packages may use a pinned GitHub asset digest when no publisher checksum exists; record the API evidence and disclose this in the install warning. This does not provide independent publisher authentication.
+4. Keep the entry at `candidate` while runtime or lifecycle safety is unresolved. Candidates can retain validated release metadata, but no compatibility or install definition.
+5. Use `experimental` for a warned, authorized test after release, runtime and lifecycle review. One maintainer can complete this review. Use `installable` only after the full two-reviewer checklist passes. Device and display declarations are optional for experimental packages; missing exact device evidence does not block installation.
+   An authorized `install.upstream_managed` package can use verified download/extraction while leaving runtime setup and updates to the app. It must stay experimental, disclose these risks, preserve user data, and declare cleanup checks for external hooks. An unverified license needs a visible warning and direct upstream download without redistribution. See [upstream-managed installation](docs/how-to-add-a-package.md#upstream-managed-installation).
+6. Use `verified` only when a linked report shows a successful test on the exact device, firmware, architecture, and resolution in the manifest.
+
+A README statement alone is not compatibility evidence. Do not add installers that pipe remote data to a shell or that need unrestricted writes. Do not add ROM-download sources.
+
+## Code changes
+
+Keep the installer independent from presentation code. New filesystem behavior needs a temporary-root integration test. New archive behavior needs an adversarial fixture where an unsafe implementation would produce a different result.
+
+Run:
+
+```sh
+make check
+make build
+make catalogue
+make catalogue-check
+```
+
+Generated build output is not committed. `make catalogue-check` is the local gate: it builds the index twice and requires the two builds to be byte-identical. A `git diff --exit-code -- build/catalog-index.json` cannot stand in for it, because `build/` is gitignored and git reports an ignored path as clean either way. Device CI signs `catalog-index.json` and compiles the matching public key into that build.
+
+The weekly release checker has read-only repository access. It downloads GitHub release metadata only and uploads a review report. Run it locally with `go run ./cmd/check-updates -output build/catalogue-update-report`; it writes a `.json` and a `.md` report for manual review and never edits a manifest. It does not download assets, edit manifests, approve updates, open issues, or merge changes. `GITHUB_TOKEN` is optional for local use and increases the GitHub API rate limit; never put it in a report.
+
+Comments must explain a design reason that the code cannot make clear by itself.
