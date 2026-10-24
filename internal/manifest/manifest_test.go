@@ -38,6 +38,57 @@ func TestExperimentalDoesNotRequireDeviceOrDisplayClaims(t *testing.T) {
 	}
 }
 
+func TestUpstreamManagedRequiresExperimentalStatusAndLicenseDisclosure(t *testing.T) {
+	pkg := validPackage()
+	pkg.Review.Status = "experimental"
+	pkg.Install.UpstreamManaged = true
+	pkg.Install.Warning = "License unverified; upstream controls runtime writes and updates."
+	pkg.License = ""
+	if err := pkg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	pkg.Install.UpstreamManaged = false
+	if err := pkg.Validate(); err == nil {
+		t.Fatal("normal package accepted an unknown license")
+	}
+	pkg.Install.UpstreamManaged = true
+	pkg.Review.Status = "installable"
+	if err := pkg.Validate(); err == nil {
+		t.Fatal("upstream-managed package claimed completed technical review")
+	}
+}
+
+func TestGeneratedLauncherAndUninstallChecksRejectUnsafePaths(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		edit func(*Package)
+	}{
+		{"uninstall outside userdata", func(p *Package) {
+			p.Install.UninstallChecks = []UninstallCheck{{Path: "/root/config", Message: "cleanup"}}
+		}},
+		{"uninstall manager state", func(p *Package) {
+			p.Install.UninstallChecks = []UninstallCheck{{Path: ManagerStatePath, Message: "cleanup"}}
+		}},
+		{"menu escape", func(p *Package) { p.Install.Menu.Path = "../../root/run.sh" }},
+		{"foreign command", func(p *Package) { p.Install.MenuCommand[0] = "/bin/sh" }},
+		{"NUL argument", func(p *Package) { p.Install.MenuCommand = append(p.Install.MenuCommand, "bad\x00arg") }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			pkg := validPackage()
+			pkg.Install.Menu = &Menu{Gamelist: "/userdata/roms/tools/gamelist.xml", Path: "./demo-menu.sh", Name: "Demo"}
+			pkg.Install.MenuCommand = []string{pkg.Install.Destination + "/" + pkg.Install.Launcher}
+			pkg.Install.AllowedWritePaths = append(pkg.Install.AllowedWritePaths, "/userdata/roms/tools/demo-menu.sh", "/userdata/roms/tools/gamelist.xml")
+			if err := pkg.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			test.edit(&pkg)
+			if err := pkg.Validate(); err == nil {
+				t.Fatal("unsafe manifest passed validation")
+			}
+		})
+	}
+}
+
 func TestEmbeddedPayloadRequiresTarAndAnInteriorOffset(t *testing.T) {
 	pkg := validPackage()
 	pkg.Release.Format = "tar.gz"

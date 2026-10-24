@@ -165,12 +165,11 @@ walk catalogue-tabs keyboard \
   "catalogue" \
   "installed"
 
-# A read-only package offers no action and says so. Only compatible packages
-# are listed. Names sort Grout, PlayTime, then PocketCurator.
-walk catalogue-read-only keyboard \
+# The former PocketCurator candidate now opens an upstream-managed install
+# confirmation. Never confirm a download in this offline flow.
+walk upstream-managed-confirmation keyboard \
   "down,down,enter" \
-  "catalogue" \
-  "No safe action is available"
+  "catalogue,confirm"
 
 # Leaving is the Select chord and nothing else: Escape at the catalogue does
 # not leave it, and a held Tab plus Y does.

@@ -14,7 +14,7 @@
 ## Promotion checklist
 
 1. Confirm the repository belongs to the project or documented maintainer.
-2. Read the repository license file and record a valid SPDX expression.
+2. Read the repository license file and record a valid SPDX expression. Only an authorized upstream-managed experimental direct download may omit an unverified license, with a visible license warning and no asset redistribution.
 3. Select a version-tagged release URL. Reject branch archives and `latest` aliases. Never execute a remote installer. A release containing a base64 `tar.gz` payload can use `release.base64_offset`: the exact byte offset after its marker line. Verify the full release's size and checksum, and inspect the decoded archive. No script prefix is executed.
 4. Obtain the SHA-256 from the publisher through a channel separate from the downloaded asset. Record compressed and installed byte sizes.
 5. Inspect the complete archive. It must contain regular files only and one declared launcher.
@@ -25,6 +25,8 @@
 10. Use `experimental` for an authorized, clearly warned hardware test when mandatory release and path controls pass but compatibility evidence is incomplete. Promote to `installable` after review. Add `real-device-test` evidence and promote to `verified` only after the exact matrix passes on hardware.
 
 For ROM-download software, record a visible copyright warning and review every provider and self-update path. Approval does not establish that a ROM download is lawful. The user must have the required rights and comply with local law.
+
+`install.upstream_managed` is an explicit experimental exception to Store-managed runtime updates. Review the original archive and Store write paths, disclose first-launch setup and app-controlled updates/downloads, and keep the package experimental. Runtime writes are not sandboxed. Store Repair returns managed files to the pinned release. Declare read-only `uninstall_checks` for external hooks or service state and verify that a blocked removal changes no package files, menu entries or installed state. Never execute upstream install/uninstall scripts. See [upstream-managed installation](how-to-add-a-package.md#upstream-managed-installation).
 
 ## Build the index
 

@@ -74,6 +74,12 @@ printf 'GLIBC_2.17\nGLIBC_2.34\nGLIBC_2.40\n' >"$ROOT/lib/libc.so.6"
 : >"$ROOT/usr/lib/libSDL2_ttf-2.0.so.0"
 : >"$ROOT/lib/libresolv.so.2"
 : >"$ROOT/lib/libpthread.so.0"
+mkdir -p "$ROOT/usr/bin" \
+         "$ROOT/usr/lib/python3.12/site-packages/pygame" \
+         "$ROOT/userdata/system/.local/share/PortMaster"
+: >"$ROOT/usr/bin/python3.12"
+: >"$ROOT/usr/lib/python3.12/site-packages/pygame/__init__.py"
+: >"$ROOT/userdata/system/.local/share/PortMaster/control.txt"
 
 # Filesystem display candidate for the device. On a HiDPI desktop the SDL
 # window reports pixels, so pass -resolution to pin the device size first.

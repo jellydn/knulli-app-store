@@ -33,6 +33,27 @@ func TestDetectReadsKnulliDeviceAndFramebuffer(t *testing.T) {
 	}
 }
 
+func TestDetectUpstreamAppPrerequisites(t *testing.T) {
+	root := t.TempDir()
+	for _, dependency := range []string{"python3.12", "pygame", "portmaster"} {
+		if includes(Resolve(root).Dependencies, dependency) {
+			t.Fatalf("missing dependency reported present: %s", dependency)
+		}
+	}
+	writePlatformFile(t, root, "usr/bin/python3.11", "")
+	if includes(Resolve(root).Dependencies, "python3.12") {
+		t.Fatal("Python 3.11 satisfies a CPython 3.12 extension")
+	}
+	writePlatformFile(t, root, "usr/bin/python3.12", "")
+	writePlatformFile(t, root, "usr/lib/python3.12/site-packages/pygame/__init__.py", "")
+	writePlatformFile(t, root, "userdata/system/.local/share/PortMaster/control.txt", "")
+	for _, dependency := range []string{"python3.12", "pygame", "portmaster"} {
+		if !includes(Resolve(root).Dependencies, dependency) {
+			t.Fatalf("installed prerequisite not detected: %s", dependency)
+		}
+	}
+}
+
 func TestDetectUsesDeterministicCurrentThenLegacyPriority(t *testing.T) {
 	root := t.TempDir()
 	writePlatformFile(t, root, "etc/os-release", "  OS_NAME = ' KNULLI '  \nOS_VERSION=\nOS_DATE=20260510\n")

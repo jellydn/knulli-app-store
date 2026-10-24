@@ -8,15 +8,16 @@
   "repository": "https://github.com/tomtombombadil/PocketCurator",
   "license": "MIT",
   "review": {
-    "status": "candidate",
+    "status": "experimental",
     "approval": {
       "provenance": "community"
     },
     "notes": [
-      "Rechecked 2026-10-24: stable v1.1.2 ZIP matches the publisher sidecar and GitHub digest: 5903925 compressed bytes, 19915921 regular-file bytes, 211 files and 21 directories. No duplicate paths, traversal, absolute paths, or special-file entries were found. Pinned release metadata is now retained on this read-only candidate; release mutability and device-test evidence are not the remaining blockers.",
-      "Blocked by runtime policy: user-selected ROM, media, and gamelist writes lack reviewed /userdata containment and symlink-parent checks. A disposable-fixture probe of the packaged delete_paths function confirmed it deletes a supplied regular file outside the fixture userdata directory. This is a write-boundary test, not proof that every UI path can supply that file.",
+      "Rechecked 2026-10-24: stable v1.1.2 ZIP matches the publisher sidecar and GitHub digest: 5903925 compressed bytes, 19915921 regular-file bytes, 211 files and 21 directories. No duplicate paths, traversal, absolute paths, or special-file entries were found.",
+      "Authorized upstream-managed experimental installation. The Store verifies and extracts the original ZIP into a private PocketCurator directory under Ports, keeping the launcher beside pocketcurator as upstream requires. It does not run an installer. Settings stay through repair, update and removal; unrelated Ports files are never adopted.",
+      "ROM deletion is an intentional upstream feature with a confirmation screen. Back up ROMs and scraped media before using it. App runtime writes are not sandboxed by the Store. Fetch only content you have the right to use from a server you trust; the Store supplies no ROM provider.",
       "The packaged updater and netsync download executable code outside Store transactions. PC_SKIP_UPDATE only skips launcher application of staged updates; it does not disable these downloads. The launcher can also acquire and mount a PortMaster runtime.",
-      "A reviewed package must disable executable-code downloads and runtime acquisition, constrain every write path, and resolve the ROM-fetch provider policy before promotion. Missing exact device evidence will show UNTESTED, not block installation once these package controls pass."
+      "Upstream-managed mode leaves the app's updater and PortMaster runtime acquisition available under the user's control. These are not Store-verified updates. Current PortMaster is required; system Python/pygame is preferred on Knulli. Close the app before Store operations. No exact device test is claimed."
     ],
     "evidence": [
       {
@@ -52,5 +53,27 @@
     "installed_size": 19915921,
     "format": "zip",
     "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "dependencies": ["libc", "portmaster"]
+  },
+  "install": {
+    "destination": "/userdata/roms/ports/PocketCurator",
+    "launcher": "Pocket Curator.sh",
+    "executables": ["Pocket Curator.sh"],
+    "upstream_managed": true,
+    "warning": "Untested. Requires current PortMaster. App controls runtime downloads and updates. ROM deletion is permanent: back up first. Fetch only content you may legally use. Close app before Store operations; Repair restores pinned code. Settings stay after removal.",
+    "preserve": ["pocketcurator/settings.json"],
+    "menu": {
+      "gamelist": "/userdata/roms/ports/gamelist.xml",
+      "path": "./PocketCurator/Pocket Curator.sh",
+      "name": "Pocket Curator",
+      "description": "Curate your own ROM collection. Deletions are permanent; back up first. Requires current PortMaster."
+    },
+    "network": true,
+    "allowed_write_paths": ["/userdata/roms/ports/PocketCurator", "/userdata/roms/ports/gamelist.xml"]
   }
 }

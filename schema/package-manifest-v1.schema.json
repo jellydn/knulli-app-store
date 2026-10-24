@@ -23,7 +23,15 @@
     {
       "if": { "properties": { "review": { "properties": { "status": { "const": "candidate" } } } } },
       "then": { "not": { "anyOf": [{ "required": ["compatibility"] }, { "required": ["install"] }] } },
-      "else": { "required": ["version", "repository", "license", "release", "compatibility", "install"] }
+      "else": { "required": ["version", "repository", "release", "compatibility", "install"] }
+    },
+    {
+      "if": { "not": { "required": ["license"] } },
+      "then": { "properties": { "review": { "properties": { "status": { "enum": ["candidate", "experimental"] } } }, "install": { "required": ["upstream_managed"], "properties": { "upstream_managed": { "const": true } } } } }
+    },
+    {
+      "if": { "required": ["install"], "properties": { "install": { "required": ["upstream_managed"], "properties": { "upstream_managed": { "const": true } } } } },
+      "then": { "properties": { "review": { "properties": { "status": { "const": "experimental" } } } } }
     },
     {
       "if": { "properties": { "review": { "properties": { "status": { "const": "experimental" } } } } },
@@ -140,11 +148,25 @@
         "launcher": { "type": "string", "minLength": 1 },
         "executables": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "warning": { "type": "string", "minLength": 1 },
+        "upstream_managed": { "type": "boolean", "description": "Experimental direct-download package. First-launch setup, runtime writes and self-updates are controlled by the upstream app, not sandboxed by the Store." },
+        "uninstall_checks": { "type": "array", "items": { "$ref": "#/$defs/uninstallCheck" } },
         "menu": { "$ref": "#/$defs/menu" },
+        "menu_command": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "Generate a shell-quoted menu launcher for this package's installed launcher and arguments. Never run during installation." },
         "preserve": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "network": { "type": "boolean" },
         "allowed_write_paths": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^/userdata/" }, "uniqueItems": true },
         "binary_patches": { "type": "array", "items": { "$ref": "#/$defs/binaryPatch" } }
+      },
+      "allOf": [{ "if": { "required": ["upstream_managed"], "properties": { "upstream_managed": { "const": true } } }, "then": { "required": ["warning"] } }]
+    },
+    "uninstallCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "message"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^/userdata/" },
+        "contains": { "type": "string", "minLength": 1, "description": "Case-insensitive text to search in a file or directory tree. Without it, any existing path blocks removal." },
+        "message": { "type": "string", "minLength": 1 }
       }
     },
     "binaryPatch": {

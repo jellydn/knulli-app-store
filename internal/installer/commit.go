@@ -2,10 +2,13 @@ package installer
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path"
 	"sort"
+	"strings"
 
 	storearchive "github.com/jellydn/knulli-app-store/internal/archive"
 	"github.com/jellydn/knulli-app-store/internal/gamelist"
@@ -41,6 +44,9 @@ func (m Manager) commit(ctx context.Context, operation string, pkg manifest.Pack
 		state, err = m.installFiles(tx, guard, pkg, old, staged.files, operation == "force-reinstall")
 	}
 	if err != nil {
+		return err
+	}
+	if err := installMenuLauncher(tx, guard, pkg, &state, old, operation == "adopt"); err != nil {
 		return err
 	}
 	m.event("backup_complete", "package", pkg.ID, "originals", fmt.Sprint(len(state.Originals)))
@@ -82,6 +88,9 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 		}
 	}
 	newPaths := make(map[string]bool)
+	if launcher := pkg.Install.MenuLauncherPath(); launcher != "" {
+		newPaths[launcher] = true
+	}
 	for _, file := range files {
 		virtual := path.Join(pkg.Install.Destination, file.Relative)
 		newPaths[virtual] = true
@@ -194,6 +203,58 @@ func (m Manager) adoptFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg man
 	sort.Slice(state.Files, func(i, j int) bool { return state.Files[i].Path < state.Files[j].Path })
 	m.event("adoption_complete", "package", pkg.ID, "managed_files", fmt.Sprint(len(state.Files)), "backups", fmt.Sprint(len(state.Originals)))
 	return state, nil
+}
+
+func installMenuLauncher(tx *safefs.Transaction, guard *safefs.Guard, pkg manifest.Package, state *Installed, old *Installed, adopting bool) error {
+	virtual := pkg.Install.MenuLauncherPath()
+	if virtual == "" {
+		return nil
+	}
+	host, err := guard.Resolve(virtual)
+	if err != nil {
+		return err
+	}
+	arguments := make([]string, len(pkg.Install.MenuCommand))
+	for i, argument := range pkg.Install.MenuCommand {
+		arguments[i] = "'" + strings.ReplaceAll(argument, "'", "'\"'\"'") + "'"
+	}
+	data := []byte("#!/bin/sh\nexec " + strings.Join(arguments, " ") + "\n")
+	tracked := false
+	if old != nil {
+		for _, file := range old.Files {
+			tracked = tracked || file.Path == virtual
+		}
+	}
+	if info, err := os.Stat(host); err == nil {
+		if !tracked {
+			if err := backupExisting(tx, guard, pkg.ID, existingFile{Virtual: virtual, Host: host, Mode: info.Mode()}, state); err != nil {
+				return err
+			}
+		}
+		if adopting {
+			existing, err := os.ReadFile(host)
+			if err != nil {
+				return err
+			}
+			if string(existing) != string(data) {
+				digest := sha256.Sum256(data)
+				state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: hex.EncodeToString(digest[:]), Mode: uint32(info.Mode().Perm()), Unmanaged: true})
+				return nil
+			}
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if err := tx.Write(virtual, data, 0755); err != nil {
+		return err
+	}
+	info, err := os.Stat(host)
+	if err != nil {
+		return err
+	}
+	digest := sha256.Sum256(data)
+	state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: hex.EncodeToString(digest[:]), Mode: uint32(info.Mode().Perm())})
+	return nil
 }
 
 func backupExisting(tx *safefs.Transaction, guard *safefs.Guard, id string, file existingFile, state *Installed) error {

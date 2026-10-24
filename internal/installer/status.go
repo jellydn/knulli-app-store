@@ -134,7 +134,8 @@ func (m Manager) Status(id string) (Status, error) {
 			continue
 		}
 		destination := strings.TrimSuffix(state.Manifest.Install.Destination, "/")
-		if file.Path != destination && !strings.HasPrefix(file.Path, destination+"/") {
+		menuLauncher := state.Manifest.Install.MenuLauncherPath()
+		if file.Path != destination && !strings.HasPrefix(file.Path, destination+"/") && file.Path != menuLauncher {
 			status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "unexpected managed path", Expected: destination, Actual: file.Path})
 			continue
 		}
@@ -155,7 +156,11 @@ func (m Manager) Status(id string) (Status, error) {
 			return Status{}, err
 		}
 		if digest != file.SHA256 {
-			status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: "content changed", Expected: file.SHA256, Actual: digest})
+			check := "content changed"
+			if state.Manifest.Install.UpstreamManaged {
+				check = "upstream-managed content changed; Store repair restores the pinned release"
+			}
+			status.addIssue(m, state.Manifest.ID, HealthIssue{Path: file.Path, Check: check, Expected: file.SHA256, Actual: digest})
 		}
 		if issue := modeIssue(file, info.Mode()); issue != nil {
 			status.addIssue(m, state.Manifest.ID, *issue)

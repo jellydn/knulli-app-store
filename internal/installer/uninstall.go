@@ -1,11 +1,16 @@
 package installer
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
 
 	"github.com/jellydn/knulli-app-store/internal/gamelist"
+	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
 
@@ -40,6 +45,9 @@ func (m Manager) uninstall(ctx context.Context, id string, outcome *OperationOut
 	}
 	if state == nil {
 		return fmt.Errorf("package %s is not installed", id)
+	}
+	if err := m.checkUninstall(ctx, state.Manifest.Install.UninstallChecks); err != nil {
+		return err
 	}
 	allowed := append([]string{}, state.Manifest.Install.AllowedWritePaths...)
 	allowed = append(allowed, managerPath)
@@ -95,5 +103,61 @@ func (m Manager) uninstall(ctx context.Context, id string, outcome *OperationOut
 	}
 	*outcome = m.outcome(ctx, gameListChanged)
 	m.event("operation_complete", "package", id, "action", "uninstall")
+	return nil
+}
+
+// Checks are read-only and fail closed. Runtime hooks are not Store-owned files:
+// removing an app must never edit a shared hook or strand a reference to it.
+func (m Manager) checkUninstall(ctx context.Context, checks []manifest.UninstallCheck) error {
+	for _, check := range checks {
+		guard, err := safefs.NewGuard(m.root(), []string{check.Path})
+		if err != nil {
+			return err
+		}
+		host, err := guard.Resolve(check.Path)
+		if err != nil {
+			return fmt.Errorf("cannot check uninstall safety: %w", err)
+		}
+		err = filepath.WalkDir(host, func(file string, entry fs.DirEntry, walkErr error) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if os.IsNotExist(walkErr) {
+				return nil
+			}
+			if walkErr != nil {
+				return walkErr
+			}
+			if check.Contains == "" {
+				return fmt.Errorf("uninstall blocked by %s: %s", check.Path, check.Message)
+			}
+			if entry.IsDir() {
+				return nil
+			}
+			if !entry.Type().IsRegular() {
+				return fmt.Errorf("cannot inspect non-regular hook %s", file)
+			}
+			input, err := os.Open(file)
+			if err != nil {
+				return err
+			}
+			const maxHookBytes = 1 << 20
+			data, err := io.ReadAll(io.LimitReader(input, maxHookBytes+1))
+			input.Close()
+			if err != nil {
+				return err
+			}
+			if len(data) > maxHookBytes {
+				return fmt.Errorf("hook exceeds inspection limit: %s", file)
+			}
+			if bytes.Contains(bytes.ToLower(data), bytes.ToLower([]byte(check.Contains))) {
+				return fmt.Errorf("uninstall blocked by %s: %s", check.Path, check.Message)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

@@ -117,6 +117,15 @@ type Install struct {
 	Network           bool              `json:"network"`
 	AllowedWritePaths []string          `json:"allowed_write_paths"`
 	BinaryPatches     []BinaryPatch     `json:"binary_patches,omitempty"`
+	UpstreamManaged   bool              `json:"upstream_managed,omitempty"`
+	UninstallChecks   []UninstallCheck  `json:"uninstall_checks,omitempty"`
+	MenuCommand       []string          `json:"menu_command,omitempty"`
+}
+
+type UninstallCheck struct {
+	Path     string `json:"path"`
+	Contains string `json:"contains,omitempty"`
+	Message  string `json:"message"`
 }
 
 type BinaryPatch struct {
@@ -133,6 +142,14 @@ type Menu struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	Image       string `json:"image,omitempty"`
+}
+
+// MenuLauncherPath is the optional Store-generated launcher, not an archive file.
+func (i Install) MenuLauncherPath() string {
+	if i.Menu == nil || len(i.MenuCommand) == 0 {
+		return ""
+	}
+	return path.Join(path.Dir(i.Menu.Gamelist), i.Menu.Path)
 }
 
 func (p Package) Installable() bool {
@@ -210,8 +227,12 @@ func (p Package) Validate() error {
 
 func (p Package) validateInstallable() []string {
 	var problems []string
-	if p.Version == "" || p.Repository == "" || p.License == "" {
+	licenseOptional := p.Experimental() && p.Install != nil && p.Install.UpstreamManaged
+	if p.Version == "" || p.Repository == "" || (p.License == "" && !licenseOptional) {
 		problems = append(problems, "installable packages require version, repository, and license")
+	}
+	if p.License == "" && licenseOptional && !strings.Contains(strings.ToLower(p.Install.Warning), "license") {
+		problems = append(problems, "upstream-managed packages without a verified license require a license warning")
 	}
 	problems = append(problems, p.validateRelease()...)
 	problems = append(problems, p.validateInstallation()...)
@@ -307,6 +328,14 @@ func (p Package) validateInstallation() []string {
 	if p.Experimental() && strings.TrimSpace(p.Install.Warning) == "" {
 		problems = append(problems, "experimental packages require an install warning")
 	}
+	if p.Install.UpstreamManaged && !p.Experimental() {
+		problems = append(problems, "upstream-managed packages must remain experimental")
+	}
+	for _, check := range p.Install.UninstallChecks {
+		if !safeAbsolute(check.Path) || !under(check.Path, "/userdata") || overlaps(check.Path, ManagerStatePath) || strings.TrimSpace(check.Message) == "" {
+			problems = append(problems, "uninstall checks require a clean /userdata path outside manager state and cleanup instructions")
+		}
+	}
 	mappedPaths := make(map[string]bool)
 	for source, destination := range p.Install.FileMappings {
 		if !safeRelative(source) || !safeRelative(destination) || mappedPaths[destination] {
@@ -350,6 +379,9 @@ func (p Package) validateInstallation() []string {
 	if !coveredBy(p.Install.Destination, p.Install.AllowedWritePaths) {
 		problems = append(problems, "install destination must be covered by allowed_write_paths")
 	}
+	if len(p.Install.MenuCommand) > 0 && p.Install.Menu == nil {
+		problems = append(problems, "menu command requires menu metadata")
+	}
 	if p.Install.Menu != nil {
 		if !safeAbsolute(p.Install.Menu.Gamelist) || !coveredBy(p.Install.Menu.Gamelist, p.Install.AllowedWritePaths) {
 			problems = append(problems, "menu gamelist must be an allowed absolute path")
@@ -359,6 +391,17 @@ func (p Package) validateInstallation() []string {
 		}
 		if p.Install.Menu.Image != "" && !safeRelative(strings.TrimPrefix(p.Install.Menu.Image, "./")) {
 			problems = append(problems, "menu image must be a safe relative path")
+		}
+		if len(p.Install.MenuCommand) > 0 {
+			launcher := p.Install.MenuLauncherPath()
+			if !safeRelative(strings.TrimPrefix(p.Install.Menu.Path, "./")) || !coveredBy(launcher, p.Install.AllowedWritePaths) || under(launcher, p.Install.Destination) || p.Install.MenuCommand[0] != path.Join(p.Install.Destination, p.Install.Launcher) {
+				problems = append(problems, "menu command must invoke the package launcher from a separate allowed menu path")
+			}
+			for _, argument := range p.Install.MenuCommand {
+				if strings.ContainsRune(argument, '\x00') {
+					problems = append(problems, "menu command arguments must not contain NUL")
+				}
+			}
 		}
 	}
 	return problems
