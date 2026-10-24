@@ -30,6 +30,62 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
 
+func TestPocketCuratorLauncherFindsPrivatePayloadAfterInstallAndRepair(t *testing.T) {
+	// Only reproduce the launcher's directory selection, not its downloads,
+	// mounts, cleanup or application code.
+	header := "#!/bin/bash\nSCRIPT_DIR=\"$(dirname \"$0\")\"\ndirectory=\"$1\"\n"
+	before := "GAMEDIR=\"/$directory/ports/pocketcurator\""
+	after := "GAMEDIR=\"$SCRIPT_DIR/pocketcurator\"      "
+	footer := "\ntest -f \"$GAMEDIR/main.py\" || exit 1\nprintf '%s' \"$GAMEDIR\"\n"
+	asset := zipBytes(t, map[string]string{
+		"Pocket Curator.sh":           header + before + footer,
+		"pocketcurator/main.py":       "payload marker, never executed",
+		"pocketcurator/settings.json": "defaults",
+	})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg, err := manifest.Load("../../catalogue/packages/io.github.tomtombombadil.pocketcurator.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg.Release = testPackage(pkg.Release.URL, asset, pkg.Version).Release
+	for i := range pkg.Install.BinaryPatches {
+		pkg.Install.BinaryPatches[i].Offset = int64(len(header))
+		digest := sha256.Sum256([]byte(header + after + footer))
+		pkg.Install.BinaryPatches[i].SHA256 = hex.EncodeToString(digest[:])
+	}
+	for _, operation := range []Op{OpInstall, OpRepair} {
+		t.Run(string(operation), func(t *testing.T) {
+			root := t.TempDir()
+			detected := testPlatform()
+			detected.Dependencies = append(detected.Dependencies, "portmaster")
+			manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(detected)
+			if operation == OpRepair {
+				legacy := pkg
+				install := *pkg.Install
+				install.BinaryPatches = nil
+				legacy.Install = &install
+				if _, err := manager.Apply(context.Background(), OpInstall, legacy); err != nil {
+					t.Fatal(err)
+				}
+				writeRootFile(t, root, "userdata/roms/ports/PocketCurator/pocketcurator/settings.json", "my settings")
+			}
+			if _, err := manager.Apply(context.Background(), operation, pkg); err != nil {
+				t.Fatal(err)
+			}
+			launcher := filepath.Join(root, "userdata/roms/ports/PocketCurator/Pocket Curator.sh")
+			output, err := exec.Command("bash", launcher, strings.TrimPrefix(root, "/")+"/userdata/roms").CombinedOutput()
+			want := filepath.Join(root, "userdata/roms/ports/PocketCurator/pocketcurator")
+			if err != nil || string(output) != want {
+				t.Fatalf("launcher did not find its installed payload: got %q, want %q, err %v", output, want, err)
+			}
+			if operation == OpRepair {
+				assertRootFile(t, root, "userdata/roms/ports/PocketCurator/pocketcurator/settings.json", "my settings")
+			}
+		})
+	}
+}
+
 func TestUpstreamManagedInstallRepairAndGuardedRemoval(t *testing.T) {
 	root := t.TempDir()
 	asset := zipBytes(t, map[string]string{"launch.sh": "upstream launcher", "settings.json": "defaults"})
