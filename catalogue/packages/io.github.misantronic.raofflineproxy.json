@@ -18,9 +18,22 @@
       "Rechecked 2026-10-24: data-only decoding at byte offset 1173 after the unique __RAOFFLINEPROXY_PAYLOAD_BELOW__ marker yielded a 1018930-byte tar.gz with 66 regular files, 9 directories, and 2340621 regular-file bytes. No duplicate paths, traversal, absolute paths, or special-file entries were found. Store base64_offset support removes the need for a separately published archive; it never executes the shell prefix.",
       "Authorized upstream-managed experimental installation: the Store only verifies and extracts the bundle, maps launchers into bin, and creates a Tools entry. It does not run the installer or configure the proxy. Launch the app to set up emulator integration and optional autostart. Runtime writes and upstream updates are not sandboxed or checksum-controlled by the Store.",
       "Stop the proxy, disable autostart, then run bin/raofflineproxy remove-boot-hook before Store removal. Read-only removal checks reject remaining boot/game hooks, a service PID file, or the default proxy address in known emulator/frontend configs. Saved patch state is retained because upstream Stop may leave it after restoring emulator settings. The Store never removes shared hooks or persistent config/cache data. Do not use upstream Uninstall if you need cached credentials or queued awards; it deletes them. Custom proxy addresses and configuration paths require manual review.",
-      "Both bundled native libraries are ELF64 AArch64 with a glibc 2.17 symbol floor. The SQLite extension targets CPython 3.12. Python 3.12 and pygame must already be present; no runtime is installed by the Store. Actual device loading remains untested."
+      "Both bundled native libraries are ELF64 AArch64 with a glibc 2.17 symbol floor. The SQLite extension targets CPython 3.12. Python 3.12 and pygame must already be present; no runtime is installed by the Store. The owner confirmed this version tested on TrimUI Smart Pro, Knulli, aarch64, 1280x720 on 2026-10-25. Other device matrices remain untested."
     ],
     "evidence": [
+      {
+        "kind": "real-device-test",
+        "url": "https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b",
+        "note": "Owner confirmed all seven current versions tested on TrimUI Smart Pro only. Separate lifecycle steps were not reported.",
+        "tester": "dunghd",
+        "date": "2026-10-25",
+        "package_version": "2.2.0-alpha1",
+        "firmware": "knulli",
+        "architecture": "aarch64",
+        "device": "trimui-smart-pro",
+        "resolution": "1280x720",
+        "result": "passed"
+      },
       {
         "kind": "repository",
         "url": "https://github.com/misantronic/RAOfflineProxy"

@@ -16,9 +16,22 @@
       "Grout 5.2.0.0 is authorized for experimental installation on any Knulli device with matching aarch64 glibc and declared SDL libraries. Device lists and display bounds are advisory; missing exact-device evidence means untested, not blocked.",
       "The Store replaces the one pinned updater-metadata URL in the reviewed binary with a reserved .invalid URL and verifies the exact transformed SHA-256. This prevents Grout's self-updater from obtaining release metadata.",
       "The manager preserves config.json, save_slots.json, .cache, and logs during update, repair, force reinstall, and uninstall. Recovery backups remain available for manual restore.",
-      "Real-device validation is limited to Grout 5.1.0.0 on TrimUI Smart Pro with Knulli Scarab; it does not verify this 5.2.0.0 release or another device."
+      "The owner confirmed Grout 5.2.0.0 tested on TrimUI Smart Pro, Knulli, aarch64, 1280x720 on 2026-10-25. Individual lifecycle results and other devices are not covered by this report."
     ],
     "evidence": [
+      {
+        "kind": "real-device-test",
+        "url": "https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b",
+        "note": "Owner confirmed all seven current versions tested on TrimUI Smart Pro only. Separate lifecycle steps were not reported.",
+        "tester": "dunghd",
+        "date": "2026-10-25",
+        "package_version": "5.2.0.0",
+        "firmware": "knulli",
+        "architecture": "aarch64",
+        "device": "trimui-smart-pro",
+        "resolution": "1280x720",
+        "result": "passed"
+      },
       {
         "kind": "repository",
         "url": "https://github.com/rommapp/grout"

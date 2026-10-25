@@ -14,13 +14,26 @@
     },
     "notes": [
       "User-authorized experimental installation on any Knulli device with matching aarch64 glibc and declared SDL libraries. Device lists and display bounds are advisory; exact-device evidence controls the tested badge.",
-      "Real-device validation is limited to PlayTime 1.0.0 on TrimUI Smart Pro with Knulli Scarab. The tester reported only that the test was all good; individual lifecycle steps were not reported.",
+      "The owner confirmed PlayTime 1.0.0 tested on TrimUI Smart Pro, Knulli, aarch64, 1280x720 on 2026-10-25. This supplements the September report; individual lifecycle steps were not reported.",
       "MagicX testing is authorized from confirmed Knulli, aarch64, 640x480, and SDL GameController runtime facts; package install and launch remain untested.",
       "The manager restores execute permission only for the reviewed playtime binary and playtime.sh launcher.",
       "PlayTime statistics remain outside the managed package directory under /userdata/system/configs/playtime.",
       "The tagged UI derives its layout from the display size and falls back to 640x480. Accelerated SDL rendering and the MagicX controller remain real-device test requirements."
     ],
     "evidence": [
+      {
+        "kind": "real-device-test",
+        "url": "https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b",
+        "note": "Owner confirmed all seven current versions tested on TrimUI Smart Pro only. Separate lifecycle steps were not reported.",
+        "tester": "dunghd",
+        "date": "2026-10-25",
+        "package_version": "1.0.0",
+        "firmware": "knulli",
+        "architecture": "aarch64",
+        "device": "trimui-smart-pro",
+        "resolution": "1280x720",
+        "result": "passed"
+      },
       {
         "kind": "repository",
         "url": "https://github.com/unitreign/playtime"

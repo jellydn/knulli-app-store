@@ -13,7 +13,7 @@
       "provenance": "maintainer"
     },
     "notes": [
-      "RetSend 1.0.0 is the upstream Knulli release, authorized for experimental installation on any Knulli device with matching aarch64 glibc, SDL2, and libc. Device lists and display bounds are advisory. No real-device test is recorded for this version. Approval remains maintainer provenance, not community or device verification.",
+      "RetSend 1.0.0 is the upstream Knulli release, authorized for experimental installation on any Knulli device with matching aarch64 glibc, SDL2, and libc. Device lists and display bounds are advisory. The owner confirmed this version tested on TrimUI Smart Pro, Knulli, aarch64, 1280x720 on 2026-10-25. Approval provenance and experimental safety-review status are unchanged.",
       "The stable package ID and destination are retained so fork installations can update in place. The upstream tools/ prefix stays inside /userdata/roms/tools/RetSend to avoid colliding with the fork's retsend file. The archive's gamelist.xml and image remain package-local; the Store owns only one entry in the shared gamelist.",
       "GitHub reports v1.0.0 as not immutable. The Store pins the accepted bytes by exact compressed size, installed size, and SHA-256 before extraction. Source evidence pins tag commit 7968a92c1f751521ac426397c87cea146cb769b0.",
       "The archive contains five regular files and three directory entries, with no links, special files, traversal, or duplicate paths. Only Retsend.sh and retsend/retsend receive execute mode. The upstream ZIP does not ship LICENSE or third-party notices; source licensing and the missing bundled notices are disclosed, not treated as resolved.",
@@ -21,9 +21,22 @@
       "HOME and XDG_DATA_HOME stay in the package-local retsend directory. Logs and SDL preferences are unmanaged runtime files there. The upstream ES InvertButtons mapping, back-to-quit behavior, and binary are unchanged. The launcher uses no remote installer or PortMaster helper. Upstream browser roots are not a filesystem sandbox.",
       "LAN discovery uses UDP 53317; HTTPS transfers use self-signed peer certificates and TCP 53317 with fallback ports. Configuration permits HTTP. Only the reviewed upstream ZIP is downloaded by the Store.",
       "Security limits remain: no authenticated TLS peer pinning, no explicit restrictive private-key mode, no symlink-safe rooted receive writes or storage quota, overwrite enabled by default, and no signed immutable release, attestation, or per-crate SBOM. These block verified status.",
-      "The binary requires glibc 2.28 and SDL 2.0.18 or later for SDL_RenderGeometry. Detection confirms SDL2 presence, not its version. Controller behavior and display bounds still need exact-device testing."
+      "The binary requires glibc 2.28 and SDL 2.0.18 or later for SDL_RenderGeometry. Detection confirms SDL2 presence, not its version. Other device matrices still need testing."
     ],
     "evidence": [
+      {
+        "kind": "real-device-test",
+        "url": "https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b",
+        "note": "Owner confirmed all seven current versions tested on TrimUI Smart Pro only. Separate lifecycle steps were not reported.",
+        "tester": "dunghd",
+        "date": "2026-10-25",
+        "package_version": "1.0.0",
+        "firmware": "knulli",
+        "architecture": "aarch64",
+        "device": "trimui-smart-pro",
+        "resolution": "1280x720",
+        "result": "passed"
+      },
       {
         "kind": "repository",
         "url": "https://github.com/mxmgorin/retsend",

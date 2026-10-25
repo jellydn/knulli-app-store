@@ -12,11 +12,24 @@
       "Requires a retroshelf account and Wi-Fi for linking and syncing. Upstream documents offline session queuing and a game-session hook installed on first launch.",
       "Review on 2026-10-24 verified the version-pinned Knulli v0.5.6 ZIP against the publisher checksums.txt and GitHub asset digest: 19393643 compressed bytes, 41864615 regular-file bytes, SHA-256 bb60de30f256e9f187e755b2cc84b6df2ffb6b5d04a2be63f8421fdbec18c8bb. All eight files and four directories were inspected; no packaged code was executed.",
       "Authorized upstream-managed experimental installation follows the Knulli guide: extract into /userdata/roms/tools/retroshelf, register the launcher, then let the user launch and link. First launch installs session hooks. Runtime writes and upstream updates are not sandboxed or checksum-controlled by the Store.",
-      "A redistributable license has not been verified. The public release repository links to a source repository that returned HTTP 404 during review. ELF inspection establishes AArch64 and a glibc 2.17 symbol floor for the UI; the sync engine has no dynamic NEEDED entries. Actual device loading, write containment, preserved credentials and session data, hook ownership, and uninstall behavior remain unverified.",
+      "A redistributable license has not been verified. The public release repository links to a source repository that returned HTTP 404 during review. ELF inspection establishes AArch64 and a glibc 2.17 symbol floor for the UI; the sync engine has no dynamic NEEDED entries. The owner confirmed this version tested on TrimUI Smart Pro, Knulli, aarch64, 1280x720 on 2026-10-25. Separate write-containment, preserved-data, hook-ownership and uninstall results were not reported.",
       "The Store links directly to the publisher's release; it does not mirror or redistribute the ZIP. License remains unverified and is disclosed before installation. This exception is limited to upstream-managed experimental packages; no license identifier or device-test result is invented.",
       "Before Store removal, close the app and run /userdata/roms/tools/retroshelf/bin/retroshelf-uninstall.sh --keep-data to remove its hooks while preserving the linked device and sync history. A read-only check of /userdata/system/scripts refuses removal while any hook still references retroshelf. The Store never runs that script or removes shared hooks or runtime-created data."
     ],
     "evidence": [
+      {
+        "kind": "real-device-test",
+        "url": "https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b",
+        "note": "Owner confirmed all seven current versions tested on TrimUI Smart Pro only. Separate lifecycle steps were not reported.",
+        "tester": "dunghd",
+        "date": "2026-10-25",
+        "package_version": "0.5.6",
+        "firmware": "knulli",
+        "architecture": "aarch64",
+        "device": "trimui-smart-pro",
+        "resolution": "1280x720",
+        "result": "passed"
+      },
       {
         "kind": "setup-guide",
         "url": "https://www.retroshelf.org/help/plugins/knulli",
@@ -64,7 +77,7 @@
     "launcher": "retroshelf.sh",
     "executables": ["retroshelf.sh", "retroshelf-app", "retroshelf-sync", "bin/retroshelf-uninstall.sh"],
     "upstream_managed": true,
-    "warning": "Untested; license unverified. Direct upstream download, not redistributed. App controls hooks and updates. Close app before Store operations; Repair restores pinned code. Before removal run bin/retroshelf-uninstall.sh --keep-data. Account and session data stay.",
+    "warning": "Experimental; license unverified. Owner-tested on TrimUI Smart Pro; other device matrices remain untested. Direct upstream download, not redistributed. App controls hooks and updates. Close app before Store operations; Repair restores pinned code. Before removal run bin/retroshelf-uninstall.sh --keep-data. Account and session data stay.",
     "menu": {
       "gamelist": "/userdata/roms/tools/gamelist.xml",
       "path": "./retroshelf/retroshelf.sh",

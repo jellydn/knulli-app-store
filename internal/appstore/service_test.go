@@ -50,8 +50,9 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 	experimental := 0
 	verified := 0
 	for _, item := range items {
-		if item.Package.ID == "io.github.unitreign.playtime" && !item.DeviceTested {
-			t.Fatalf("Smart Pro test evidence was not matched for %s", item.Package.ID)
+		wantTested := item.Package.ID != "io.github.jellydn.random-game-picker"
+		if item.DeviceTested != wantTested {
+			t.Fatalf("wrong exact-version Smart Pro test badge for %s: got %v, want %v", item.Package.ID, item.DeviceTested, wantTested)
 		}
 		if item.Package.Installable() {
 			if item.Package.Experimental() {
