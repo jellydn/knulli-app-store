@@ -156,16 +156,38 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	defer ticker.Stop()
 	exitRequested := false
 	var repeat NavRepeat
+	dirty := true
+	noticeCount := 0
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+			// Include expose/reset and hotplug events, not only mapped actions.
+			dirty = true
 			if handleEvent(ctx, model, event, &controller, controls, options.Diagnostics, options.Input) {
 				return nil
 			}
 		}
 		if !options.Input.IsKeyboard() {
-			repeatHeldDirection(ctx, model, controls, controller, options.Diagnostics, &repeat)
+			if repeatHeldDirection(ctx, model, controls, controller, options.Diagnostics, &repeat) {
+				dirty = true
+			}
 		}
-		model.Poll()
+		if model.Poll() {
+			dirty = true
+		}
+		// Expire notices even while idle; their disappearance needs one redraw.
+		if count := len(model.LiveToasts()); count != noticeCount {
+			noticeCount = count
+			dirty = true
+		}
+		if !dirty && options.Screenshot == "" && walk == nil {
+			continue
+		}
+		dirty = false
 		frame := canvas.draw(model, platformHeader, controls)
 		if err := texture.Update(nil, unsafe.Pointer(&frame.Pix[0]), frame.Stride); err != nil {
 			return fmt.Errorf("upload card frame: %w", err)
@@ -225,11 +247,6 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 				cancel()
 				return fmt.Errorf("walkthrough timed out after %s: sent %d of %d keys, captured %d frames", options.WalkTimeout, walk.Sent(), len(options.Keys), walk.Steps())
 			}
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
 		}
 	}
 }
@@ -457,20 +474,21 @@ func heldDirection(controller *controllerState, mapping storeinput.Mapping) stor
 // repeatHeldDirection feeds the pad's held direction to the repeat schedule and
 // re-dispatches the direction through the same handler a press uses, so a
 // repeat reaches the screen the press did.
-func repeatHeldDirection(ctx context.Context, model *storeui.Model, controls *storeinput.Session, controller *controllerState, logger *diagnostics.Log, repeat *NavRepeat) {
+func repeatHeldDirection(ctx context.Context, model *storeui.Model, controls *storeinput.Session, controller *controllerState, logger *diagnostics.Log, repeat *NavRepeat) bool {
 	var direction storeinput.Action
 	if controller != nil {
 		direction = heldDirection(controller, controls.ScreenMapping())
 	}
 	action, due := repeat.Held(direction, time.Now())
 	if !due {
-		return
+		return false
 	}
 	button, ok := controls.ScreenMapping()[action]
 	if !ok {
-		return
+		return false
 	}
 	Handle(ctx, model, controls, logger, Event{Kind: EventButton, Button: button})
+	return true
 }
 
 func selectedOutputSize(resolution string) (int, int) {
