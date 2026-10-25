@@ -38,6 +38,12 @@ case "$TARGET" in
   *) echo "unsupported device target: $TARGET" >&2; exit 2 ;;
 esac
 
+# Host packaging tools can be missing even when the cross-toolchain is ready.
+if ! command -v zip >/dev/null 2>&1 || ! command -v file >/dev/null 2>&1 || ! command -v readelf >/dev/null 2>&1; then
+  apt-get update -qq
+  apt-get install -y -qq binutils file zip
+fi
+
 if ! command -v aarch64-linux-gnu-gcc >/dev/null 2>&1 ||
   ! PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig pkg-config --exists sdl2 SDL2_image SDL2_ttf SDL2_gfx; then
   dpkg --add-architecture arm64
@@ -53,9 +59,9 @@ mkdir -p "$OUTPUT_DIR"
 CATALOG="$WORK/catalog-index.json"
 KEY="$WORK/catalog-signing-key"
 
-# The index is signed with a key generated for this build, and the matching
-# public key is compiled into both binaries, so a signed index cannot outlive
-# the binary that embeds its key until a long-lived production key exists.
+# The index is signed with a key generated for this build. The GUI retains the
+# verification key; the CLI's unused key can be removed by the linker. Ship
+# the GUI and its signed index together until a stable key policy exists.
 go run ./cmd/knulli-app catalogue -output "$CATALOG" -generate-signing-key "$KEY"
 PUBLIC_KEY=$(tr -d ' \n' < "$KEY.pub")
 if [ "${#PUBLIC_KEY}" -ne 64 ]; then
