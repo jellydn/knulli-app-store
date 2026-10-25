@@ -1,15 +1,17 @@
-# Random Game Picker 0.2.0 contract
+# Random Game Picker 0.2.1 contract
 
 The catalogue pins the public stable Go release, not development-build bytes.
-The final tag resolves to `da79d67d74185dda23d6804a30d38cb2c66cd57c`.
+The final tag resolves to
+[4eb687b](https://github.com/jellydn/knulli-random-game-picker/commit/4eb687b0a4cdb2b42787739157cfb12db5b4af90).
 
-- Asset: `random-game-picker-0.2.0-knulli-aarch64.zip`, from
-  <https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.2.0/random-game-picker-0.2.0-knulli-aarch64.zip>.
-- ZIP size: 3,273,845 bytes; regular-file total: 7,872,532 bytes across 20 files.
-- SHA-256: `3f8a225cffcb2a89ffee166ff4f06dbf87923142309d97203e738a8200737df4`.
+- Asset: `random-game-picker-0.2.1-knulli-aarch64.zip`, from
+  <https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.2.1/random-game-picker-0.2.1-knulli-aarch64.zip>.
+- ZIP size: 3,274,637 bytes; regular-file total: 7,873,304 bytes across 20 files.
+- SHA-256: `1645ecb4d8fd38a7b2a8405bdb493dc9a121dceb202e7a772533353e78105f1f`.
 - Publisher `artifact.json`, `SHA256SUMS.txt`, `abi.txt` and
-  `archive-inventory.txt` accompany the ZIP. Independently downloaded bytes
-  agree with the checksum and manifest.
+  `archive-inventory.txt` accompany the ZIP, with `build-info.txt` for build
+  provenance. All six anonymous downloads match GitHub sizes and digests;
+  the ZIP agrees with the publisher checksum, inventory and manifest.
 - GitHub reports `immutable=false`. The version-specific URL and enforced
   size/SHA pin protect the reviewed content; no server-enforced immutability
   or repository setting change is claimed.
@@ -24,9 +26,23 @@ The final tag resolves to `da79d67d74185dda23d6804a30d38cb2c66cd57c`.
   No libstdc++ dependency or replacement firmware libraries. The only network
   calls are bounded loopback ES API requests on port 1234.
 
-The package stays experimental. Development-build injected controls and ES
-handoff evidence do not prove stable-version physical presses, audible sound,
-normal gameplay/hotkey return, or MagicX hardware operation.
+Version 0.2.1 fixes partial malformed settings, bounds reads, avoids idle
+redraws, limits path-identity reuse to one scan and hardens ABI/provenance
+checks. Fresh discovery before Play, exact system/path checks, successful
+save and SDL teardown before one POST, and no ambiguous retry remain required.
+
+The package stays experimental and **UNTESTED on every hardware matrix**.
+The owner's Picker 0.2.0 report remains historical exact-version evidence;
+it does not grant a badge to 0.2.1. Host/race SDL fixtures cover both target
+sizes, not physical controls, audio, gameplay/hotkey return, external pads,
+real overrides/second-system behavior, MagicX or handheld performance.
+
+The Store verified published-byte fresh Install, 0.2.0→0.2.1 Update, Repair
+and Uninstall in disposable roots. All 20 installed files matched the ZIP,
+both executables kept their modes and nested `state/` data survived. These
+checks did not execute the ARM64 app. See the
+[Picker release workflow](https://github.com/jellydn/knulli-random-game-picker/actions/runs/40148484875)
+and [device evidence](real-device-tests.md).
 
 ## UI reference
 
@@ -41,3 +57,6 @@ as the Store frontend.
 
 Coordination and device evidence:
 <https://ampcode.com/threads/T-01a16e60-ed52-70d8-ac24-d7b17380f4e5>.
+
+Picker 0.2.1 release contract and remaining hardware limits:
+<https://ampcode.com/threads/T-01a1705a-0fca-70c2-aaf0-f791d3b40d2b>.
