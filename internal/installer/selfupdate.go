@@ -15,6 +15,7 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/gamelist"
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	"github.com/jellydn/knulli-app-store/internal/safefs"
+	"github.com/jellydn/knulli-app-store/internal/version"
 )
 
 const StoreDirectory = "/userdata/roms/ports/knulli-app-store"
@@ -80,6 +81,11 @@ func (m Manager) CheckStoreUpdate(ctx context.Context, target, current string) (
 			decoded, err := hex.DecodeString(digest)
 			if !strings.HasPrefix(asset.Digest, "sha256:") || err != nil || len(decoded) != 32 || asset.Size <= 0 || asset.Size > manifest.MaxPackageBytes {
 				return nil, fmt.Errorf("store asset lacks a valid SHA-256 or byte size")
+			}
+			// API order can change when an old release is published again.
+			// Hash builds have no numeric order; retain their existing discovery.
+			if order, comparable := version.CompareNumeric(release.Tag, current); comparable && order <= 0 {
+				return nil, nil
 			}
 			return &StoreUpdate{Version: release.Tag, Release: manifest.Release{URL: asset.URL, SHA256: digest, Size: asset.Size, InstalledSize: manifest.MaxPackageBytes, Format: "zip", Immutable: true}}, nil
 		}
