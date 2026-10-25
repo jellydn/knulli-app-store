@@ -1,99 +1,175 @@
 KNULLI APP STORE - MAGICX ZERO 28 EXPERIMENTAL BUILD
 
-Knulli source identifies this target as magicx-zero-28, AArch64 Cortex-A53,
-with a 640x480 display. A real-device diagnostic confirms Knulli Scarab,
-aarch64, 640x480, and SDL GameController magicx-input with a nonzero GUID.
-Physical button assignments remain runtime data.
+Target: Knulli, AArch64, 640x480. A device diagnostic confirms Knulli Scarab,
+the display, and SDL GameController magicx-input. Full GUI tests are incomplete.
+The current gabagool-backed Option B Library is a responsive list, not the
+earlier one-card browser. Smart Pro evidence does not verify MagicX. A full
+release does not remove these experimental limits. Package evidence is separate.
 
-INSTALL OR UPDATE
+INSTALL OR MANUAL UPDATE
 
-1. On a computer, verify the ZIP with: sha256sum -c SHA256SUMS.txt
-2. Shut down Knulli.
-3. Extract the versioned ZIP into /userdata/roms/ports and replace an older
-   Knulli App Store launcher and knulli-app-store directory when updating.
-   Confirm images/Knulli App Store.png is present beside the launcher.
-4. Safely eject, boot, and refresh game lists or reboot.
-5. Open Knulli App Store in Ports. The Ports list uses that image after a
-   game list refresh.
+Release target: v2026.10.25.1. Hardware reports remain scoped to the artifacts
+actually tested. Earlier Smart Pro Picker evidence applies to 0.2.0, not 0.2.1.
 
-CONTROLLER SETUP
+1. Download examples for the MagicX ZIP and SHA256SUMS.txt:
+   https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.25.1
+   The target ZIP is:
+   knulli-app-store-magicx-zero-28-experimental-v2026.10.25.1.zip
+2. In the download directory, run:
+   sha256sum --ignore-missing -c SHA256SUMS.txt
+   Continue only if your ZIP reports OK. The other target may be absent.
+3. Shut down Knulli and connect its data card to the computer.
+4. Extract the ZIP directly into /userdata/roms/ports. Check these paths:
+   /userdata/roms/ports/Knulli App Store.sh
+   /userdata/roms/ports/knulli-app-store/knulli-app-ui
+   /userdata/roms/ports/images/Knulli App Store.png
+5. For an update, replace all Store release files together: launcher, icon,
+   CLI, GUI, catalogue, signature, and this guide. Do not delete installed
+   apps, settings, or /userdata/system/knulli-app-store.
+6. Safely eject, start Knulli, and refresh game lists or reboot.
+7. Open Knulli App Store in Ports.
 
-The first launch for each device/controller identity uses a dedicated screen
-before the catalogue. Choose Use Detected Mapping, Test Detected Mapping,
-Customize, or Safe Exit. Every choice that builds a mapping asks one question
-first: whether this pad pages with the shoulder buttons. Paging is optional, so
-a pad without them answers SKIP PAGING and setup asks only for the required
-actions. Customize assigns one semantic action at a time, and each detected
-button has Select, Retry, Start Over, and Back choices. Conflicts stay on the
-current action. The preview is finished by the required actions, and an optional
-binding never pressed is left out of what is saved. No timeout skips setup.
+Device builds need system SDL2, SDL2_image, and SDL2_ttf. SDL2_gfx is linked
+statically. The build rejects required glibc versions above 2.34. Do not
+replace Knulli's system libraries.
 
-Open Settings with the control the footer shows beside SETTINGS. Settings can
-rerun setup, export diagnostics, reset the active mapping, or close. Hold the
-saved Back and Settings controls while launching to force setup. Instructions
-do not assume physical A/B positions. A missing SDL GameController shows a
-blocked screen and diagnostic locations instead of the catalogue.
+CONTROLS
 
-The footer is the only place a screen shows controls. It names each available
-action beside its binding, for example Confirm (SOUTH)  Settings (NORTH)  Quit
-(SELECT + NORTH),
-and the same action name always means the same action. No screen repeats a
-control hint in its own text; the controller mapping summary uses the same
-names. Quitting is the one control no button carries alone: hold Select and
-press North. On the blocked screen, Confirm exports diagnostics and that chord is
-the way out.
+The Store opens the Option B Library immediately: nearby rows remain visible,
+the selected row expands beside a mint focus rail, and All/Ready/Installed
+filters stay visible. The footer uses circled face-button glyphs and contextual
+actions; the upper badge shows the quit chord. There is no controller setup
+or custom mapping editor. Controls use Knulli's EmulationStation (ES) letters:
 
-The catalogue opens on its whole list and carries a tab bar above the rows:
-ALL, READY, and INSTALLED, with the active view marked in the accent colour.
-Left and right step the bar, up and down step the rows, and the shoulders page
-a list longer than its window. A finished operation reports in a notice bar
-over the bottom of the panel and clears itself after three seconds; a failure
-is not a notice and keeps the status block until it is answered.
+  D-pad up/down     Browse apps; left/right also work
+  L1/R1             Filter All, Ready, and Installed
+  A                 Review or confirm an action
+  B                 Cancel or go back
+  Y                 Open More; Y inside More exports diagnostics
+  Select + Y        Hold Select, then press Y to quit
 
-Mappings are stored by Knulli device plus controller GUID under:
-  /userdata/system/configs/knulli-app-store/controller-mappings.json
+The first A press on a row opens confirmation; it does not install an app.
+More has details and secondary actions. An Issue opens its health check first.
+The footer shows the actions available on each screen. Completion notices
+clear after three seconds; failures stay until answered.
 
-When GUID is absent, device plus normalized controller name is used. A mapping
-with neither is not saved. Corrupt files are retained with a .corrupt suffix.
+The launcher selects the default Knulli layout, or Xbox layout when the Ports
+Xbox flag exists. Bindings compensate once; SDL events are not swapped.
+Update the launcher and binaries together. Legacy controller-mappings.json
+files are ignored and left unchanged. No assignments are loaded or saved.
 
-PACKAGE STATUS
+If no SDL GameController is available, a blocked screen shows diagnostic
+paths. Reconnect the controller to resume. Y exports diagnostics directly
+there and on an empty catalogue; Confirm also exports on the blocked screen.
+Select+Y remains the quit chord.
 
-STORE SELF-UPDATE: select the Knulli App Store card, confirm Check for updates,
-then select and confirm Update when offered. Exit and reopen after completion.
-Official experimental builds are included. Exact asset size and SHA-256 are
-verified before journaled replacement. Installed apps and settings stay intact.
-Requires the standard /userdata/roms/ports/knulli-app-store location. Older
-builds need one manual ZIP update to gain this feature.
+STORE SELF-UPDATE
 
-All packaged apps can install on any Knulli device when architecture, glibc
-ABI and runtime libraries pass. Device identity and display size do not block
-installation. Without an exact device report, the badge is UNTESTED.
-Select Install, or Manage existing for detected external files, and confirm
-the warning. An empty destination directory is not a copy, and a card that
-reports a wider file mode than requested is not a health failure. The Store
-disables Grout's self-updater with a verified staging patch. RetSend needs
-local Wi-Fi and keeps its configuration and TLS identity under
-/userdata/system/configs/retsend, with the default receive directory in
-/userdata/roms/retsend-inbox. A verified launcher patch keeps these paths on
-update from the fork; saved or selected routes can override the default inbox.
-None of the three has MagicX real-device evidence.
+Select the Knulli App Store entry. Confirm Check for updates, then confirm
+Update when offered. Exit and reopen after completion. Checks include
+official experimental pre-releases and use this packaged target.
 
-PlayTime data stays under /userdata/system/configs/playtime. Manager state and
-adoption backups are under /userdata/system/knulli-app-store. Force reinstall
-appears only after Manage existing fails, needs two confirmations, and stores
-a timestamped recovery backup. Package details
-and the log identify the exact managed file when Repair is required. The app
-asks Knulli to reload game lists when it changes the menu; reboot if it reports
-that a restart is required.
+Self-update needs the standard /userdata/roms/ports/knulli-app-store location
+and a build with update support. It verifies GitHub's asset size and SHA-256,
+then replaces only the seven Store release files. Installed apps and settings
+stay. This trusts GitHub and the publisher account, not an independent update
+signing key. Older builds, custom locations, and text file busy failures need
+the manual ZIP procedure above. Startup recovery runs before the GUI loads.
+A failed rollback retains its journal and snapshots for recovery. Evidence
+already deleted by an older build cannot be recovered by this mechanism.
+
+CATALOGUE AND SAFETY
+
+On 2026-10-25 (Asia/Singapore), the owner confirmed seven listed versions
+tested on TrimUI Smart Pro only, Knulli AArch64 at 1280x720. Source:
+https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b
+Manifest statuses remain experimental: Grout 5.2.0.0, PlayTime 1.0.0,
+Random Game Picker 0.2.0, RetSend 1.0.0, PocketCurator 1.1.2,
+RAOfflineProxy 2.2.0-alpha1, and retroshelf 0.5.6. Passed package evidence
+covers that Smart Pro matrix only. MagicX and other matrices remain untested.
+Picker is now 0.2.1 and UNTESTED on all matrices. The 0.2.0 report remains
+historical exact-version evidence. The other six current versions retain
+Smart Pro-only evidence. All seven review statuses remain experimental.
+Separate lifecycle, physical button, audio, power-loss, and Store idle-redraw
+results are not supplied by this confirmation.
+
+Firmware, architecture, ABI, and runtime libraries must pass checks. Unknown
+device identity or display size does not block installation. UNTESTED means
+no exact package-version and device-matrix evidence exists. No current package
+has exact MagicX evidence. A Smart Pro result does not verify MagicX, and
+Store navigation does not prove package behavior.
+
+The Store verifies pinned HTTPS downloads before staging regular files. It
+never runs a downloaded installer. Store writes stay below /userdata and use
+journals and snapshots for rollback. Installed apps are NOT sandboxed.
+PortMaster is external; the Store does not install its catalogue.
+
+An existing copy offers Manage existing. Exact matches can become owned;
+uncertain files stay unmanaged and are backed up before later replacement.
+Empty directories do not count as external copies. Repair restores pinned
+files and keeps declared data. Uninstall removes owned files and restores
+originals where applicable. Close apps before Store operations.
+
+Grout's updater URL is disabled by a verified staging patch. Its settings
+stay under /userdata/roms/tools/Grout. PlayTime data stays under
+/userdata/system/configs/playtime. RetSend keeps configuration and TLS identity
+under /userdata/system/configs/retsend and its default inbox under
+/userdata/roms/retsend-inbox. User-selected routes can override that inbox.
+Repair moves an older RetSend launcher to RetSend/RetSend.sh.
+Random Game Picker 0.2.1 needs glibc 2.34 or later, firmware SDL2/image/ttf/gfx,
+and the loopback EmulationStation API. Settings and logs in state/ stay.
+It is UNTESTED on every device matrix. It fixes settings limits/malformed
+fields, idle redraw, per-scan path caching and ABI/provenance checks. Launcher,
+settings schema and exact-path ES launch behavior are unchanged. Preserve the
+entire state/ directory.
+https://github.com/jellydn/knulli-random-game-picker/releases/tag/v0.2.1
+Its runtime requirements are separate from the Store's.
+
+PocketCurator, RAOfflineProxy, and retroshelf are upstream-managed. They
+control later setup, runtime writes, downloads, and self-updates. Store Repair
+restores pinned code, not upstream-updated code, and keeps declared data.
+PocketCurator needs PortMaster and can permanently delete ROMs. Back up first.
+Use only ROMs you have the right to use and servers you trust. For an older
+PocketCurator launcher-path failure, update the Store to v2026.10.24.4 or
+later, close PocketCurator, then use More > Repair and confirm.
+
+RAOfflineProxy needs Python 3.12 and pygame. No separate publisher checksum
+exists; its pinned hash was checked against GitHub's asset digest. Before
+removal, stop the proxy, disable autostart, then run this command yourself:
+  /userdata/system/raofflineproxy/bin/raofflineproxy remove-boot-hook
+Follow remaining Store cleanup messages for game hooks and proxy settings.
+Keep its config/cache; upstream's own Uninstall action deletes data.
+
+retroshelf needs an account and Wi-Fi. Its license is unverified; the Store
+downloads directly from the publisher without redistribution. Close it, then
+run this command yourself before Store removal:
+  /userdata/roms/tools/retroshelf/bin/retroshelf-uninstall.sh --keep-data
+Read-only checks block removal while declared hooks or service state remain.
+They do not cover every custom path. The Store never runs cleanup scripts.
 
 TROUBLESHOOTING
 
-Application log:
-  /userdata/system/logs/knulli-app-store.log
+Application log: /userdata/system/logs/knulli-app-store.log
+Diagnostics: /userdata/system/knulli-app-store/diagnostics/
+Manager state and backups: /userdata/system/knulli-app-store/
 
-Use Settings > Export Diagnostics to write a redacted bundle under:
-  /userdata/system/knulli-app-store/diagnostics/
+Press Y for More, then Y to export diagnostics. Inspect the export for private
+data before sharing it. Exports contain platform, controller, catalogue, and
+redacted log data, not package settings or ROMs.
 
-The log includes controller device, GUID/name when exposed, mapping source,
-semantic events, setup decisions, validation failures, and display candidates.
-Inspect a diagnostic bundle for private data before sharing it.
+A full health check hashes immutable managed files. The GUI caches results;
+reopen the Store to detect changes made outside it. Wider filesystem modes
+are accepted; lost recorded owner permissions are an issue. Select Issue for
+the exact path and expected/actual hash or mode. Declared runtime data does
+not cause a health failure.
+
+Force reinstall is limited to recoverable management failures or validated
+stale transactions. It needs two confirmations and retains a complete backup
+under recovery-backups/<package-id>/. It cannot bypass mandatory safety checks.
+Active transactions block recovery actions. Do not edit state while running.
+
+A menu refresh accepted by Knulli is queued, not completed. Return to
+EmulationStation and refresh or restart it if an entry is missing.
+
+Device instructions and evidence:
+https://github.com/jellydn/knulli-app-store/blob/main/docs/magicx-zero-28.md

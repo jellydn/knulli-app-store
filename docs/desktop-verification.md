@@ -5,6 +5,23 @@ opens the catalogue immediately: no setup, calibration, or saved assignments.
 The scratch fixture supplies platform files; architecture and resolution are
 explicit overrides, not measurements from a real device.
 
+Release target: v2026.10.25.1. Hardware reports remain scoped to the artifacts
+actually tested. The earlier audit baseline was v2026.10.25 at `14490119`.
+Picker 0.2.1 is published but UNTESTED on every hardware matrix. Its settings
+limits/malformed-field handling, idle redraw, per-scan path caching and
+ABI/provenance fixes add no device evidence. Launcher, settings schema, `state/`
+preservation, firmware SDL requirements and the local ES API contract remain.
+The historical Picker 0.2.0 Smart Pro report does not verify 0.2.1. The other
+six current package versions retain Smart Pro-only evidence; all seven remain
+experimental. See [device evidence](real-device-tests.md).
+
+For the v2026.10.25.1 work, the lead reported passing race suites, 84.0% coverage,
+both Staticcheck tag sets and all ten network-backed GUI flows. Separately,
+published Picker 0.2.1 assets/digests, its 20 regular archive files and exact ABI
+were independently checked. Fixture-root Install, 0.2.0→0.2.1 Update, Repair and
+Uninstall passed with nested `state/` retained. No ARM64 runtime was executed;
+these package and desktop checks do not grant a hardware-tested badge.
+
 ## Prerequisites and interactive run
 
 Install SDL2 development libraries (`brew install sdl2 sdl2_image sdl2_ttf sdl2_gfx` or
@@ -39,15 +56,16 @@ toolkit's developer mapping wizard is not part of the Store.
 
 | Action | Desktop key | KNULLI ES button |
 | --- | --- | --- |
-| Browse app cards / action buttons | Arrow keys | D-pad |
+| Browse Library rows / action buttons | Arrow keys | D-pad |
 | Filter All / Ready / Installed | Page Up / Page Down | L1 / R1 |
 | Confirm | Enter | A |
 | Back | Escape | B |
 | More; export diagnostics inside More | Y | Y |
 | Quit | Hold Tab (or F5), then Y | Hold Select, then Y |
 
-The desktop card footer reads `Browse (LEFT/RIGHT)  Confirm (ENTER)  More (Y)  Quit (TAB + Y)`.
-The card opens confirmation directly for the first allowed action. More keeps
+The footer shows contextual actions and navigation/filter hints. The Library
+keeps nearby rows visible and expands the selected row. It opens confirmation
+directly for the first allowed action. More keeps
 the full action list and details; Y there exports diagnostics. Empty catalogues
 and blocked-controller screens still export directly. Confirmation panels show
 Confirm and Back; a busy operation advertises no unavailable actions. Keyboard
@@ -80,10 +98,10 @@ evidence when checks fail. Screenshots are not checked in.
 
 | Flow | Covers |
 | --- | --- |
-| `automatic-first-run` | Immediate app card, navigation and filtering |
+| `automatic-first-run` | Immediate Library, navigation and filtering |
 | `catalogue-walk` | Direct confirmation, cancel, More, secondary confirmation and quit |
 | `catalogue-tabs` | All, Ready, Installed and stepping out of an empty tab |
-| `catalogue-read-only` | A package with no safe action |
+| `upstream-managed-confirmation` | Full warnings for an actionable upstream-managed package |
 | `quit-chord` | Escape does not quit; held Tab plus Y does |
 | `export-diagnostics` | Y for More, Y there to export |
 | `blocked-export-diagnostics` | No-controller diagnostics and quit |
@@ -118,10 +136,13 @@ runtime-library, and framebuffer evidence below a throwaway root. Its
 relative paths, and unmarked non-empty directories. Installs, logs, recovery
 backups and diagnostics remain below the fixture root.
 
-The catalogue starts on All; left/right browse one app card at a time, while
-L1/R1 (Page Up/Down) step All, Ready and Installed. Up/down also browse cards.
-Tabs remember selection. Operation notices clear after three
-seconds; failures remain until answered.
+The Library starts on All; up/down browse rows, and left/right also work.
+L1/R1 (Page Up/Down) step All, Ready and Installed. Filters remember selection.
+Operation notices clear after three seconds; failures remain until answered.
+Normal runs poll at 30 Hz but redraw only after input, window/controller events,
+held navigation repeats, operation events or notice expiry. Screenshot and
+scripted walkthrough runs still render complete frames on each step. They do
+not measure quiet interactive CPU use.
 
 Renderer and router tests cover automatic controls in both letter modes,
 ignored legacy mappings, disconnect/hotplug, footers, lifecycle confirmations,
