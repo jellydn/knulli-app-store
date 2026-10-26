@@ -44,8 +44,8 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 7 {
-		t.Fatalf("expected seven catalogue items, got %d", len(items))
+	if len(items) != 8 {
+		t.Fatalf("expected eight catalogue items, got %d", len(items))
 	}
 	experimental := 0
 	verified := 0
@@ -69,8 +69,8 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 			t.Fatalf("candidate became actionable: %#v", item)
 		}
 	}
-	if experimental != 7 || verified != 0 {
-		t.Fatalf("expected seven experimental and no universally verified packages, got %d and %d", experimental, verified)
+	if experimental != 8 || verified != 0 {
+		t.Fatalf("expected eight experimental and no universally verified packages, got %d and %d", experimental, verified)
 	}
 }
 

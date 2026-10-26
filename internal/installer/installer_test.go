@@ -30,6 +30,64 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
 
+func TestZitchPrivateLauncherAndLifecycleKeepAccountsAndGames(t *testing.T) {
+	pkg, err := manifest.Load("../../catalogue/packages/io.github.itchio.zitch.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Exercise directory selection without running PortMaster, butler or games.
+	header := "#!/bin/bash\ndirectory=wrong\nunset SCRIPT_DIR\n"
+	before := "GAMEDIR=\"/$directory/ports/zitch\""
+	after := "GAMEDIR=\"$(dirname \"$0\")/zitch\"  "
+	footer := "\ntest -f \"$GAMEDIR/zitch.aarch64\" || exit 1\nprintf '%s' \"$GAMEDIR\"\n"
+	asset := zipBytes(t, map[string]string{
+		"itch.io.sh":           header + before + footer,
+		"zitch/zitch.aarch64":  "frontend, never executed",
+		"zitch/butler":         "butler, never executed",
+		"zitch/love":           "love, never executed",
+		"zitch/screenshot.png": "menu image",
+		"zitch/home/settings":  "defaults",
+	})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg.Release = testPackage(pkg.Release.URL, asset, pkg.Version).Release
+	pkg.Install.BinaryPatches[0].Offset = int64(len(header))
+	digest := sha256.Sum256([]byte(header + after + footer))
+	pkg.Install.BinaryPatches[0].SHA256 = hex.EncodeToString(digest[:])
+	root := filepath.Join(t.TempDir(), "root with spaces")
+	if err := os.Mkdir(root, 0755); err != nil {
+		t.Fatal(err)
+	}
+	detected := testPlatform()
+	detected.GLIBCVersion = "2.38"
+	detected.Dependencies = append(detected.Dependencies, "portmaster", "libresolv", "libpthread")
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(detected)
+	for _, operation := range []Op{OpInstall, OpRepair} {
+		if _, err := manager.Apply(context.Background(), operation, pkg); err != nil {
+			t.Fatal(err)
+		}
+		launcher := filepath.Join(root, "userdata/roms/ports/Zitch/itch.io.sh")
+		output, err := exec.Command("bash", launcher).CombinedOutput()
+		want := filepath.Join(root, "userdata/roms/ports/Zitch/zitch")
+		if err != nil || string(output) != want {
+			t.Fatalf("launcher: got %q, want %q, err %v", output, want, err)
+		}
+		assertContains(t, root, "userdata/roms/ports/gamelist.xml", "./Zitch/zitch/screenshot.png")
+		if operation == OpRepair {
+			assertRootFile(t, root, "userdata/roms/ports/Zitch/zitch/home/settings", "my account")
+			assertRootFile(t, root, "userdata/roms/ports/Zitch/zitch/home/game/save", "my save")
+		}
+		writeRootFile(t, root, "userdata/roms/ports/Zitch/zitch/home/settings", "my account")
+		writeRootFile(t, root, "userdata/roms/ports/Zitch/zitch/home/game/save", "my save")
+	}
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	assertMissing(t, root, "userdata/roms/ports/Zitch/itch.io.sh")
+	assertRootFile(t, root, "userdata/roms/ports/Zitch/zitch/home/settings", "my account")
+	assertRootFile(t, root, "userdata/roms/ports/Zitch/zitch/home/game/save", "my save")
+}
+
 func TestPocketCuratorLauncherFindsPrivatePayloadAfterInstallAndRepair(t *testing.T) {
 	// Only reproduce the launcher's directory selection, not its downloads,
 	// mounts, cleanup or application code.

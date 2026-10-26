@@ -1,0 +1,105 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "io.github.itchio.zitch",
+  "name": "zitch",
+  "version": "0.3.0",
+  "type": "utility",
+  "summary": "Browse and install your itch.io library. Knulli game launch support is untested.",
+  "repository": "https://github.com/itchio/zitch",
+  "license": "MIT",
+  "review": {
+    "status": "experimental",
+    "notes": [
+      "Reviewed 2026-10-26 at v0.3.0 commit 052379ecfa9682217cdb45b0b9445ef818aed0f8. No community approval or real-device result is claimed. Upstream provides a PortMaster package for Knulli and other firmwares, but develops and tests primarily on muOS.",
+      "Downloaded PortMaster ZIP matches publisher SHA256SUMS and GitHub API digest. Inventory: 17 regular files, four directories, 19061242 compressed bytes and 44174629 regular-file bytes. No duplicate names, absolute paths, traversal, links or special entries. Bundled MIT, zlib, LuaJIT and CC0 notices remain in zitch/licenses.",
+      "Store writes are limited to private /userdata/roms/ports/Zitch and the shared Ports gamelist. The original launcher and nested zitch payload stay together. A same-length verified patch at offset 687 derives GAMEDIR from the launcher path instead of the shared Ports root. No upstream script is run by the Store. The bundled screenshot supplies the menu image; package-local gameinfo.xml never replaces the shared gamelist.",
+      "Upstream PortMaster metadata specifies aarch64 and minimum glibc 2.38. ELF inspection finds maximum GLIBC_2.35 in zitch, GLIBC_2.34 in the shim, GLIBC_2.29 in butler and GLIBC_2.27 in liblove. Retain upstream's conservative 2.38 floor. The frontend needs SDL2, libc, libm, libgcc_s and the aarch64 loader; butler also needs libpthread, libresolv and libdl. 7z libraries need libstdc++. LÖVE additionally needs freetype, OpenAL, zlib, modplug, vorbisfile, theoradec, ogg and mpg123. The Store detects SDL2, libc, libresolv, libpthread and PortMaster, not every transitive library; device launch must verify the rest.",
+      "The launcher sets HOME, XDG_CONFIG_HOME and XDG_CACHE_HOME under zitch/home. This holds account credentials, the butler database, settings, installed games, prerequisites and cover cache. Runtime-created home, args and log files are not Store-owned and remain after removal. Close zitch and its games before Store operations. No shared boot hook or service installer is present in the reviewed launcher.",
+      "Network use includes itch.io authentication, library metadata, covers and game downloads via butler. Scan the sign-in code with another device. Downloaded games and their installers execute outside Store verification and are not sandboxed; install only games you have the right to use from publishers you trust. The PortMaster launcher passes --no-self-update. Store Repair restores the pinned frontend, not downloaded games.",
+      "ROM/core launch paths use /opt/muos and are not implemented for Knulli. The SDL game shim environment is also gated by muOS detection in this version. Do not promise native game, AppImage or LÖVE launch on Knulli from upstream README claims. Library browsing, account login, controller input, rendering, audio and game launch still need exact-device testing. No tested badge is granted."
+    ],
+    "evidence": [
+      {
+        "kind": "tagged-release",
+        "url": "https://github.com/itchio/zitch/releases/tag/v0.3.0",
+        "note": "PortMaster ZIP independently downloaded and hashed; no installer, frontend, butler or game executed during archive review."
+      },
+      {
+        "kind": "publisher-checksum",
+        "url": "https://github.com/itchio/zitch/releases/download/v0.3.0/SHA256SUMS",
+        "note": "PortMaster SHA-256 7fd61f4cc68bdf6e08d02b1c1fcccd1803c0eb35a1aa03c2d3b39d202293940b agrees with downloaded bytes and release API digest."
+      },
+      {
+        "kind": "license",
+        "url": "https://github.com/itchio/zitch/blob/052379ecfa9682217cdb45b0b9445ef818aed0f8/LICENSE",
+        "note": "MIT, copyright 2026 itch corp. Bundled license notices retained from the release."
+      },
+      {
+        "kind": "launcher-and-write-paths",
+        "url": "https://github.com/itchio/zitch/blob/052379ecfa9682217cdb45b0b9445ef818aed0f8/handheld/portmaster/itch.io.sh",
+        "note": "PortMaster helpers, private HOME/XDG directories, log.txt, optional args and --no-self-update reviewed. Only GAMEDIR is patched for private Store installation."
+      },
+      {
+        "kind": "compatibility-claim",
+        "url": "https://github.com/itchio/zitch/blob/052379ecfa9682217cdb45b0b9445ef818aed0f8/handheld/portmaster/port.json",
+        "note": "aarch64, minimum glibc 2.38. README in this directory explicitly says non-muOS firmware support is in progress."
+      },
+      {
+        "kind": "runtime-review",
+        "url": "https://github.com/itchio/zitch/blob/052379ecfa9682217cdb45b0b9445ef818aed0f8/src/muos/firmware.rs",
+        "note": "available() requires /opt/muos/script/mux/launch.sh; game_env() supplies no SDL shim environment without it. muOS ROM/core launch paths are not Knulli integration."
+      },
+      {
+        "kind": "data-paths",
+        "url": "https://github.com/itchio/zitch/blob/052379ecfa9682217cdb45b0b9445ef818aed0f8/src/main.rs",
+        "note": "Settings, database, apps and prerequisites derive from config_dir; covers derive from cache_dir. Both are redirected below package-local zitch/home by the launcher."
+      },
+      {
+        "kind": "menu-artwork",
+        "url": "https://github.com/itchio/zitch/blob/052379ecfa9682217cdb45b0b9445ef818aed0f8/handheld/portmaster/gameinfo.xml",
+        "note": "Use the release's zitch/screenshot.png (249885 bytes) as upstream does. No generated logo or mirrored executable asset is needed."
+      }
+    ]
+  },
+  "release": {
+    "url": "https://github.com/itchio/zitch/releases/download/v0.3.0/zitch-0.3.0-portmaster.zip",
+    "sha256": "7fd61f4cc68bdf6e08d02b1c1fcccd1803c0eb35a1aa03c2d3b39d202293940b",
+    "size": 19061242,
+    "installed_size": 44174629,
+    "format": "zip",
+    "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "minimum_glibc": "2.38",
+    "dependencies": ["sdl2", "libc", "libresolv", "libpthread", "portmaster"]
+  },
+  "install": {
+    "destination": "/userdata/roms/ports/Zitch",
+    "launcher": "itch.io.sh",
+    "executables": ["itch.io.sh", "zitch/zitch.aarch64", "zitch/butler", "zitch/love"],
+    "upstream_managed": true,
+    "warning": "Untested on Knulli. Needs PortMaster and glibc 2.38+. ROM/core launch is muOS-only; other games may not launch. App downloads and runs games outside Store checks. Use trusted publishers and content you may legally use. Close app/games before Store operations. Accounts and games stay after removal.",
+    "preserve": ["zitch/home", "zitch/args", "zitch/log.txt"],
+    "menu": {
+      "gamelist": "/userdata/roms/ports/gamelist.xml",
+      "path": "./Zitch/itch.io.sh",
+      "name": "itch.io (zitch)",
+      "description": "Experimental itch.io library browser and installer. Requires PortMaster and glibc 2.38+. Knulli game launch is untested; ROM/core launch is muOS-only.",
+      "image": "./Zitch/zitch/screenshot.png"
+    },
+    "network": true,
+    "allowed_write_paths": ["/userdata/roms/ports/Zitch", "/userdata/roms/ports/gamelist.xml"],
+    "binary_patches": [
+      {
+        "path": "itch.io.sh",
+        "offset": 687,
+        "before_hex": "47414d454449523d222f246469726563746f72792f706f7274732f7a6974636822",
+        "after_hex": "47414d454449523d2224286469726e616d652022243022292f7a69746368222020",
+        "sha256": "358eaeebff64282ec542a2c987b239e49aa4941ac523fe9c61041f8d2aeeff93"
+      }
+    ]
+  }
+}

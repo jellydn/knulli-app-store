@@ -122,7 +122,7 @@ The installer never runs remote install scripts. It only copies regular files fr
 
 ## Catalogue status
 
-All seven catalogue apps have experimental installation definitions. They can install on any Knulli device when architecture, ABI, and runtime dependencies pass. Missing device identity, an unlisted board, or a display outside the recorded scope does not block installation. **UNTESTED** means no exact device report exists; it is a warning, not an installation gate. PocketCurator, RAOfflineProxy and retroshelf use the authorized upstream-managed model below. PortMaster is a featured external provider and is not installed from this catalogue.
+All eight catalogue apps have experimental installation definitions. They can install on any Knulli device when architecture, ABI, and runtime dependencies pass. Missing device identity, an unlisted board, or a display outside the recorded scope does not block installation. **UNTESTED** means no exact device report exists; it is a warning, not an installation gate. PocketCurator, RAOfflineProxy, retroshelf and zitch use the authorized upstream-managed model below. PortMaster is a featured external provider and is not installed from this catalogue.
 
 | Package | What it does | Status | Remaining blocker |
 | --- | --- | --- | --- |
@@ -133,10 +133,13 @@ All seven catalogue apps have experimental installation definitions. They can in
 | [PocketCurator](https://github.com/tomtombombadil/PocketCurator) v1.1.2 | Curates your own ROM collection | Experimental; upstream-managed | Requires current PortMaster. Installs in Ports/PocketCurator; settings stay. ROM deletion is permanent; back up first |
 | [RAOfflineProxy](https://github.com/misantronic/RAOfflineProxy) v2.2.0-alpha1 | Offline casual RetroAchievements | Experimental; upstream-managed | Requires Python 3.12 and pygame. Extracts the embedded bundle as data; launch from Tools to configure. Stop proxy and disable autostart before removal |
 | [retroshelf](https://github.com/retroshelf-org/linux) v0.5.6 | Records and syncs game sessions | Experimental; upstream-managed | Extracts the publisher's ZIP into Tools/retroshelf. Account and Wi-Fi needed to link. License unverified; direct download only. Remove hooks with `--keep-data` before Store removal |
+| [zitch 0.3.0](https://github.com/itchio/zitch/releases/tag/v0.3.0) | Browses and installs your itch.io library | Experimental; upstream-managed | Requires PortMaster, aarch64 and glibc 2.38+. Knulli launch untested; ROM/core launch is muOS-only. Accounts and games stay after removal; [review](docs/zitch-0.3.0.md) |
 
 ### Upstream-managed apps
 
 The Store downloads directly from each publisher, verifies the pinned size and SHA-256, extracts regular files, and registers the menu entry. It never runs the upstream installer. PocketCurator keeps the upstream launcher/payload layout inside a private Ports/PocketCurator folder so the Store never adopts the whole shared Ports directory. RAOfflineProxy keeps its documented system location with a Store-generated Tools launcher. retroshelf uses its documented Tools/retroshelf folder.
+
+zitch uses private Ports/Zitch with a verified launcher-path patch and the publisher's bundled screenshot as menu artwork. Its PortMaster launcher disables frontend self-updates. Sign-in, game downloads and game execution remain upstream-managed and are not sandboxed or verified by the Store. Use only trusted publishers and games you have the right to use. Close zitch and its games before Store operations. Store removal keeps its account data and downloaded games under `Zitch/zitch/home`; it does not sign you out or erase credentials. ROM/core launch and the native-game SDL shim are muOS-specific in this release, so Knulli game launch is not promised.
 
 PocketCurator's launcher needs a verified staging patch to find its payload in that private directory rather than the shared Ports root. The patch derives the directory directly from the launcher path: PortMaster clears `SCRIPT_DIR`, so the earlier patch in v2026.10.24.3 still failed on hardware. Update the Store to **v2026.10.24.4 or later**, close PocketCurator, then select **Y (More) → Repair → Confirm** to fix an existing Store installation; settings stay. This also records the correct managed-file hash after the manual device fix. No uninstall or folder move is needed. An upstream self-update can replace the patched launcher, so use Store Repair again if the launch-path failure returns. Repair restores the pinned release, not the upstream-updated code.
 
