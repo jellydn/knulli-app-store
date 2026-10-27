@@ -91,7 +91,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    container: golang:1.27.1-bookworm
+    container: golang:1.27.3-bookworm
     strategy:
       matrix:
         target: [trimui-smart-pro, magicx-zero-28]
