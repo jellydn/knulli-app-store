@@ -1,12 +1,12 @@
 # Real-device test evidence
 
-## Current scope after Picker 0.2.1 publication
+## Current scope after Picker 0.2.2 publication
 
-[Picker 0.2.1](https://github.com/jellydn/knulli-random-game-picker/releases/tag/v0.2.1) is published, with no new hardware evidence. It is **UNTESTED on all matrices**. The owner report below remains exact-version evidence for Picker 0.2.0 only; the other six unchanged current versions retain tested evidence on TrimUI Smart Pro, Knulli AArch64 at 1280×720 only. All seven `review.status` values remain **experimental**. No package has current MagicX evidence.
+[Picker 0.2.2](https://github.com/jellydn/knulli-random-game-picker/releases/tag/v0.2.2) is published, with no new hardware gameplay evidence. It is **UNTESTED on all matrices**. Read-only device inspection confirmed Tools and Emulators application metadata, not runtime compatibility. The owner report below remains exact-version evidence for Picker 0.2.0 only; the other six unchanged current versions retain tested evidence on TrimUI Smart Pro, Knulli AArch64 at 1280×720 only. All seven `review.status` values remain **experimental**. No package has current MagicX evidence.
 
-Release target: Store v2026.10.25.1. Hardware reports remain scoped to the artifacts actually tested. The earlier audit baseline was public v2026.10.25 at `14490119`; its signature checks and native development-build reports do not transfer to another release.
+Release target: Store v2026.10.27. Hardware reports remain scoped to the artifacts actually tested. The earlier audit baseline was public v2026.10.25 at `14490119`; its signature checks and native development-build reports do not transfer to another release.
 
-The lead independently verified Picker 0.2.1's six published assets/digests, 20 regular archive files and exact ABI. Published-byte Install, 0.2.0→0.2.1 Update, Repair and Uninstall validation passed in fixture roots with nested `state/` retained. No ARM64 runtime was executed. These are archive/installer checks, not hardware or Picker runtime evidence.
+Picker 0.2.2's six published assets/digests, 20 regular archive files and exact ABI were independently verified. Published-byte Install, 0.2.1→0.2.2 Update, Repair and Uninstall validation passed in both device fixture roots with nested `state/` retained. No ARM64 runtime was executed. These are archive/installer checks, not hardware or Picker runtime evidence.
 
 ## 2026-10-25: Current owner confirmation
 
@@ -15,7 +15,7 @@ The lead independently verified Picker 0.2.1's six published assets/digests, 20 
 - Exact confirmation: “Yes, all seven current versions were tested on TrimUI Smart Pro only, Knulli AArch64 at 1280×720”.
 - Passed package tests: Grout 5.2.0.0, PlayTime 1.0.0, Random Game Picker 0.2.0, RetSend 1.0.0, PocketCurator 1.1.2, RAOfflineProxy 2.2.0-alpha1, and retroshelf 0.5.6.
 
-This confirmation supplies the listed package versions and the Smart Pro, Knulli, AArch64, 1280×720 matrix for passed `real-device-test` evidence. It supersedes the earlier broad owner report for those exact versions, not later releases. Picker 0.2.0 is now historical evidence, not a tested badge for 0.2.1. All seven review statuses remain **experimental**. MagicX Zero 28 and other matrices remain untested.
+This confirmation supplies the listed package versions and the Smart Pro, Knulli, AArch64, 1280×720 matrix for passed `real-device-test` evidence. It supersedes the earlier broad owner report for those exact versions, not later releases. Picker 0.2.0 is now historical evidence, not a tested badge for 0.2.2. All seven review statuses remain **experimental**. MagicX Zero 28 and other matrices remain untested.
 
 The owner did not supply separate lifecycle results, physical button tests, audio tests, power-loss tests, or Store idle-redraw verification. Do not treat this package confirmation as proof of those details or of a particular Store ZIP. No exact firmware build identifier was supplied by this confirmation; do not copy one from a historical report.
 

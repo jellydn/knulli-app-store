@@ -8,13 +8,13 @@ release does not remove these experimental limits. Package evidence is separate.
 
 INSTALL OR MANUAL UPDATE
 
-Release target: v2026.10.25.1. Hardware reports remain scoped to the artifacts
-actually tested. Earlier Smart Pro Picker evidence applies to 0.2.0, not 0.2.1.
+Release target: v2026.10.27. Hardware reports remain scoped to the artifacts
+actually tested. Earlier Smart Pro Picker evidence applies to 0.2.0, not 0.2.2.
 
 1. Download examples for the MagicX ZIP and SHA256SUMS.txt:
-   https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.25.1
+   https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.27
    The target ZIP is:
-   knulli-app-store-magicx-zero-28-experimental-v2026.10.25.1.zip
+   knulli-app-store-magicx-zero-28-experimental-v2026.10.27.zip
 2. In the download directory, run:
    sha256sum --ignore-missing -c SHA256SUMS.txt
    Continue only if your ZIP reports OK. The other target may be absent.
@@ -87,7 +87,7 @@ Manifest statuses remain experimental: Grout 5.2.0.0, PlayTime 1.0.0,
 Random Game Picker 0.2.0, RetSend 1.0.0, PocketCurator 1.1.2,
 RAOfflineProxy 2.2.0-alpha1, and retroshelf 0.5.6. Passed package evidence
 covers that Smart Pro matrix only. MagicX and other matrices remain untested.
-Picker is now 0.2.1 and UNTESTED on all matrices. The 0.2.0 report remains
+Picker is now 0.2.2 and UNTESTED on all matrices. The 0.2.0 report remains
 historical exact-version evidence. The other six current versions retain
 Smart Pro-only evidence. All seven review statuses remain experimental.
 Separate lifecycle, physical button, audio, power-loss, and Store idle-redraw
@@ -116,13 +116,13 @@ stay under /userdata/roms/tools/Grout. PlayTime data stays under
 under /userdata/system/configs/retsend and its default inbox under
 /userdata/roms/retsend-inbox. User-selected routes can override that inbox.
 Repair moves an older RetSend launcher to RetSend/RetSend.sh.
-Random Game Picker 0.2.1 needs glibc 2.34 or later, firmware SDL2/image/ttf/gfx,
+Random Game Picker 0.2.2 needs glibc 2.34 or later, firmware SDL2/image/ttf/gfx,
 and the loopback EmulationStation API. Settings and logs in state/ stay.
-It is UNTESTED on every device matrix. It fixes settings limits/malformed
-fields, idle redraw, per-scan path caching and ABI/provenance checks. Launcher,
+It is UNTESTED on every device matrix. Tools and Emulators application systems
+are excluded from discovery, selection and Play revalidation. Launcher,
 settings schema and exact-path ES launch behavior are unchanged. Preserve the
 entire state/ directory.
-https://github.com/jellydn/knulli-random-game-picker/releases/tag/v0.2.1
+https://github.com/jellydn/knulli-random-game-picker/releases/tag/v0.2.2
 Its runtime requirements are separate from the Store's.
 
 PocketCurator, RAOfflineProxy, and retroshelf are upstream-managed. They

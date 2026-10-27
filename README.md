@@ -6,19 +6,19 @@ The Store verifies downloads and journals file changes for rollback. It never ru
 
 ## Devices and release
 
-Release target: [v2026.10.25.1](https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.25.1). Hardware reports remain scoped to the artifacts actually tested. Device targets remain **experimental**:
+Release target: [v2026.10.27](https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.27). Includes Picker 0.2.2, which excludes Tools and Emulators applications. Hardware reports remain scoped to the artifacts actually tested. Device targets remain **experimental**:
 
 | Target | Display | Evidence |
 | --- | --- | --- |
-| [TrimUI Smart Pro](docs/trimui-smart-pro.md) | 1280×720 | Historical native Option B development-build checks with Picker 0.2.0: Install, Update, Repair, injected navigation and ES return. No Picker 0.2.1 hardware evidence; physical presses and audio remain unverified. |
+| [TrimUI Smart Pro](docs/trimui-smart-pro.md) | 1280×720 | Historical native Option B development-build checks with Picker 0.2.0: Install, Update, Repair, injected navigation and ES return. No Picker 0.2.2 hardware gameplay evidence; physical presses and audio remain unverified. |
 | [MagicX Zero 28](docs/magicx-zero-28.md) | 640×480 | Device diagnostic confirms Knulli, AArch64, display, and SDL controller; full GUI testing remains incomplete. |
 
 **Knulli is the only implemented firmware profile.** Device GUI builds require AArch64, glibc, and system SDL2, SDL2_image, and SDL2_ttf; SDL2_gfx is linked statically. Do not replace firmware libraries.
 
-Download examples for v2026.10.25.1:
+Download examples for v2026.10.27:
 
-- `knulli-app-store-trimui-smart-pro-experimental-v2026.10.25.1.zip`
-- `knulli-app-store-magicx-zero-28-experimental-v2026.10.25.1.zip`
+- `knulli-app-store-trimui-smart-pro-experimental-v2026.10.27.zip`
+- `knulli-app-store-magicx-zero-28-experimental-v2026.10.27.zip`
 - `SHA256SUMS.txt`
 
 Successful `main` builds also publish dated experimental pre-releases. A release version alone does not establish hardware evidence.
@@ -67,19 +67,19 @@ The first A press opens confirmation, not installation. **More** contains detail
 
 ## Catalogue and safety
 
-On 2026-10-25 (Asia/Singapore), the [owner confirmed](https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b) seven package versions tested on TrimUI Smart Pro only, Knulli AArch64 at 1280×720. That report covers Picker 0.2.0, not the newly published 0.2.1. The other six current versions retain passed package evidence on that matrix only, not separate lifecycle results. **Picker 0.2.1 is UNTESTED on all matrices.** MagicX Zero 28 and other matrices remain untested for every package. All seven manifest review statuses remain **experimental**:
+On 2026-10-25 (Asia/Singapore), the [owner confirmed](https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b) seven package versions tested on TrimUI Smart Pro only, Knulli AArch64 at 1280×720. That report covers Picker 0.2.0, not the newly published 0.2.2. The other six current versions retain passed package evidence on that matrix only, not separate lifecycle results. **Picker 0.2.2 is UNTESTED on all matrices.** MagicX Zero 28 and other matrices remain untested for every package. All seven manifest review statuses remain **experimental**:
 
 | Package | Current manifest version | Purpose |
 | --- | --- | --- |
 | Grout | 5.2.0.0 | Connect to a RomM server |
 | PlayTime | 1.0.0 | Track game play time |
-| Random Game Picker | 0.2.1 | Select from existing EmulationStation games |
+| Random Game Picker | 0.2.2 | Select from existing EmulationStation games |
 | RetSend | 1.0.0 | Transfer files over local Wi-Fi with LocalSend peers |
 | PocketCurator | 1.1.2 | Manage your ROM collection; requires PortMaster |
 | RAOfflineProxy | 2.2.0-alpha1 | Offline casual RetroAchievements; requires Python 3.12 and pygame |
 | retroshelf | 0.5.6 | Sync game sessions; requires an account and Wi-Fi |
 
-Firmware, architecture, ABI, and runtime dependencies still gate installation. Device identity and display scope are advisory. **UNTESTED** means no passed report matches the exact package version and device matrix. See the [evidence and its limits](docs/real-device-tests.md#2026-10-25-current-owner-confirmation). [Picker 0.2.1](https://github.com/jellydn/knulli-random-game-picker/releases/tag/v0.2.1) fixes settings limits and malformed fields, idle redraw, per-scan path caching, and ABI/provenance checks. It adds no hardware evidence. Its launcher, settings schema, `state/` preservation and exact-path ES launch contract are unchanged. It still requires glibc ≥2.34, firmware SDL2/image/ttf/gfx, and the loopback EmulationStation API. Its requirements are separate from the Store's.
+Firmware, architecture, ABI, and runtime dependencies still gate installation. Device identity and display scope are advisory. **UNTESTED** means no passed report matches the exact package version and device matrix. See the [evidence and its limits](docs/real-device-tests.md#2026-10-25-current-owner-confirmation). [Picker 0.2.2](https://github.com/jellydn/knulli-random-game-picker/releases/tag/v0.2.2) excludes Tools and Emulators application systems before gamelist parsing, from selection and during Play revalidation. Path-only candidates use boundary-aware application-root checks. It adds no hardware gameplay evidence. Its launcher, settings schema, `state/` preservation and exact-path ES launch contract are unchanged. It still requires glibc ≥2.34, firmware SDL2/image/ttf/gfx, and the loopback EmulationStation API. Its requirements are separate from the Store's.
 
 PortMaster is an external provider: the Store does not install its catalogue. ROM-download sources are outside official catalogue policy. Use only ROMs you have the right to use and servers you trust.
 

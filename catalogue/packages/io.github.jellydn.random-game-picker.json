@@ -2,7 +2,7 @@
   "schema": "org.knulli.app-store/package-manifest/v1",
   "id": "io.github.jellydn.random-game-picker",
   "name": "Random Game Picker",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "utility",
   "summary": "Pick an existing ES game with saved filters and scraped art.",
   "repository": "https://github.com/jellydn/knulli-random-game-picker",
@@ -11,9 +11,9 @@
     "status": "experimental",
     "approval": {"provenance": "maintainer"},
     "notes": [
-      "Stable 0.2.1 fixes partial malformed settings, bounds settings reads, avoids idle redraws, scopes path-identity reuse to one scan and hardens ABI/provenance checks. Launcher, install paths and settings schema stay unchanged. A plays, X rerolls, Y opens settings and Y inside settings rescans. No exact-version hardware evidence exists for 0.2.1; the 0.2.0 owner report remains historical. Store review status remains experimental.",
+      "Stable 0.2.2 excludes the confirmed Tools and Emulators application systems before gamelist parsing, from in-memory selection and during Play revalidation. Path-only candidates use boundary-aware application-root checks. No title, pc platform, sh core, hardware tool or extension blacklist is used; the existing Ports policy is unchanged. Launcher, paths, settings and controls stay unchanged. No exact-version hardware gameplay evidence exists for 0.2.2; the 0.2.0 owner report remains historical. Store review status remains experimental.",
       "The version-specific URL, exact size and SHA-256 pin the reviewed bytes. GitHub reports immutable=false: this is not a server-enforced immutable release. The Store rejects replacement bytes; release.immutable declares the pinned-content contract, not a GitHub repository setting.",
-      "The picker reads effective ES system configuration, gamelists and the live ES catalogue; no game ROM directory or emulator command is hardcoded. Ports, collections, missing/hidden games and ambiguous launch paths are excluded.",
+      "The picker reads effective ES system configuration, gamelists and the live ES catalogue; no game ROM directory or emulator command is hardcoded. Tools and Emulators are identified by exact system IDs; only path-only candidates use the confirmed /userdata/roms/tools and /userdata/roms/emulators roots. Ports, collections, missing/hidden games and ambiguous launch paths remain excluded. Application systems still contribute to launch-path ambiguity checks.",
       "The only network use is bounded HTTP to 127.0.0.1:1234. Play closes SDL, sends one exact raw-path POST to ES and exits. HTTP acceptance does not confirm play; there is no retry or nested configgen fallback.",
       "The Store owns only its package directory and one Ports menu entry. Preserve the entire state directory: settings.json, atomic settings.json.tmp, replaced-per-run last-run.log and new ui.log. The system string and favorites boolean are unchanged; no schema migration is needed. A nonstandard configured Ports root needs manual installation in that root instead.",
       "Includes the TSP-tested A/B and X/Y correction: default KNULLI SDL bindings translate back to ES labels. The launcher honors the Ports Xbox-layout flag, which keeps the identity mapping. Both launcher and binary must update together; this report does not verify every external controller or MagicX.",
@@ -39,32 +39,32 @@
       },
       {
         "kind": "release-asset",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.2.1/random-game-picker-0.2.1-knulli-aarch64.zip",
-        "note": "Downloaded stable ZIP: 3,274,637 compressed bytes, 7,873,304 regular-file bytes across 20 files; SHA-256 1645ecb4d8fd38a7b2a8405bdb493dc9a121dceb202e7a772533353e78105f1f. Publisher artifact.json and SHA256SUMS.txt agree. Flat layout; no archive links, state or bundled libraries. All six published files match GitHub sizes and digests. GitHub does not enforce immutability for this release."
+        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.2.2/random-game-picker-0.2.2-knulli-aarch64.zip",
+        "note": "Downloaded stable ZIP: 3,275,031 compressed bytes, 7,873,304 regular-file bytes across 20 files; SHA-256 9a1a086a649ef62dd3203328a2da400517c6e9301a273f2bef8dbe013735f897. Publisher artifact.json and SHA256SUMS.txt agree. Flat layout; no archive links, state or bundled libraries. All six published files match GitHub sizes and digests. GitHub does not enforce immutability for this release."
       },
       {
         "kind": "publisher-checksum",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.2.1/SHA256SUMS.txt"
+        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.2.2/SHA256SUMS.txt"
       },
       {
         "kind": "license",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/blob/4eb687b0a4cdb2b42787739157cfb12db5b4af90/LICENSE",
+        "url": "https://github.com/jellydn/knulli-random-game-picker/blob/956f9b4d8e1c0cce91ad4a5c45a6ff0df8850cc7/LICENSE",
         "note": "MIT project license. ZIP includes THIRD_PARTY.md, Go toolchain and module LICENSE/COPYING files, and the DejaVu font notice. SDL libraries remain firmware dependencies. Historical C++ notices in THIRD_PARTY.md describe 0.1.1, not the Go executable."
       },
       {
         "kind": "runtime-dependency-review",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.2.1/abi.txt",
+        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.2.2/abi.txt",
         "note": "ELF64 AArch64, interpreter /lib/ld-linux-aarch64.so.1; highest GLIBC symbol 2.34. NEEDED: libSDL2_image-2.0.so.0, libSDL2-2.0.so.0, libSDL2_ttf-2.0.so.0, libSDL2_gfx-1.0.so.0 and libc.so.6. No libstdc++ runtime dependency."
       },
       {
         "kind": "filesystem-and-network-review",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/blob/4eb687b0a4cdb2b42787739157cfb12db5b4af90/docs/go-rewrite.md",
+        "url": "https://github.com/jellydn/knulli-random-game-picker/blob/956f9b4d8e1c0cce91ad4a5c45a6ff0df8850cc7/docs/go-rewrite.md",
         "note": "Launcher sets package-local state and reads /var/run/ports_xbox_layout.flag without writing it. Settings/atomic temporary file, last-run.log and ui.log stay under state. ES config, ROMs, art and saves are read-only to the picker; the launched emulator can make its normal writes. Only bounded loopback ES requests are used."
       },
       {
         "kind": "desktop-test",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/actions/runs/40148484875",
-        "note": "Passed gated release workflow for source 4eb687b0a4cdb2b42787739157cfb12db5b4af90 publishes the ARM64 ZIP, artifact.json, SHA256SUMS.txt, abi.txt, archive-inventory.txt and build-info.txt. Release bytes and metadata were independently downloaded and checked; host/race SDL fixtures cover both target sizes, not physical devices."
+        "url": "https://github.com/jellydn/knulli-random-game-picker/actions/runs/40435138065",
+        "note": "Passed gated 0.2.2 release workflow publishes the ARM64 ZIP, artifact.json, SHA256SUMS.txt, abi.txt, archive-inventory.txt and build-info.txt. Release bytes and metadata were independently downloaded and checked. Discovery, in-memory eligibility and launch regressions cover application exclusions and path-boundary controls; host/race and SDL fixtures cover both target sizes, not physical devices."
       },
       {
         "kind": "device-test",
@@ -74,9 +74,9 @@
     ]
   },
   "release": {
-    "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.2.1/random-game-picker-0.2.1-knulli-aarch64.zip",
-    "sha256": "1645ecb4d8fd38a7b2a8405bdb493dc9a121dceb202e7a772533353e78105f1f",
-    "size": 3274637,
+    "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.2.2/random-game-picker-0.2.2-knulli-aarch64.zip",
+    "sha256": "9a1a086a649ef62dd3203328a2da400517c6e9301a273f2bef8dbe013735f897",
+    "size": 3275031,
     "installed_size": 7873304,
     "format": "zip",
     "immutable": true
@@ -95,7 +95,7 @@
     "strip_components": 0,
     "launcher": "RandomGamePicker.sh",
     "executables": ["RandomGamePicker.sh", "random-game-picker"],
-    "warning": "Experimental Go 0.2.1: no exact-version hardware test; 0.2.0 evidence does not cover this release. Requires glibc 2.34+, firmware SDL2/image/ttf/gfx and local ES API. Submit Play once; inspect state/last-run.log and state/ui.log before retrying. Standard Ports location only. Settings/logs stay after uninstall.",
+    "warning": "Experimental Go 0.2.2: no exact-version hardware gameplay test; 0.2.0 evidence does not cover this release. Tools and Emulators are excluded from selection. Requires glibc 2.34+, firmware SDL2/image/ttf/gfx and local ES API. Submit Play once; inspect state/last-run.log and state/ui.log before retrying. Standard Ports location only. Settings/logs stay after uninstall.",
     "menu": {
       "gamelist": "/userdata/roms/ports/gamelist.xml",
       "path": "./RandomGamePicker/RandomGamePicker.sh",

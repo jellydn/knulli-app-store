@@ -5,15 +5,19 @@ opens the catalogue immediately: no setup, calibration, or saved assignments.
 The scratch fixture supplies platform files; architecture and resolution are
 explicit overrides, not measurements from a real device.
 
-Release target: v2026.10.25.1. Hardware reports remain scoped to the artifacts
+Release target: v2026.10.27. Hardware reports remain scoped to the artifacts
 actually tested. The earlier audit baseline was v2026.10.25 at `14490119`.
-Picker 0.2.1 is published but UNTESTED on every hardware matrix. Its settings
-limits/malformed-field handling, idle redraw, per-scan path caching and
-ABI/provenance fixes add no device evidence. Launcher, settings schema, `state/`
+Picker 0.2.2 is published but UNTESTED on every hardware matrix. Its Tools and
+Emulators exclusions add no hardware gameplay evidence. Launcher, settings schema, `state/`
 preservation, firmware SDL requirements and the local ES API contract remain.
-The historical Picker 0.2.0 Smart Pro report does not verify 0.2.1. The other
+The historical Picker 0.2.0 Smart Pro report does not verify 0.2.2. The other
 six current package versions retain Smart Pro-only evidence; all seven remain
 experimental. See [device evidence](real-device-tests.md).
+
+For v2026.10.27, published Picker 0.2.2 bytes passed all six asset digest/size
+checks, ZIP inventory/modes and AArch64/GLIBC 2.34 inspection. The real CLI
+passed fresh Install, 0.2.1→0.2.2 Update, damaged-binary Repair and Uninstall
+in both device fixture roots; nested state survived. No ARM64 code ran.
 
 For the v2026.10.25.1 work, the lead reported passing race suites, 84.0% coverage,
 both Staticcheck tag sets and all ten network-backed GUI flows. Separately,
