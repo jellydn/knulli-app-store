@@ -1,21 +1,21 @@
 KNULLI APP STORE - TRIMUI SMART PRO EXPERIMENTAL BUILD
 
-Target: Knulli, AArch64, 1280x720. The current gabagool-backed Option B Library
-uses a responsive list. A same-source development build passed native Picker
+Target: Knulli, AArch64, 1280x720. The gabagool-backed Library now uses stable
+rows and a persistent detail pane. A historical development build passed Picker
 Install, Update, Repair, injected navigation and return to EmulationStation.
-This is not a public-ZIP device test. Physical presses, audio and the later
-idle-redraw change still need hardware checks. See the linked device evidence.
+This is not a device test of this redesign or public ZIP. Physical presses,
+audio and idle behavior still need hardware checks. See the device evidence.
 A full release does not remove experimental limits; package evidence is separate.
 
 INSTALL OR MANUAL UPDATE
 
-Release target: v2026.10.27. Hardware reports remain scoped to the artifacts
+Release target: v2026.10.27.1. Hardware reports remain scoped to the artifacts
 actually tested. Earlier native evidence used Picker 0.2.0, not current 0.2.2.
 
 1. Download examples for the Smart Pro ZIP and SHA256SUMS.txt:
-   https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.27
+   https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.27.1
    The target ZIP is:
-   knulli-app-store-trimui-smart-pro-experimental-v2026.10.27.zip
+   knulli-app-store-trimui-smart-pro-experimental-v2026.10.27.1.zip
 2. In the download directory, run:
    sha256sum --ignore-missing -c SHA256SUMS.txt
    Continue only if your ZIP reports OK. The other target may be absent.
@@ -36,10 +36,10 @@ replace Knulli's system libraries with desktop or stock TrimUI copies.
 
 CONTROLS
 
-The Store opens the Option B Library immediately: nearby rows remain visible,
-the selected row expands beside a mint focus rail, and All/Ready/Installed
-filters stay visible. The footer uses circled face-button glyphs and contextual
-actions; the upper badge shows the quit chord. There is no controller setup
+The Store opens the Library immediately: equal-height rows remain visible,
+a mint outline marks focus, and details appear beside the list. All/Ready/
+Installed filters stay visible. The footer uses circled face-button glyphs and
+contextual actions; the status area shows the quit chord. There is no setup
 or custom mapping editor. Controls use Knulli's EmulationStation (ES) letters:
 
   D-pad up/down     Browse apps; left/right also work
@@ -53,6 +53,10 @@ The first A press on a row opens confirmation; it does not install an app.
 More has details and secondary actions. An Issue opens its health check first.
 The footer shows the actions available on each screen. Completion notices
 clear after three seconds; failures stay until answered.
+
+Package menu changes queue one game-list refresh when the Store exits, not
+one per install. Idle or cancelled-only sessions request none. A refused
+refresh requires a manual ES refresh or restart; committed installs remain.
 
 The launcher selects the default Knulli layout, or Xbox layout when the Ports
 Xbox flag exists. Bindings compensate once; SDL events are not swapped.

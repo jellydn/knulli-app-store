@@ -2,19 +2,19 @@ KNULLI APP STORE - MAGICX ZERO 28 EXPERIMENTAL BUILD
 
 Target: Knulli, AArch64, 640x480. A device diagnostic confirms Knulli Scarab,
 the display, and SDL GameController magicx-input. Full GUI tests are incomplete.
-The current gabagool-backed Option B Library is a responsive list, not the
-earlier one-card browser. Smart Pro evidence does not verify MagicX. A full
+The gabagool-backed Library uses stable rows and a persistent detail pane.
+This redesign still needs device tests. Smart Pro evidence does not verify MagicX. A full
 release does not remove these experimental limits. Package evidence is separate.
 
 INSTALL OR MANUAL UPDATE
 
-Release target: v2026.10.27. Hardware reports remain scoped to the artifacts
+Release target: v2026.10.27.1. Hardware reports remain scoped to the artifacts
 actually tested. Earlier Smart Pro Picker evidence applies to 0.2.0, not 0.2.2.
 
 1. Download examples for the MagicX ZIP and SHA256SUMS.txt:
-   https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.27
+   https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.27.1
    The target ZIP is:
-   knulli-app-store-magicx-zero-28-experimental-v2026.10.27.zip
+   knulli-app-store-magicx-zero-28-experimental-v2026.10.27.1.zip
 2. In the download directory, run:
    sha256sum --ignore-missing -c SHA256SUMS.txt
    Continue only if your ZIP reports OK. The other target may be absent.
@@ -35,10 +35,10 @@ replace Knulli's system libraries.
 
 CONTROLS
 
-The Store opens the Option B Library immediately: nearby rows remain visible,
-the selected row expands beside a mint focus rail, and All/Ready/Installed
-filters stay visible. The footer uses circled face-button glyphs and contextual
-actions; the upper badge shows the quit chord. There is no controller setup
+The Store opens the Library immediately: equal-height rows remain visible,
+a mint outline marks focus, and details appear beside the list. All/Ready/
+Installed filters stay visible. The footer uses circled face-button glyphs and
+contextual actions; the status area shows the quit chord. There is no setup
 or custom mapping editor. Controls use Knulli's EmulationStation (ES) letters:
 
   D-pad up/down     Browse apps; left/right also work
@@ -52,6 +52,10 @@ The first A press on a row opens confirmation; it does not install an app.
 More has details and secondary actions. An Issue opens its health check first.
 The footer shows the actions available on each screen. Completion notices
 clear after three seconds; failures stay until answered.
+
+Package menu changes queue one game-list refresh when the Store exits, not
+one per install. Idle or cancelled-only sessions request none. A refused
+refresh requires a manual ES refresh or restart; committed installs remain.
 
 The launcher selects the default Knulli layout, or Xbox layout when the Ports
 Xbox flag exists. Bindings compensate once; SDL events are not swapped.

@@ -1,6 +1,6 @@
 # MagicX Zero 28 experimental test build
 
-Release target: v2026.10.27. Hardware reports remain scoped to the artifacts actually tested. This device target remains experimental. Knulli source confirms the board and display. A real-device diagnostic also confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController name `magicx-input` with a nonzero GUID. Full GUI testing is incomplete. The current gabagool-backed Option B Library is a responsive list, not the earlier one-card browser; Smart Pro evidence does not verify it on MagicX. A shared A133 family alone does not establish application or package compatibility.
+Release target: v2026.10.27.1. Hardware reports remain scoped to the artifacts actually tested. This device target remains experimental. Knulli source confirms the board and display. A real-device diagnostic also confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController name `magicx-input` with a nonzero GUID. Full GUI testing is incomplete. The gabagool-backed Library now uses stable rows and a persistent detail pane. This redesign still needs device tests; Smart Pro evidence does not verify it on MagicX. A shared A133 family alone does not establish application or package compatibility.
 
 ## Confirmed facts
 
@@ -15,8 +15,8 @@ Device builds require system SDL2, SDL2_image, and SDL2_ttf. SDL2_gfx is linked 
 
 ## Install and automatic controls
 
-1. Release target: [v2026.10.27](https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.27).
-2. Download `knulli-app-store-magicx-zero-28-experimental-v2026.10.27.zip` and `SHA256SUMS.txt` into one directory on your computer.
+1. Release target: [v2026.10.27.1](https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.27.1).
+2. Download `knulli-app-store-magicx-zero-28-experimental-v2026.10.27.1.zip` and `SHA256SUMS.txt` into one directory on your computer.
 3. Run `sha256sum --ignore-missing -c SHA256SUMS.txt`. Continue only if your ZIP reports `OK`. The checksum file covers both targets; this command skips the missing target.
 4. Shut down Knulli and connect its data card to your computer.
 5. Extract the ZIP into `/userdata/roms/ports`. Check for `Knulli App Store.sh`, `knulli-app-store/knulli-app-ui`, and `images/Knulli App Store.png` below that directory.
@@ -24,13 +24,13 @@ Device builds require system SDL2, SDL2_image, and SDL2_ttf. SDL2_gfx is linked 
 
 For commit-specific testing, download the `knulli-app-store-magicx-zero-28-experimental` artifact from a successful `check` run. Extract the Actions artifact first, then verify its inner ZIP against its `SHA256SUMS.txt`.
 
-Every launch opens the Option B Library immediately: **up/down** browse (left/right also work), **A** opens confirmation for the selected row's first allowed action, **B** cancels back, and **Y** opens More. More retains all permitted actions and details; Y there exports diagnostics. **L1/R1** filter All, Ready and Installed. **Select+Y** quits. There is no setup, calibration, mapping editor, or saved-assignment override.
+Every launch opens the Library immediately: **up/down** browse (left/right also work), **A** opens confirmation for the selected row's first allowed action, **B** cancels back, and **Y** opens More. More retains all permitted actions and details; Y there exports diagnostics. **L1/R1** filter All, Ready and Installed. **Select+Y** quits. There is no setup, calibration, mapping editor, or saved-assignment override.
 
 If no SDL GameController exists, a blocked screen shows the log and diagnostic paths. Reconnecting resumes normal controls immediately and clears held chord state. Old `/userdata/system/configs/knulli-app-store/controller-mappings.json` files are ignored and left untouched, even when malformed.
 
-The footer uses circled face-button glyphs with contextual action names and navigation/filter hints; the upper badge shows the quit chord. The launcher selects `STORE_CONTROLLER_LAYOUT=knulli` normally or `xbox` when `/var/run/ports_xbox_layout.flag` exists. Knulli maps ES a/b/x/y → SDL b/a/y/x normally and uses direct letters in Xbox mode. Bindings compensate once; SDL events are unchanged. Update the binary and launcher together. No guessed raw indices or system mapping writes are used. On the blocked screen, Confirm also exports diagnostics and Select+Y still quits.
+The footer uses circled face-button glyphs with contextual action names and navigation/filter hints; the status area above it shows the quit chord. The launcher selects `STORE_CONTROLLER_LAYOUT=knulli` normally or `xbox` when `/var/run/ports_xbox_layout.flag` exists. Knulli maps ES a/b/x/y → SDL b/a/y/x normally and uses direct letters in Xbox mode. Bindings compensate once; SDL events are unchanged. Update the binary and launcher together. No guessed raw indices or system mapping writes are used. On the blocked screen, Confirm also exports diagnostics and Select+Y still quits.
 
-The Library opens on **ALL**, with nearby package rows visible and an expanded selected row beside a mint focus rail. It shows version, technical/test status, install state and summary; the footer names the primary action. **ALL**, **READY**, and **INSTALLED** filters stay visible, including leaving an empty filter. One responsive 480-high logical canvas expands with output aspect ratio (minimum width 640). A finished operation reports in a notice bar and clears after three seconds; failures remain until answered. Candidates remain read-only and issues still open the health check before actions.
+The Library opens on **ALL**, with equal-height rows and a mint outline around focus. A persistent detail pane shows version, separate technical/test and install states, and wrapped summary text; the footer names the primary action. **ALL**, **READY**, and **INSTALLED** filters stay visible, including leaving an empty filter. One responsive 480-high logical canvas expands with output aspect ratio (minimum width 640). A finished operation reports in a notice bar and clears after three seconds; failures remain until answered. Candidates remain read-only and issues still open the health check before actions. Committed menu changes trigger one game-list refresh on exit, not one per install. Idle, cancelled and failed-only sessions send none; a refused refresh does not undo committed operations.
 
 Every screen can be checked on a development machine first, with no handheld and no controller: `make gui GUI_DEVICE=magicx-zero-28 GUI_RESOLUTION=640x480` opens the interactive GUI from the keyboard against a scratch fixture root. `make walkthrough WALK_DEVICE=magicx-zero-28 WALK_RESOLUTION=640x480` replays the offline flows and records the opening, post-key, and operation-completion frames. Add `WALK_FLAGS=--install` for the network-backed package lifecycle flows. Neither run exercises a real GameController or touches a real `/userdata`. See [Desktop GUI verification](desktop-verification.md).
 
@@ -69,7 +69,7 @@ Successful Store navigation does not prove any package. No current package has e
 1. Record Knulli version, hardware revision, and SDL controller name/GUID. Follow [Recording a device control report](#recording-a-device-control-report).
 2. Confirm the header identifies MagicX Zero 28 and 640×480, with readable responsive content and no clipping.
 3. Confirm the first launch opens the catalogue with no setup.
-4. Check up/down (and left/right) Library browsing, nearby rows, mint focus rail, circled controls, A review/confirm, B cancel, Y More, L1/R1 filtering and Select+Y in both default Knulli and Ports Xbox modes. X has no new feature. First A must not write files. B from direct confirmation must return to the selected row; secondary actions inside More still require confirmation.
+4. Check up/down (and left/right) Library browsing, equal-height rows, mint outline, matching detail pane, circled controls, A review/confirm, B cancel, Y More, L1/R1 filtering and Select+Y in both default Knulli and Ports Xbox modes. X has no new feature. First A must not write files. B from direct confirmation must return to the selected row; secondary actions inside More still require confirmation. Multiple committed menu changes must trigger one refresh on exit, not one per operation.
 5. Restart with an old custom mapping file present. Confirm defaults remain active and the file stays unchanged.
 6. Disconnect and reconnect the controller if the runtime permits it. Confirm the correct identity and mapping return.
 7. Press Y for More, then Y to export diagnostics. Confirm controller identity, mapping source, and semantic events are present without private data.
