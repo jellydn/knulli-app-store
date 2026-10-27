@@ -42,7 +42,7 @@ Successful `main` builds also publish dated experimental pre-releases. A release
 
 An existing copy offers **Manage existing**: matching release files become owned without reinstalling; uncertain files remain unmanaged and are backed up before replacement. Empty directories do not count as external copies. **Repair** restores pinned code and keeps declared data. **Uninstall** removes owned files, restores originals where applicable, and keeps declared data. Close apps before Store operations.
 
-Menu refresh **accepted** means queued, not completed. Refresh or restart EmulationStation if an entry is missing.
+The GUI requests one menu refresh on exit if package operations changed the game list, not after each install. One-shot CLI commands still refresh immediately. Menu refresh **accepted** means queued, not completed. Refresh or restart EmulationStation if an entry is missing.
 
 ### Update the Store
 
@@ -52,7 +52,7 @@ For an older build, custom location, or **text file busy** failure, verify the Z
 
 ## Controls
 
-The current **Option B Library** is a responsive list: nearby package rows stay visible, the selected row expands beside a mint focus rail, **All / Ready / Installed** filters remain visible, and circled face-button controls show contextual actions. It is not the earlier one-card browser. No setup wizard or custom mapping editor is needed.
+The **Library** uses a stable package list beside a persistent detail pane. A mint outline marks focus; **All / Ready / Installed** filters stay visible. Test evidence and installation state are separate, and long titles and summaries wrap in the detail pane. Controller glyphs and keyboard hints name the active controls. This Zitch-led presentation revision starts with v2026.10.27.1. No setup wizard or custom mapping editor is needed.
 
 | Action | Knulli controller | Desktop keyboard |
 | --- | --- | --- |
@@ -64,6 +64,8 @@ The current **Option B Library** is a responsive list: nearby package rows stay 
 | Quit | Hold Select, then press Y | Hold Tab or F5, then press Y |
 
 The first A press opens confirmation, not installation. **More** contains details and secondary actions; **Issue** opens health first. Y exports diagnostics directly on empty-catalogue and blocked-controller screens. Face labels follow the active Knulli Ports layout; the launcher compensates once for default or Xbox mode. Legacy `controller-mappings.json` files are ignored and left unchanged. See [frontend design](docs/adr/0010-gabagool-knulli-frontend.md) and [device reports](docs/real-device-tests.md).
+
+To test a separately prepared, unpublished build without replacing the production Store, use the [isolated device-test procedure](docs/ui-redesign-device-test.md). Normal release ZIPs are not isolated test packages.
 
 ## Catalogue and safety
 

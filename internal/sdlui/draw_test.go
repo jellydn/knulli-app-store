@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -37,6 +38,15 @@ func TestRenderRepresentativeStates(t *testing.T) {
 	recovery.Actions = []appstore.Action{appstore.Adopt, appstore.ForceReinstall}
 	recovery.RecoveryReason = "An existing backup requires manual review."
 	recovery.RecoverySummary = "Replaces reviewed app files, preserves declared data and backs up the complete existing destination for manual restore."
+	longTitle := item
+	longTitle.Package.Name = "Asymmetric package title with a long final word — settings"
+	longTitle.Package.Summary = strings.Repeat("Long package text must stay in the detail pane. ", 8)
+	update := installed
+	update.InstalledVersion = "0.2.1"
+	update.Actions = []appstore.Action{appstore.Update, appstore.Uninstall, appstore.Repair}
+	storeUpdate := installed
+	storeUpdate.Package.ID, storeUpdate.Package.Name = appstore.StoreID, "Knulli App Store"
+	storeUpdate.Actions = []appstore.Action{appstore.CheckUpdate}
 	states := map[string]*storeui.Model{
 		"catalogue":     {Items: []appstore.Item{item}},
 		"details":       {Items: []appstore.Item{item}, Focus: storeui.Actions},
@@ -48,6 +58,10 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		"force-confirm": {Items: []appstore.Item{recovery}, Focus: storeui.ForceConfirm, Action: 1},
 		"error":         {Items: []appstore.Item{item}, Error: "SHA-256 mismatch. Package files were not changed."},
 		"progress":      {Items: []appstore.Item{item}, Busy: true, Message: "Downloading and verifying Random Game Picker"},
+		"manage":        {Items: []appstore.Item{recovery}},
+		"update":        {Items: []appstore.Item{update}},
+		"store-update":  {Items: []appstore.Item{storeUpdate}},
+		"long-title":    {Items: []appstore.Item{longTitle}},
 		"empty":         {},
 	}
 	notice := &storeui.Model{Items: []appstore.Item{installed}}
@@ -79,17 +93,28 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		}
 		controls := storeinput.NewSession(t.TempDir(), "trimui-smart-pro")
 		controls.Connected, controls.Mode = true, storeinput.Normal
-		for name, model := range states {
-			frame := canvas.draw(model, "KNULLI", controls)
-			if frame.Bounds() != image.Rect(0, 0, logicalWidth(size.width, size.height), 480) {
-				t.Fatal(frame.Bounds())
-			}
-			if directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR"); directory != "" {
-				if err := os.MkdirAll(directory, 0755); err != nil {
-					t.Fatal(err)
+		for mode, session := range map[string]*storeinput.Session{"": controls, "-keyboard": storeinput.NewDesktopSession(t.TempDir(), "")} {
+			for name, model := range states {
+				frame := canvas.draw(model, "KNULLI", session)
+				if frame.Bounds() != image.Rect(0, 0, logicalWidth(size.width, size.height), 480) {
+					t.Fatal(frame.Bounds())
 				}
-				if err := saveOutputScreenshot(filepath.Join(directory, size.name+"-"+name+".png"), frame, size.width, size.height); err != nil {
-					t.Fatal(err)
+				// Long action/key labels must leave the footer's safe margins
+				// intact, including Manage existing on the narrow keyboard view.
+				for y := 427; y < 480; y++ {
+					for x := 0; x < 16; x++ {
+						if frame.RGBAAt(x, y) != palette.panel || frame.RGBAAt(canvas.width-1-x, y) != palette.panel {
+							t.Fatalf("%s %s%s: footer escaped safe margins", size.name, name, mode)
+						}
+					}
+				}
+				if directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR"); directory != "" {
+					if err := os.MkdirAll(directory, 0755); err != nil {
+						t.Fatal(err)
+					}
+					if err := saveOutputScreenshot(filepath.Join(directory, size.name+"-"+name+mode+".png"), frame, size.width, size.height); err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
 		}

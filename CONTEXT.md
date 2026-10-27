@@ -24,7 +24,7 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Tab** — One view of the catalogue: the whole list, the packages with something to act on, or the packages installed on this device. A tab filters on a package's typed state, never on its rendered state label.
 
-**Library browsing** — Moving through a compact package list with up/down (left/right also work). The selected row expands to show its version, summary and state; neighbouring packages stay visible. Y opens More for details and secondary actions. A opens confirmation for the first permitted action; an issue opens its health check first.
+**Library browsing** — Moving through a stable package list with up/down (left/right also work). An outline marks the selected row; its title, version, summary, test evidence and installation state appear in a persistent detail pane. Neighbouring packages stay visible. Y opens More for details and secondary actions. A opens confirmation for the first permitted action; an issue opens its health check first.
 
 **Filtering** — Switching All, Ready and Installed with L1/R1 (Page Up/Page Down on a keyboard). Each view remembers the selected package. An empty filter still permits switching to another view.
 
@@ -44,7 +44,7 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Uninstall** — Remove owned managed files, restore originals where they exist, and release menu ownership. Preserved and unmanaged files stay.
 
-**Outcome** — What an operation reports after committing: whether the game list refresh was accepted, or a restart is required. The operation is committed either way.
+**Outcome** — What an operation reports after committing: the GUI queues a game list refresh for exit; a one-shot CLI operation reports whether its refresh was accepted or a restart is required. The operation is committed either way.
 
 **Interruptible** — A step that honours the caller's context, so cancelling stops it where it stands instead of at the end. Extraction is interruptible between archive entries and partway through a single entry's transfer, so a large release stops promptly. Only the staging directory has been written when it stops, so an interrupted operation needs no rollback: the staging work is discarded and the destination is left exactly as it was found.
 
@@ -74,7 +74,7 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Menu ownership** — The installer owns a `gamelist.xml` entry only when it created that exact entry and it is unchanged. For an existing exact launcher path, registration and Repair can fill blank name, description, and image fields without taking ownership. Existing nonblank values, play history, and custom fields remain. Shared or modified entries are never replaced or deleted.
 
-**Game list refresh** — The loopback request asking Knulli to reload menus after a committed menu change. Accepted means queued, not completed; a refusal is reported as restart required while the operation stays committed.
+**Game list refresh** — The loopback request asking Knulli to reload menus after a committed menu change. The GUI combines all such changes into one request on exit, after any active operation finishes. An unchanged, cancelled or failed-only session sends none. One-shot CLI commands request it immediately. Accepted means queued, not completed; a refusal is reported as restart required while the operation stays committed.
 
 ## Platform
 

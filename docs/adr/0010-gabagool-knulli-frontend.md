@@ -31,14 +31,30 @@ transactional installer and presentation. This is not a new language migration.
 Pin gabagool/v2 v2.26.6, the version inspected in Grout. Use its public advanced
 window/renderer API (`Init`, `GetWindow`, `Present`, `Close`) and go-sdl2 event
 types instead of the local C wrapper. Use the owner-selected Library design:
-a compact list with an expanded selected row, local Store mark, visible filters
-and contextual button glyphs. Keep the released picker's shared responsive
+a package list, visible filters and contextual button glyphs. The original
+expanded selected row was replaced in the 2026-10-27 development revision below.
+Keep the released picker's shared responsive
 canvas: logical height 480, width max(640, output width × 480 / output height).
 Use its DejaVu Sans 18/26 px scale, palette and contextual footer proportions.
 Keep selection, confirmations, health detours, notices and
 semantic footer vocabulary. This
 is a toolkit-backed custom screen, **not** adoption of Grout's list layout or
 gabagool's stock screen components.
+
+### 2026-10-27 presentation revision (unreleased)
+
+Use Zitch as the lead reference: its [official handheld screenshot and UI source](https://github.com/itchio/zitch/tree/0c296f6faf76787e5a7c868f2abba20a8962f282)
+establish outlined controller focus, tabbed browsing, separate package pages and
+persistent input hints. Adapt these patterns to a stable text list and persistent
+detail pane: the Store has no reviewed covers, so a cover carousel adds no value.
+Keep the Store's own navy/mint palette and licensed font; no reference assets or
+code are copied. [RetroShelf's public site](https://www.retroshelf.org/) and
+[KNULLI guide](https://www.retroshelf.org/help/plugins/knulli) inform quiet spacing
+and clear status copy, not handheld navigation: its linked source returned 404.
+Test evidence and installation state remain separate. Rendering modules own the
+library, chrome, and package review; the input model and installer do not change.
+Verify the same layout at 1280×720 and 640×480 with both input sources. Desktop
+fixtures do not establish physical-controller or native-device results.
 
 Stock components run blocking event loops and add Start-to-confirm. Using them
 now would introduce another owner for controls, confirmation and asynchronous
