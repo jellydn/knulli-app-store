@@ -19,8 +19,8 @@ type OperationOutcome struct {
 // what the caller should report.
 func (m Manager) outcome(ctx context.Context, gameListChanged bool) OperationOutcome {
 	outcome := OperationOutcome{GameListChanged: gameListChanged}
-	if gameListChanged {
-		if err := m.refreshGameList(ctx); err != nil {
+	if gameListChanged && !m.DeferGameListRefresh {
+		if err := m.RefreshGameList(ctx); err != nil {
 			outcome.RestartRequired = true
 			m.event("gamelist_refresh_unavailable", "error", err.Error(), "restart_required", "true")
 		} else {
@@ -31,7 +31,9 @@ func (m Manager) outcome(ctx context.Context, gameListChanged bool) OperationOut
 	return outcome
 }
 
-func (m Manager) refreshGameList(ctx context.Context) error {
+// RefreshGameList requests one reload. GUI sessions call it on exit; one-shot
+// CLI operations request it immediately through outcome.
+func (m Manager) RefreshGameList(ctx context.Context) error {
 	endpoint := m.RefreshURL
 	if endpoint == "" {
 		endpoint = emulationStationReloadURL

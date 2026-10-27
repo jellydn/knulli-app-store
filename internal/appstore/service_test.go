@@ -443,12 +443,107 @@ func testZip(t *testing.T, files map[string]string) []byte {
 	return buffer.Bytes()
 }
 
+func TestSessionRefreshesGameListOnceOnExit(t *testing.T) {
+	for _, status := range []int{http.StatusNoContent, http.StatusInternalServerError} {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			var reloads atomic.Int32
+			reload := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet || r.URL.Path != "/reloadgames" {
+					t.Errorf("unexpected reload: %s %s", r.Method, r.URL.Path)
+				}
+				reloads.Add(1)
+				w.WriteHeader(status)
+			}))
+			defer reload.Close()
+			asset := testZip(t, map[string]string{"run.sh": "#!/bin/sh\n"})
+			digest := sha256.Sum256(asset)
+			var failDownload atomic.Bool
+			failDownload.Store(true)
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if failDownload.Load() {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Length", strconv.Itoa(len(asset)))
+				_, _ = w.Write(asset)
+			}))
+			defer server.Close()
+			client := server.Client()
+			client.Transport = testRewriteTransport{base: client.Transport, host: strings.TrimPrefix(server.URL, "https://")}
+			pkg := installablePackage()
+			pkg.Release.SHA256 = hex.EncodeToString(digest[:])
+			pkg.Release.Size = int64(len(asset))
+			pkg.Release.InstalledSize = int64(len("#!/bin/sh\n"))
+			pkg.Install.Menu = &manifest.Menu{Gamelist: "/userdata/roms/ports/gamelist.xml", Path: "./test/run.sh", Name: "Test"}
+			pkg.Install.AllowedWritePaths = append(pkg.Install.AllowedWritePaths, pkg.Install.Menu.Gamelist)
+			canonical, err := manifest.Canonical(pkg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			manifestDigest := sha256.Sum256(canonical)
+			index := catalog.Index{Schema: catalog.IndexSchemaV1, Packages: []catalog.Entry{{ID: pkg.ID, Package: pkg, ManifestSHA256: hex.EncodeToString(manifestDigest[:])}}}
+			path := filepath.Join(t.TempDir(), "index.json")
+			if err := writeIndexForTest(index, path); err != nil {
+				t.Fatal(err)
+			}
+			manager := installer.Manager{Root: t.TempDir(), Client: client, RefreshURL: reload.URL + "/reloadgames"}.WithPlatform(platform.Info{
+				Firmware: "knulli", Version: "2026.05", Arch: "aarch64", ABI: "linux-aarch64-glibc", Dependencies: []string{"sdl2"},
+			})
+			service, err := Open(path, manager)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx := context.Background()
+			if err := service.FlushGameListRefresh(ctx); err != nil || reloads.Load() != 0 {
+				t.Fatalf("idle session requested a reload: %d, %v", reloads.Load(), err)
+			}
+			cancelled, cancel := context.WithCancel(ctx)
+			cancel()
+			if err := service.Execute(cancelled, pkg.ID, Install, func(string) {}); err == nil {
+				t.Fatal("cancelled install succeeded")
+			}
+			if err := service.FlushGameListRefresh(ctx); err != nil || reloads.Load() != 0 {
+				t.Fatalf("cancelled session requested a reload: %d, %v", reloads.Load(), err)
+			}
+			if err := service.Execute(ctx, pkg.ID, Install, func(string) {}); err == nil {
+				t.Fatal("failed download succeeded")
+			}
+			if err := service.FlushGameListRefresh(ctx); err != nil || reloads.Load() != 0 {
+				t.Fatalf("failed session requested a reload: %d, %v", reloads.Load(), err)
+			}
+			failDownload.Store(false)
+			for _, action := range []Action{Install, Repair, Uninstall, Install} {
+				if err := service.Execute(ctx, pkg.ID, action, func(string) {}); err != nil {
+					t.Fatalf("%s: %v", action, err)
+				}
+				if reloads.Load() != 0 {
+					t.Fatalf("reload requested before exit after %s", action)
+				}
+			}
+			err = service.FlushGameListRefresh(ctx)
+			if (err != nil) != (status == http.StatusInternalServerError) || reloads.Load() != 1 {
+				t.Fatalf("exit reload: count=%d err=%v", reloads.Load(), err)
+			}
+			if err := service.FlushGameListRefresh(ctx); err != nil || reloads.Load() != 1 {
+				t.Fatalf("duplicate exit reload: count=%d err=%v", reloads.Load(), err)
+			}
+			items, err := service.Items(ctx)
+			if err != nil || len(items) != 1 || !items[0].Installed || !items[0].Healthy {
+				t.Fatalf("reload result changed committed installation: %#v, %v", items, err)
+			}
+		})
+	}
+}
+
 func TestCompletionMessageReportsRefreshOrRestartPrecisely(t *testing.T) {
 	if got := completionMessage(Uninstall, installer.OperationOutcome{GameListRefreshAccepted: true}); got != "Uninstall completed; game list refresh requested" {
 		t.Fatalf("refresh message = %q", got)
 	}
 	if got := completionMessage(Adopt, installer.OperationOutcome{RestartRequired: true}); got != "Manage existing install completed; restart required to update game list" {
 		t.Fatalf("restart message = %q", got)
+	}
+	if got := completionMessage(Install, installer.OperationOutcome{GameListChanged: true}); got != "Install completed; game list refresh on exit" {
+		t.Fatalf("deferred refresh message = %q", got)
 	}
 }
 

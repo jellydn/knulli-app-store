@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -95,6 +96,9 @@ func run() error {
 		ShotDir:     *shotDir,
 		WalkTimeout: *walkTimeout,
 	})
+	// Run has stopped the UI and cancelled its worker context. Use a fresh
+	// context so quitting does not cancel the single queued menu reload.
+	err = errors.Join(err, service.FlushGameListRefresh(context.Background()))
 	if err != nil {
 		diagnosticLog.Event("final_error", "error", err.Error())
 	}

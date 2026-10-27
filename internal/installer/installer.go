@@ -22,13 +22,14 @@ import (
 )
 
 type Manager struct {
-	Root           string
-	Client         *http.Client
-	RefreshClient  *http.Client
-	RefreshURL     string
-	Diagnostics    *diagnostics.Log
-	Now            func() time.Time
-	AvailableBytes func(string) (uint64, error)
+	Root                 string
+	Client               *http.Client
+	RefreshClient        *http.Client
+	RefreshURL           string
+	DeferGameListRefresh bool
+	Diagnostics          *diagnostics.Log
+	Now                  func() time.Time
+	AvailableBytes       func(string) (uint64, error)
 
 	platform    platform.Info
 	statusCache *StatusCache

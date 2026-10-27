@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/jellydn/knulli-app-store/internal/catalog"
 	"github.com/jellydn/knulli-app-store/internal/installer"
@@ -55,9 +56,11 @@ func (s *Service) SetPlatform(info platform.Info) {
 }
 
 type Service struct {
-	index   catalog.Index
-	manager installer.Manager
-	store   *selfUpdate
+	index          catalog.Index
+	manager        installer.Manager
+	store          *selfUpdate
+	operationMu    sync.Mutex
+	refreshPending bool
 }
 
 // Open loads the catalogue index and binds the service to it. The manager keeps
@@ -74,7 +77,25 @@ func Open(indexPath string, manager installer.Manager) (*Service, error) {
 		return nil, err
 	}
 	manager.Diagnostics.Event("catalogue_loaded", "path", indexPath, "packages", fmt.Sprint(len(index.Packages)))
+	manager.DeferGameListRefresh = true
 	return &Service{index: index, manager: manager.WithStatusCache(installer.NewStatusCache())}, nil
+}
+
+// FlushGameListRefresh waits for an in-flight operation, then requests at most
+// one reload for this session. Call after the UI has cancelled its worker context.
+func (s *Service) FlushGameListRefresh(ctx context.Context) error {
+	s.operationMu.Lock()
+	defer s.operationMu.Unlock()
+	if !s.refreshPending {
+		return nil
+	}
+	s.refreshPending = false
+	if err := s.manager.RefreshGameList(ctx); err != nil {
+		s.manager.Diagnostics.Event("gamelist_refresh_unavailable", "error", err.Error(), "restart_required", "true")
+		return fmt.Errorf("restart required to update game list: %w", err)
+	}
+	s.manager.Diagnostics.Event("gamelist_refresh_accepted")
+	return nil
 }
 
 func (s *Service) Items(ctx context.Context) ([]Item, error) {
@@ -97,6 +118,8 @@ func (s *Service) Items(ctx context.Context) ([]Item, error) {
 }
 
 func (s *Service) Execute(ctx context.Context, id string, action Action, progress func(string)) error {
+	s.operationMu.Lock()
+	defer s.operationMu.Unlock()
 	if id == StoreID && s.store != nil {
 		return s.executeStore(ctx, action, progress)
 	}
@@ -136,6 +159,8 @@ func (s *Service) Execute(ctx context.Context, id string, action Action, progres
 	default:
 		return fmt.Errorf("unknown action %q", action)
 	}
+	// A committed menu change still needs a reload if later bookkeeping fails.
+	s.refreshPending = s.refreshPending || (s.manager.DeferGameListRefresh && outcome.GameListChanged)
 	if err != nil {
 		lifecycle.Failure = err.Error()
 		lifecycle.ForceAllowed = action == Adopt && recoverableAdoptionFailure(err)
@@ -338,6 +363,9 @@ func completionMessage(action Action, outcome installer.OperationOutcome) string
 	}
 	if outcome.RestartRequired {
 		return message + "; restart required to update game list"
+	}
+	if outcome.GameListChanged {
+		return message + "; game list refresh on exit"
 	}
 	return message
 }
