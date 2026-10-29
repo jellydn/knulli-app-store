@@ -7,7 +7,7 @@
     "abis": [
       "linux-aarch64-glibc"
     ],
-    "minimum_glibc": "2.17",
+    "minimum_glibc": "2.29",
     "dependencies": [
       "sdl2",
       "sdl2-image",
@@ -29,7 +29,7 @@
       "bin/retroshelf-uninstall.sh"
     ],
     "upstream_managed": true,
-    "warning": "Experimental; license unverified. Owner-tested on TrimUI Smart Pro; other device matrices remain untested. Direct upstream download, not redistributed. App controls hooks and updates. Close app before Store operations; Repair restores pinned code. Before removal run bin/retroshelf-uninstall.sh --keep-data. Account and session data stay.",
+    "warning": "Experimental; license unverified. Historical TSP test covers 0.5.6, not this version. Direct upstream download, not redistributed. App controls hooks and updates; runtime writes and downloaded updates are not sandboxed. Close app before Store operations; Repair restores pinned code. Before removal run bin/retroshelf-uninstall.sh --keep-data. Account and session data stay.",
     "menu": {
       "gamelist": "/userdata/roms/tools/gamelist.xml",
       "path": "./retroshelf/retroshelf.sh",
@@ -66,10 +66,11 @@
       "Requires a retroshelf account and Wi-Fi for linking and syncing. Upstream documents offline session queuing and a game-session hook installed on first launch.",
       "Review on 2026-10-24 verified the version-pinned Knulli v0.5.6 ZIP against the publisher checksums.txt and GitHub asset digest: 19393643 compressed bytes, 41864615 regular-file bytes, SHA-256 bb60de30f256e9f187e755b2cc84b6df2ffb6b5d04a2be63f8421fdbec18c8bb. All eight files and four directories were inspected; no packaged code was executed.",
       "Authorized upstream-managed experimental installation follows the Knulli guide: extract into /userdata/roms/tools/retroshelf, register the launcher, then let the user launch and link. First launch installs session hooks. Runtime writes and upstream updates are not sandboxed or checksum-controlled by the Store.",
-      "A redistributable license has not been verified. The public release repository links to a source repository that returned HTTP 404 during review. ELF inspection establishes AArch64 and a glibc 2.17 symbol floor for the UI; the sync engine has no dynamic NEEDED entries. The owner confirmed this version tested on TrimUI Smart Pro, Knulli, aarch64, 1280x720 on 2026-10-25. Separate write-containment, preserved-data, hook-ownership and uninstall results were not reported.",
+      "Historical 0.5.6 review: a redistributable license was not verified and the linked source repository returned HTTP 404. The owner confirmed 0.5.6 tested on TrimUI Smart Pro, Knulli, aarch64, 1280x720 on 2026-10-25. Separate write-containment, preserved-data, hook-ownership and uninstall results were not reported; this is not a 0.6.3 device report.",
       "The Store links directly to the publisher's release; it does not mirror or redistribute the ZIP. License remains unverified and is disclosed before installation. This exception is limited to upstream-managed experimental packages; no license identifier or device-test result is invented.",
       "Before Store removal, close the app and run /userdata/roms/tools/retroshelf/bin/retroshelf-uninstall.sh --keep-data to remove its hooks while preserving the linked device and sync history. A read-only check of /userdata/system/scripts refuses removal while any hook still references retroshelf. The Store never runs that script or removes shared hooks or runtime-created data.",
-      "Automated release proposal: downloaded size/SHA-256 and bounded archive inspection passed. Earlier runtime, dependency, path and device evidence is historical; review this version before merging. No upstream code was executed."
+      "Manual 0.6.3 review on 2026-10-29 independently matched the ZIP to publisher checksums.txt and inspected all eight regular files: 19739401 compressed bytes, 42693255 installed bytes. The launcher and uninstall wrapper are byte-identical to 0.5.6; they still relocate through /tmp, apply upstream-staged updates, repair game-session hooks and delegate removal to the sync engine. These runtime actions remain explicitly upstream-managed. No upstream code or scripts were executed.",
+      "The 0.6.3 UI and sync engine are AArch64; the engine is statically linked. The UI requires the existing SDL2/image/ttf, libc, libresolv and libpthread libraries. Bundled SDL2_gfx requires GLIBC_2.29, so the complete package minimum is 2.29. Source and license remain unavailable; opaque binary hook, updater and data-migration behavior cannot be fully audited. See docs/retroshelf-0.6.3.md for evidence and fixture lifecycle limits."
     ],
     "evidence": [
       {
@@ -122,6 +123,11 @@
       {
         "kind": "publisher-checksum",
         "url": "https://github.com/retroshelf-org/linux/releases/download/v0.6.3/checksums.txt"
+      },
+      {
+        "kind": "runtime-dependency-review",
+        "url": "https://github.com/retroshelf-org/linux/releases/download/v0.6.3/retroshelf-knulli-v0.6.3.zip",
+        "note": "Manual 2026-10-29 review: AArch64 UI GLIBC_2.17, static AArch64 sync engine, bundled SDL2_gfx GLIBC_2.29. Launcher/uninstall wrapper match 0.5.6 exactly. Existing /userdata/system/scripts cleanup check is retained. Store lifecycle fixtures do not execute the app, hooks, updater or data migrations; upstream runtime remains unsandboxed and source/license unavailable."
       }
     ]
   },
