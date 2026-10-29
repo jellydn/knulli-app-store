@@ -2,7 +2,7 @@
   "schema": "org.knulli.app-store/package-manifest/v1",
   "id": "app.romm.grout",
   "name": "Grout",
-  "version": "5.2.0.0",
+  "version": "5.4.1.0",
   "type": "integration",
   "summary": "Connects a Linux retro handheld to a RomM server.",
   "repository": "https://github.com/rommapp/grout",
@@ -13,12 +13,35 @@
       "provenance": "community"
     },
     "notes": [
-      "Grout 5.2.0.0 is authorized for experimental installation on any Knulli device with matching aarch64 glibc and declared SDL libraries. Device lists and display bounds are advisory; missing exact-device evidence means untested, not blocked.",
+      "Grout 5.4.1.0 is reviewed for experimental installation on any Knulli device with matching aarch64 glibc and declared SDL libraries. Device lists and display bounds are advisory; missing exact-device evidence means untested, not blocked.",
       "The Store replaces the one pinned updater-metadata URL in the reviewed binary with a reserved .invalid URL and verifies the exact transformed SHA-256. This prevents Grout's self-updater from obtaining release metadata.",
-      "The manager preserves config.json, save_slots.json, .cache, and logs during update, repair, force reinstall, and uninstall. Recovery backups remain available for manual restore.",
+      "A second exact-byte staging patch disables the launcher's pending ../.update copy/remove block. An old staged upstream update is left untouched and cannot overwrite the Store-managed installation through this launcher. Both patches must match their source bytes and final whole-file hashes before mutation.",
+      "Review on 2026-10-29 verified the v5.4.1.0 Knulli ZIP against publisher versions.json at commit 48b229cc04002681335ba66547a267d680c152e3 and GitHub asset 686708108: 24862889 compressed bytes, 48758713 regular-file bytes, SHA-256 7850d50388f4c13d4d0ac7d4ba353fba80008cdcce70216ae5aeb3903c93088f. The single updater URL begins at byte 9819700; the patched binary SHA-256 is 02a2475559f7daedeb6186f9cb21ba60361150238f66e8245d4c2a548c257a10. The bundled SDL2_gfx library requires glibc 2.29 even though the main binary only requires 2.17. No upstream code was executed during this archive review.",
+      "The manager preserves config.json, save_slots.json, input_mapping.json, .cache, and logs during update, repair, force reinstall, and uninstall. Recovery backups remain available for manual restore.",
+      "Upstream supports RomM 5.4.1 or newer. Use only ROMs and BIOS files you have the right to use and servers you trust. Runtime downloads, metadata writes and save replacement are not sandboxed; temporary files can be written outside /userdata. Host TLS verification can be disabled in Grout settings. Store archive checks do not validate later server-provided content.",
       "The owner confirmed Grout 5.2.0.0 tested on TrimUI Smart Pro, Knulli, aarch64, 1280x720 on 2026-10-25. Individual lifecycle results and other devices are not covered by this report."
     ],
     "evidence": [
+      {
+        "kind": "release-asset",
+        "url": "https://github.com/rommapp/grout/releases/download/v5.4.1.0/Grout-Knulli.zip",
+        "note": "Asset 686708108 matches the publisher checksum and GitHub digest. Six regular files and two directories were inspected; exact size and SHA-256 reject replacement bytes despite the non-immutable GitHub release. See docs/grout-5.4.1.0.md for inventory and lifecycle validation."
+      },
+      {
+        "kind": "publisher-checksum",
+        "url": "https://github.com/rommapp/grout/blob/48b229cc04002681335ba66547a267d680c152e3/docs/versions.json",
+        "note": "stable.assets.Grout-Knulli.zip pins v5.4.1.0, 24862889 bytes and SHA-256 7850d50388f4c13d4d0ac7d4ba353fba80008cdcce70216ae5aeb3903c93088f; independently compared with the downloaded ZIP. The release tag predates this publisher checksum commit."
+      },
+      {
+        "kind": "runtime-dependency-review",
+        "url": "https://github.com/rommapp/grout/tree/1484116313cee19d12b92590c2057fa02bc3cba2",
+        "note": "Downloaded ELF is AArch64 with /lib/ld-linux-aarch64.so.1; system SDL2/image/ttf, libresolv, libpthread and libc remain required. Bundled SDL2_gfx also needs libm and GLIBC_2.29. The unique updater metadata URL remains patchable with the same-length reserved .invalid URL."
+      },
+      {
+        "kind": "license",
+        "url": "https://github.com/rommapp/grout/blob/1484116313cee19d12b92590c2057fa02bc3cba2/LICENSE",
+        "note": "MIT license also retained in the reviewed ZIP."
+      },
       {
         "kind": "real-device-test",
         "url": "https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b",
@@ -72,10 +95,10 @@
     ]
   },
   "release": {
-    "url": "https://github.com/rommapp/grout/releases/download/v5.2.0.0/Grout-Knulli.zip",
-    "sha256": "bd1d4eea3cc262a50cf6c58369d95a1c3c474d95e7f4745406f2a5bd449e3b9d",
-    "size": 24277451,
-    "installed_size": 47590773,
+    "url": "https://github.com/rommapp/grout/releases/download/v5.4.1.0/Grout-Knulli.zip",
+    "sha256": "7850d50388f4c13d4d0ac7d4ba353fba80008cdcce70216ae5aeb3903c93088f",
+    "size": 24862889,
+    "installed_size": 48758713,
     "format": "zip",
     "immutable": true
   },
@@ -83,7 +106,7 @@
     "firmware": "knulli",
     "architectures": ["aarch64"],
     "abis": ["linux-aarch64-glibc"],
-    "minimum_glibc": "2.17",
+    "minimum_glibc": "2.29",
     "dependencies": ["sdl2", "sdl2-image", "sdl2-ttf", "libc", "libresolv", "libpthread"],
     "device_scope": "any",
     "display_bounds": {
@@ -98,7 +121,7 @@
     "strip_components": 1,
     "launcher": "Grout.sh",
     "executables": ["Grout.sh", "grout"],
-    "warning": "Experimental on this device. Store integrity controls disable Grout's self-updater; update only through the Store.",
+    "warning": "Experimental. Update only through the Store; self-update and pending-update application are disabled. Requires RomM 5.4.1+. Back up saves; runtime downloads and writes are not sandboxed. Use trusted servers and only ROMs/BIOS you have the right to use.",
     "menu": {
       "gamelist": "/userdata/roms/tools/gamelist.xml",
       "path": "./Grout/Grout.sh",
@@ -106,7 +129,7 @@
       "description": "Browse your RomM library and sync games to your handheld.",
       "image": "./Grout/logo.png"
     },
-    "preserve": ["config.json", "save_slots.json", ".cache", "logs"],
+    "preserve": ["config.json", "save_slots.json", "input_mapping.json", ".cache", "logs"],
     "network": true,
     "allowed_write_paths": [
       "/userdata/roms/tools/Grout",
@@ -118,10 +141,17 @@
     "binary_patches": [
       {
         "path": "grout",
-        "offset": 9490992,
+        "offset": 9819700,
         "before_hex": "68747470733a2f2f67726f75742e726f6d6d2e6170702f76657273696f6e732e6a736f6e",
         "after_hex": "68747470733a2f2f73656c662d7570646174652e64697361626c65642e696e76616c6964",
-        "sha256": "39b5ba053913620aea2db051c2fad2fa0bf05b59c2cc88bcb01734dd048882e7"
+        "sha256": "02a2475559f7daedeb6186f9cb21ba60361150238f66e8245d4c2a548c257a10"
+      },
+      {
+        "path": "Grout.sh",
+        "offset": 96,
+        "before_hex": "23204170706c792070656e64696e67207570646174650a6966205b202d6420222e2e2f2e75706461746522205d3b207468656e0a202020206370202d7266202e2e2f2e7570646174652f2a202e2e0a20202020726d202d7266202e2e2f2e7570646174650a6669",
+        "after_hex": "232053746f72652d6d616e616765643a20646f206e6f74206170706c792070656e64696e6720757073747265616d20757064617465732e202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020",
+        "sha256": "061df095b8eefdcaf12e617ea4fb19bde5e06000c0559488a17523a8cd6b2b16"
       }
     ]
   }
