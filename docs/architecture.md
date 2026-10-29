@@ -31,7 +31,7 @@ signed index                           HTTPS download
 - `internal/archive`: bounded ZIP and `tar.gz` extraction into staging.
 - `internal/safefs`: allowed-path resolution, symlink rejection, atomic files, free-space checks, and rollback snapshots.
 - `internal/installer`: download, lifecycle operations, installed state, backups, XML menu integration, and the committed game-list reload request.
-- `internal/updatecheck`: read-only upstream release metadata checks and the JSON or Markdown review report.
+- `internal/updatecheck`: upstream release metadata checks, JSON or Markdown review reports, and opt-in verified experimental release proposals. Never approves releases or executes upstream code.
 - `cmd/knulli-app`: a thin installer command-line adapter.
 - `cmd/knulli-app-ui`: the SDL2 GUI entry point behind the `sdl` build tag.
 - `cmd/check-updates`: a thin adapter that writes the catalogue update report.

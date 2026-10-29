@@ -30,13 +30,20 @@ func Markdown(report Report) []byte {
 			fmt.Fprintf(&output, "- Ignored prerelease: `%s`\n", pkg.IgnoredPrerelease)
 		}
 		if pkg.Error != "" {
-			fmt.Fprintf(&output, "- Metadata error: `%s`\n", strings.ReplaceAll(pkg.Error, "`", "'"))
+			fmt.Fprintf(&output, "- Review blocker: `%s`\n", strings.ReplaceAll(pkg.Error, "`", "'"))
 		}
 		if len(pkg.Assets) > 0 {
 			output.WriteString("- Version-pinned assets:\n")
 			for _, asset := range pkg.Assets {
 				fmt.Fprintf(&output, "  - `%s` (%d bytes, digest `%s`): %s\n", asset.Name, asset.Size, valueOrNone(asset.Digest), asset.URL)
 			}
+		}
+		if len(pkg.Inventory) > 0 {
+			var size int64
+			for _, file := range pkg.Inventory {
+				size += file.Size
+			}
+			fmt.Fprintf(&output, "- Inspected inventory: %d regular files, %d installed bytes. Full staged paths (after strip_components), mapped install paths, sizes and SHA-256 values are in this run's JSON report artifact.\n", len(pkg.Inventory), size)
 		}
 		output.WriteString("\nManual review: verify release stability and immutability, asset size/SHA-256/extracted size, license, archive inventory, write and preserve paths, dependencies, compatibility evidence, and real-device results. Never copy metadata into a manifest without review.\n\n")
 	}

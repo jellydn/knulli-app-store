@@ -2,36 +2,103 @@ name: catalogue updates
 
 on:
   schedule:
-    - cron: "17 6 * * 1"
+    # GitHub cron uses UTC: 04:00 UTC is 12:00 PM Asia/Singapore.
+    - cron: "0 4 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: catalogue-updates
+  cancel-in-progress: false
+
 jobs:
   check-releases:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: "1.27.x"
+          go-version: "1.27.1"
           cache: true
       - name: Test release checker
-        run: go test ./internal/updatecheck
-      - name: Check upstream release metadata
+        run: go test -race ./internal/updatecheck ./cmd/check-updates
+      - name: Check every package and prepare verified proposals
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: go run ./cmd/check-updates -output build/catalogue-update-report
+        run: |
+          go run ./cmd/check-updates -apply -output build/catalogue-update-report
+          cat build/catalogue-update-report.md >> "$GITHUB_STEP_SUMMARY"
+          jq -e 'all(.packages[]; .status != "metadata-error")' build/catalogue-update-report.json
+      - name: Detect changed package metadata
+        id: changes
+        run: |
+          if git diff --quiet -- catalogue/packages; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo 'No verified metadata changes; no pull request needed. Review any blockers in the report.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      # GITHUB_TOKEN-created PRs do not trigger pull_request workflows. Run the
+      # validation here before publishing rather than relying on another run.
+      - name: Install SDL2 development files
+        if: steps.changes.outputs.changed == 'true'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-gfx-dev
+      - name: Validate proposed catalogue
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          make check
+          go test -race -tags sdl ./...
+          make cover
+          make catalogue-check
+          go install honnef.co/go/tools/cmd/staticcheck@v0.8.1
+          staticcheck ./...
+          staticcheck -tags sdl ./...
+      - name: Draft pull request for human review
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          open=$(gh pr list --state open --limit 1000 --json headRefName --jq '[.[] | select(.headRefName | startswith("automation/catalogue-updates-"))] | length')
+          if [ "$open" -gt 0 ]; then
+            echo 'An existing catalogue proposal needs review; no duplicate PR was opened or modified.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          branch="automation/catalogue-updates-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- catalogue/packages
+          git commit -m 'chore(catalogue): propose verified upstream updates'
+          {
+            printf '## What\n\nPropose only changed, verified experimental package metadata.\n\n'
+            printf '## Why\n\nKeep the catalogue current without automatically approving upstream releases.\n\n'
+            printf '## How\n\nVerified downloaded size, SHA-256, publisher checksum where required, and bounded archive extraction. No upstream code was executed.\n\n'
+            printf 'Validation passed: `make check`, SDL race tests, `make cover`, `make catalogue-check`, and Staticcheck with both tag sets.\n\n'
+            printf 'Human review is required for runtime behavior, dependencies, install/preserve paths, license and device evidence. Manual blockers are listed below. Merge is manual. After merge to main, successful normal checks automatically publish an experimental prerelease through the existing release workflow. Full releases require a v* tag.\n\n'
+            printf 'The full per-file archive inventory (staged and mapped paths, sizes, SHA-256) is in the catalogue-update-report JSON artifact on the [workflow run](%s).\n\n' "$RUN_URL"
+            cat build/catalogue-update-report.md
+          } > build/catalogue-pr.md
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin "$branch"
+          gh pr create --draft --base "$BASE_BRANCH" --head "$branch" \
+            --title 'chore(catalogue): propose verified upstream updates' --body-file build/catalogue-pr.md
       - name: Upload review report
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: catalogue-update-report
           path: |
             build/catalogue-update-report.json
             build/catalogue-update-report.md
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30

@@ -47,7 +47,7 @@ When a license cannot be verified, an upstream-managed experimental manifest may
 
 Declare `install.uninstall_checks` for shared hooks and active-service state. Each check has an absolute `path` below `/userdata` and a cleanup `message`. Without `contains`, an existing path blocks removal. With `contains`, the Store searches the file or directory tree for that case-insensitive text. A match, symlink, unreadable entry or file over 1 MiB blocks removal before package mutation. Checks are read-only; never run an upstream uninstall script or delete a shared hook. Check documented hook locations and warn about custom upstream path overrides. Retest these checks when upstream changes its hook layout.
 
-For an update, repeat the full release, archive, dependency, security, lifecycle, and device review. Never copy values from the weekly report without verification. For removal or deprecation, remove the catalogue and product references, regenerate the index, and retain only generic orphan-state handling for old manager state.
+For an update, repeat the full release, archive, dependency, security, lifecycle, and device review. The daily workflow can draft verified experimental metadata changes, but its integrity checks do not replace runtime or device review. Check the report's manual blockers and historical evidence before merging a proposal. For removal or deprecation, remove the catalogue and product references, regenerate the index, and retain only generic orphan-state handling for old manager state.
 
 ## EmulationStation menu metadata
 

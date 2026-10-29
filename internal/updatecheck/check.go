@@ -31,16 +31,26 @@ type Report struct {
 }
 
 type PackageReport struct {
-	ID                string  `json:"id"`
-	Repository        string  `json:"repository"`
-	CurrentVersion    string  `json:"current_version"`
-	DiscoveredVersion string  `json:"discovered_version,omitempty"`
-	ReleaseURL        string  `json:"release_url,omitempty"`
-	ReleaseImmutable  bool    `json:"release_immutable,omitempty"`
-	Status            string  `json:"status"`
-	IgnoredPrerelease string  `json:"ignored_prerelease,omitempty"`
-	Assets            []Asset `json:"assets,omitempty"`
-	Error             string  `json:"error,omitempty"`
+	ID                string          `json:"id"`
+	Repository        string          `json:"repository"`
+	CurrentVersion    string          `json:"current_version"`
+	DiscoveredVersion string          `json:"discovered_version,omitempty"`
+	ReleaseURL        string          `json:"release_url,omitempty"`
+	ReleaseImmutable  bool            `json:"release_immutable,omitempty"`
+	Status            string          `json:"status"`
+	IgnoredPrerelease string          `json:"ignored_prerelease,omitempty"`
+	Assets            []Asset         `json:"assets,omitempty"`
+	Error             string          `json:"error,omitempty"`
+	Inventory         []InventoryFile `json:"inventory,omitempty"`
+}
+
+// StagedPath is relative to the archive after strip_components. InstalledPath
+// also accounts for file_mappings; neither field exposes a temporary host path.
+type InventoryFile struct {
+	StagedPath    string `json:"staged_path"`
+	InstalledPath string `json:"installed_path"`
+	Size          int64  `json:"size"`
+	SHA256        string `json:"sha256"`
 }
 
 type Asset struct {

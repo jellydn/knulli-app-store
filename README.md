@@ -69,11 +69,11 @@ To test a separately prepared, unpublished build without replacing the productio
 
 ## Catalogue and safety
 
-On 2026-10-25 (Asia/Singapore), the [owner confirmed](https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b) seven package versions tested on TrimUI Smart Pro only, Knulli AArch64 at 1280×720. That report covers Picker 0.2.0, not the newly published 0.2.2. The other six current versions retain passed package evidence on that matrix only, not separate lifecycle results. **Picker 0.2.2 is UNTESTED on all matrices.** MagicX Zero 28 and other matrices remain untested for every package. All seven manifest review statuses remain **experimental**:
+On 2026-10-25 (Asia/Singapore), the [owner confirmed](https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b) seven package versions tested on TrimUI Smart Pro only, Knulli AArch64 at 1280×720. That report covers Picker 0.2.0 and Grout 5.2.0.0, not Picker 0.2.2 or Grout 5.4.1.0. The other five current versions retain passed package evidence on that matrix only, not separate lifecycle results. New badges require exact-version evidence. MagicX Zero 28 and other matrices remain untested for every package. All seven manifest review statuses remain **experimental**:
 
 | Package | Current manifest version | Purpose |
 | --- | --- | --- |
-| Grout | 5.2.0.0 | Connect to a RomM server |
+| Grout | 5.4.1.0 | Connect to a RomM 5.4.1+ server; [release review](docs/grout-5.4.1.0.md) |
 | PlayTime | 1.0.0 | Track game play time |
 | Random Game Picker | 0.2.2 | Select from existing EmulationStation games |
 | RetSend | 1.0.0 | Transfer files over local Wi-Fi with LocalSend peers |
@@ -101,6 +101,8 @@ PortMaster is an external provider: the Store does not install its catalogue. RO
 - RAOfflineProxy and retroshelf require manual hook/service cleanup before removal. Read the Store's cleanup messages and the [RAOfflineProxy](catalogue/packages/io.github.misantronic.raofflineproxy.json) / [retroshelf](catalogue/packages/org.retroshelf.knulli.json) manifest warnings. Declared read-only checks block removal; the Store never runs cleanup scripts.
 
 See [package manifests](catalogue/packages/), [package contribution guidance](docs/how-to-add-a-package.md), [RetSend review](docs/retsend-upstream-1.0.0.md), and the [security model](docs/security-model.md) for preserved paths and boundaries.
+
+The daily [catalogue update check](https://github.com/jellydn/knulli-app-store/actions/workflows/catalogue-updates.yml) runs at 12:00 PM Singapore time. It verifies eligible experimental release proposals, tests changed metadata, and drafts a PR for human review; ambiguous releases and patch-dependent packages remain manual. It never approves or merges a package. After human merge to `main`, successful normal checks automatically publish an experimental prerelease; full releases require a `v*` tag. See [contribution guidance](CONTRIBUTING.md) for permissions and validation.
 
 ## Build and test
 
