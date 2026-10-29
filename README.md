@@ -106,7 +106,7 @@ The daily [catalogue update check](https://github.com/jellydn/knulli-app-store/a
 
 ## Build and test
 
-Use **Go 1.27.1 exactly** for the development/check toolchain to match the analyzer; do not substitute a newer patch version. GUI builds and `make check` also need SDL development files. On Debian or Ubuntu:
+Use **Go 1.27.3** with **Staticcheck 0.8.2** to match CI and local hooks. The analyzer supports the updated Go export format. GUI builds and `make check` also need SDL development files. On Debian or Ubuntu:
 
 ```sh
 sudo apt-get install libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-gfx-dev
