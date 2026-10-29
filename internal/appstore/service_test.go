@@ -57,8 +57,8 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 			if item.Package.Review.Status == "verified" {
 				verified++
 			}
-			if !item.Compatible || len(item.Actions) != 1 || item.Actions[0] != Install {
-				t.Fatalf("reviewed package is not installable: %#v", item)
+			if !item.Compatible || !item.DeviceTested || len(item.Actions) != 1 || item.Actions[0] != Install {
+				t.Fatalf("owner-tested TSP package is not tested and installable: %#v", item)
 			}
 			continue
 		}

@@ -23,6 +23,19 @@
     "evidence": [
       {
         "kind": "real-device-test",
+        "url": "https://ampcode.com/threads/T-01a184fd-5491-7371-9d0d-5d2a4bbddb02",
+        "note": "Owner reconfirmed all current apps working and tested on TSP. Uses the previously confirmed Knulli AArch64 1280x720 TSP matrix; separate lifecycle results were not supplied.",
+        "tester": "dunghd",
+        "date": "2026-10-30",
+        "package_version": "1.1.2",
+        "firmware": "knulli",
+        "architecture": "aarch64",
+        "device": "trimui-smart-pro",
+        "resolution": "1280x720",
+        "result": "passed"
+      },
+      {
+        "kind": "real-device-test",
         "url": "https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b",
         "note": "Owner confirmed all seven current versions tested on TrimUI Smart Pro only. Separate lifecycle steps were not reported.",
         "tester": "dunghd",

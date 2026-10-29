@@ -29,7 +29,7 @@
       "bin/retroshelf-uninstall.sh"
     ],
     "upstream_managed": true,
-    "warning": "Experimental; license unverified. Historical TSP test covers 0.5.6, not this version. Direct upstream download, not redistributed. App controls hooks and updates; runtime writes and downloaded updates are not sandboxed. Close app before Store operations; Repair restores pinned code. Before removal run bin/retroshelf-uninstall.sh --keep-data. Account and session data stay.",
+    "warning": "Experimental; license unverified. Direct upstream download, not redistributed. App controls hooks and updates; runtime writes and downloaded updates are not sandboxed. Close app before Store operations; Repair restores pinned code. Before removal run bin/retroshelf-uninstall.sh --keep-data. Account and session data stay.",
     "menu": {
       "gamelist": "/userdata/roms/tools/gamelist.xml",
       "path": "./retroshelf/retroshelf.sh",
@@ -73,6 +73,19 @@
       "The 0.6.3 UI and sync engine are AArch64; the engine is statically linked. The UI requires the existing SDL2/image/ttf, libc, libresolv and libpthread libraries. Bundled SDL2_gfx requires GLIBC_2.29, so the complete package minimum is 2.29. Source and license remain unavailable; opaque binary hook, updater and data-migration behavior cannot be fully audited. See docs/retroshelf-0.6.3.md for evidence and fixture lifecycle limits."
     ],
     "evidence": [
+      {
+        "kind": "real-device-test",
+        "url": "https://ampcode.com/threads/T-01a184fd-5491-7371-9d0d-5d2a4bbddb02",
+        "note": "Owner reconfirmed all current apps working and tested on TSP. Uses the previously confirmed Knulli AArch64 1280x720 TSP matrix; separate lifecycle results were not supplied.",
+        "tester": "dunghd",
+        "date": "2026-10-30",
+        "package_version": "0.6.3",
+        "firmware": "knulli",
+        "architecture": "aarch64",
+        "device": "trimui-smart-pro",
+        "resolution": "1280x720",
+        "result": "passed"
+      },
       {
         "kind": "real-device-test",
         "url": "https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b",

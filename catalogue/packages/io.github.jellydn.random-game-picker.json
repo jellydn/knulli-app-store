@@ -11,7 +11,7 @@
     "status": "experimental",
     "approval": {"provenance": "maintainer"},
     "notes": [
-      "Stable 0.2.2 excludes the confirmed Tools and Emulators application systems before gamelist parsing, from in-memory selection and during Play revalidation. Path-only candidates use boundary-aware application-root checks. No title, pc platform, sh core, hardware tool or extension blacklist is used; the existing Ports policy is unchanged. Launcher, paths, settings and controls stay unchanged. No exact-version hardware gameplay evidence exists for 0.2.2; the 0.2.0 owner report remains historical. Store review status remains experimental.",
+      "Stable 0.2.2 excludes the confirmed Tools and Emulators application systems before gamelist parsing, from in-memory selection and during Play revalidation. Path-only candidates use boundary-aware application-root checks. No title, pc platform, sh core, hardware tool or extension blacklist is used; the existing Ports policy is unchanged. Launcher, paths, settings and controls stay unchanged. The owner reconfirmed 0.2.2 working and tested on TSP on 2026-10-30; the 0.2.0 report remains historical. Store review status remains experimental.",
       "The version-specific URL, exact size and SHA-256 pin the reviewed bytes. GitHub reports immutable=false: this is not a server-enforced immutable release. The Store rejects replacement bytes; release.immutable declares the pinned-content contract, not a GitHub repository setting.",
       "The picker reads effective ES system configuration, gamelists and the live ES catalogue; no game ROM directory or emulator command is hardcoded. Tools and Emulators are identified by exact system IDs; only path-only candidates use the confirmed /userdata/roms/tools and /userdata/roms/emulators roots. Ports, collections, missing/hidden games and ambiguous launch paths remain excluded. Application systems still contribute to launch-path ambiguity checks.",
       "The only network use is bounded HTTP to 127.0.0.1:1234. Play closes SDL, sends one exact raw-path POST to ES and exits. HTTP acceptance does not confirm play; there is no retry or nested configgen fallback.",
@@ -20,6 +20,19 @@
       "Published AArch64 ELF inspection establishes a glibc 2.34 minimum. Firmware SDL2, SDL2_image, SDL2_ttf and SDL2_gfx are required; no firmware library is bundled or replaced. Go/module/font license notices replace the old C++ runtime notices; no libstdc++ runtime dependency remains."
     ],
     "evidence": [
+      {
+        "kind": "real-device-test",
+        "url": "https://ampcode.com/threads/T-01a184fd-5491-7371-9d0d-5d2a4bbddb02",
+        "note": "Owner reconfirmed all current apps working and tested on TSP. Uses the previously confirmed Knulli AArch64 1280x720 TSP matrix; separate lifecycle results were not supplied.",
+        "tester": "dunghd",
+        "date": "2026-10-30",
+        "package_version": "0.2.2",
+        "firmware": "knulli",
+        "architecture": "aarch64",
+        "device": "trimui-smart-pro",
+        "resolution": "1280x720",
+        "result": "passed"
+      },
       {
         "kind": "real-device-test",
         "url": "https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b",
@@ -95,7 +108,7 @@
     "strip_components": 0,
     "launcher": "RandomGamePicker.sh",
     "executables": ["RandomGamePicker.sh", "random-game-picker"],
-    "warning": "Experimental Go 0.2.2: no exact-version hardware gameplay test; 0.2.0 evidence does not cover this release. Tools and Emulators are excluded from selection. Requires glibc 2.34+, firmware SDL2/image/ttf/gfx and local ES API. Submit Play once; inspect state/last-run.log and state/ui.log before retrying. Standard Ports location only. Settings/logs stay after uninstall.",
+    "warning": "Experimental Go 0.2.2. Tools and Emulators are excluded from selection. Requires glibc 2.34+, firmware SDL2/image/ttf/gfx and local ES API. Submit Play once; inspect state/last-run.log and state/ui.log before retrying. Standard Ports location only. Settings/logs stay after uninstall.",
     "menu": {
       "gamelist": "/userdata/roms/ports/gamelist.xml",
       "path": "./RandomGamePicker/RandomGamePicker.sh",

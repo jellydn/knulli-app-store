@@ -57,4 +57,4 @@ It also rejects glibc 2.28 and accepts 2.29. The scratch test is removed after v
 
 Local validation passed: `make check`, `go test -race -tags sdl ./...`, `make cover` (84.1%), `make catalogue-check` (two identical 65,858-byte builds), Staticcheck v0.8.1 with both tag sets, and the CGO-free Linux ARM64 CLI build. The real-archive lifecycle test also passed with the race detector on both filesystem fixtures.
 
-Historical device evidence stays at 5.1.0.0 and 5.2.0.0. The owner's 2026-10-29 statement that all apps work on TSP is acknowledged, but the exact new versions and device matrix need confirmation before a new version-specific badge is recorded. No MagicX test or complete device lifecycle is claimed.
+The owner reconfirmed all current apps working and tested on TSP on 2026-10-30, including Grout 5.4.1.0 on the previously reported Knulli AArch64 1280×720 matrix. See the [current owner report](real-device-tests.md#2026-10-30-current-owner-confirmation). Older reports remain historical. No MagicX test or separate complete device lifecycle is claimed.

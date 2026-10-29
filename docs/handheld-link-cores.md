@@ -1,6 +1,6 @@
 # Handheld Link Cores — manual mGBA Dual profile
 
-Reviewed on 2026-10-29 (Asia/Singapore). Package version **2026.10.29.1**, status **experimental**. This is a limited integration of [Squirbie/handheld-link-cores](https://github.com/Squirbie/handheld-link-cores), not an installation of every upstream component. No Store device-test evidence is claimed.
+Reviewed on 2026-10-29 (Asia/Singapore). Package version **2026.10.29.1**, status **experimental**. This is a limited integration of [Squirbie/handheld-link-cores](https://github.com/Squirbie/handheld-link-cores), not an installation of every upstream component. The owner reconfirmed this current version working and tested on TSP on 2026-10-30; see the [current owner report](real-device-tests.md#2026-10-30-current-owner-confirmation). Separate multiplayer and lifecycle results were not supplied.
 
 ## Scope and safety boundary
 

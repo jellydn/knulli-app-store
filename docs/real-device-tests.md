@@ -1,12 +1,15 @@
 # Real-device test evidence
 
-## Current scope after Picker 0.2.2 publication
+## 2026-10-30: Current owner confirmation
 
-[Picker 0.2.2](https://github.com/jellydn/knulli-random-game-picker/releases/tag/v0.2.2) is published, with no new hardware gameplay evidence. It is **UNTESTED on all matrices**. Read-only device inspection confirmed Tools and Emulators application metadata, not runtime compatibility. The owner report below remains exact-version evidence for Picker 0.2.0 only; the other six unchanged current versions retain tested evidence on TrimUI Smart Pro, Knulli AArch64 at 1280×720 only. All seven `review.status` values remain **experimental**. No package has current MagicX evidence.
+- Source: [owner confirmation in the maintenance thread](https://ampcode.com/threads/T-01a184fd-5491-7371-9d0d-5d2a4bbddb02).
+- Exact confirmation: “As I said, all app are working and tested on TSP.”
+- Date recorded: 2026-10-30 (Asia/Singapore).
+- Scope: all eight current catalogue versions: Grout 5.4.1.0, Handheld Link Cores (mGBA Dual) 2026.10.29.1, PlayTime 1.0.0, Random Game Picker 0.2.2, RetSend 1.0.0, PocketCurator 1.1.2, RAOfflineProxy 2.3.0-alpha1 and retroshelf 0.6.3.
 
-Release target: Store v2026.10.27. Hardware reports remain scoped to the artifacts actually tested. The earlier audit baseline was public v2026.10.25 at `14490119`; its signature checks and native development-build reports do not transfer to another release.
+This reconfirmation updates the previously reported TrimUI Smart Pro, Knulli, AArch64, 1280×720 matrix. The manifests record passed `real-device-test` evidence for these exact package versions. No firmware build identifier, individual lifecycle, multiplayer, audio, power-loss or particular Store ZIP result is inferred. This is owner-reported hardware evidence, not an agent-run device test.
 
-Picker 0.2.2's six published assets/digests, 20 regular archive files and exact ABI were independently verified. Published-byte Install, 0.2.1→0.2.2 Update, Repair and Uninstall validation passed in both device fixture roots with nested `state/` retained. No ARM64 runtime was executed. These are archive/installer checks, not hardware or Picker runtime evidence.
+All eight safety-review statuses remain **experimental**; testing does not resolve license, runtime-update or other disclosed risks. MagicX Zero 28 and other device matrices remain untested. Older reports below retain their historical scope and do not override this newer confirmation.
 
 ## 2026-10-25: Current owner confirmation
 
