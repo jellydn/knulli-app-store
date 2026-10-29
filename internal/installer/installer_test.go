@@ -173,6 +173,63 @@ func TestUpstreamManagedInstallRepairAndGuardedRemoval(t *testing.T) {
 	assertMissing(t, root, "userdata/system/demo/launch.sh")
 }
 
+func TestHandheldCoreLifecycleLeavesFirmwareAndSavesUntouched(t *testing.T) {
+	pkg, err := manifest.Load("../../catalogue/packages/io.github.squirbie.handheld-link-cores.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	asset := zipBytes(t, map[string]string{
+		"gba-mgba-dual/mgba_dual_libretro.so":   "library data, not a process launcher",
+		"gba-mgba-dual/mgba_dual_libretro.info": "core information",
+	})
+	pkg.Release = testPackage(pkg.Release.URL, asset, pkg.Version).Release
+	server := serveAsset(t, asset)
+	defer server.Close()
+	root := t.TempDir()
+	info := testPlatform()
+	info.Dependencies = append(info.Dependencies, "libm", "retroarch")
+	manager := Manager{Root: root, Client: rewriteClient(t, server), DeferGameListRefresh: true}.WithPlatform(info)
+	untouched := map[string]string{
+		"usr/lib/libretro/mgba_libretro.so": "stock core",
+		"userdata/system/knulli.conf":       "existing game settings",
+		"userdata/roms/tools/gamelist.xml":  "<gameList/>",
+		"userdata/saves/gba/game.srm":       "original save",
+	}
+	for path, value := range untouched {
+		writeRootFile(t, root, path, value)
+	}
+	const destination = "userdata/system/handheld-link-cores/mgba-dual/"
+	for _, op := range []Op{OpInstall, OpUpdate, OpRepair} {
+		if op == OpUpdate {
+			pkg.Version += "-fixture-update"
+			writeRootFile(t, root, destination+"saves/private.srm", "private save")
+		}
+		if op == OpRepair {
+			writeRootFile(t, root, destination+"mgba_dual_libretro.so", "damaged")
+		}
+		if _, err := manager.Apply(context.Background(), op, pkg); err != nil {
+			t.Fatalf("%s: %v", op, err)
+		}
+		assertRootFile(t, root, destination+"mgba_dual_libretro.so", "library data, not a process launcher")
+		if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy || status.Version != pkg.Version {
+			t.Fatalf("%s health: %#v, %v", op, status, err)
+		}
+		for path, value := range untouched {
+			assertRootFile(t, root, path, value)
+		}
+	}
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	assertMissing(t, root, destination+"mgba_dual_libretro.so")
+	assertRootFile(t, root, destination+"saves/private.srm", "private save")
+	for path, value := range untouched {
+		assertRootFile(t, root, path, value)
+	}
+	assertMissing(t, root, "usr/lib/libretro/mgba_dual_libretro.so")
+	assertMissing(t, root, "userdata/system/scripts")
+}
+
 func TestUninstallPresenceCheckLeavesPackageIntactUntilCleanup(t *testing.T) {
 	root := t.TempDir()
 	asset := zipBytes(t, map[string]string{"launch.sh": "launcher"})

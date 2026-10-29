@@ -69,11 +69,12 @@ To test a separately prepared, unpublished build without replacing the productio
 
 ## Catalogue and safety
 
-On 2026-10-25 (Asia/Singapore), the [owner confirmed](https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b) seven package versions tested on TrimUI Smart Pro only, Knulli AArch64 at 1280×720. That report covers Picker 0.2.0, Grout 5.2.0.0 and retroshelf 0.5.6, not Picker 0.2.2, Grout 5.4.1.0 or retroshelf 0.6.3. The other four current versions retain passed package evidence on that matrix only, not separate lifecycle results. New badges require exact-version evidence. MagicX Zero 28 and other matrices remain untested for every package. All seven manifest review statuses remain **experimental**:
+On 2026-10-25 (Asia/Singapore), the [owner confirmed](https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b) seven package versions tested on TrimUI Smart Pro only, Knulli AArch64 at 1280×720. That report covers Picker 0.2.0, Grout 5.2.0.0 and retroshelf 0.5.6, not Picker 0.2.2, Grout 5.4.1.0 or retroshelf 0.6.3. The other four previously listed versions retain passed package evidence on that matrix only, not separate lifecycle results. The new Handheld Link Cores entry has no Store device-test evidence. New badges require exact-version evidence. MagicX Zero 28 and other matrices remain untested for every package. All eight manifest review statuses remain **experimental**:
 
 | Package | Current manifest version | Purpose |
 | --- | --- | --- |
 | Grout | 5.4.1.0 | Connect to a RomM 5.4.1+ server; [release review](docs/grout-5.4.1.0.md) |
+| Handheld Link Cores (mGBA Dual) | 2026.10.29.1 | Manual RetroArch core loading only; no system patches; [setup and review](docs/handheld-link-cores.md) |
 | PlayTime | 1.0.0 | Track game play time |
 | Random Game Picker | 0.2.2 | Select from existing EmulationStation games |
 | RetSend | 1.0.0 | Transfer files over local Wi-Fi with LocalSend peers |

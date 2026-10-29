@@ -35,7 +35,7 @@ func TestDetectReadsKnulliDeviceAndFramebuffer(t *testing.T) {
 
 func TestDetectUpstreamAppPrerequisites(t *testing.T) {
 	root := t.TempDir()
-	for _, dependency := range []string{"python3.12", "pygame", "portmaster", "sdl2-gfx"} {
+	for _, dependency := range []string{"python3.12", "pygame", "portmaster", "sdl2-gfx", "libm", "retroarch"} {
 		if includes(Resolve(root).Dependencies, dependency) {
 			t.Fatalf("missing dependency reported present: %s", dependency)
 		}
@@ -48,7 +48,9 @@ func TestDetectUpstreamAppPrerequisites(t *testing.T) {
 	writePlatformFile(t, root, "usr/lib/python3.12/site-packages/pygame/__init__.py", "")
 	writePlatformFile(t, root, "userdata/system/.local/share/PortMaster/control.txt", "")
 	writePlatformFile(t, root, "usr/lib/libSDL2_gfx-1.0.so.0", "")
-	for _, dependency := range []string{"python3.12", "pygame", "portmaster", "sdl2-gfx"} {
+	writePlatformFile(t, root, "usr/lib/libm.so.6", "")
+	writePlatformFile(t, root, "usr/bin/retroarch", "")
+	for _, dependency := range []string{"python3.12", "pygame", "portmaster", "sdl2-gfx", "libm", "retroarch"} {
 		if !includes(Resolve(root).Dependencies, dependency) {
 			t.Fatalf("installed prerequisite not detected: %s", dependency)
 		}
