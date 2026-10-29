@@ -23,6 +23,19 @@
     ],
     "evidence": [
       {
+        "kind": "real-device-test",
+        "url": "https://ampcode.com/threads/T-01a184fd-5491-7371-9d0d-5d2a4bbddb02",
+        "note": "Owner reconfirmed all current apps working and tested on TSP. Uses the previously confirmed Knulli AArch64 1280x720 TSP matrix; separate lifecycle results were not supplied.",
+        "tester": "dunghd",
+        "date": "2026-10-30",
+        "package_version": "5.4.1.0",
+        "firmware": "knulli",
+        "architecture": "aarch64",
+        "device": "trimui-smart-pro",
+        "resolution": "1280x720",
+        "result": "passed"
+      },
+      {
         "kind": "release-asset",
         "url": "https://github.com/rommapp/grout/releases/download/v5.4.1.0/Grout-Knulli.zip",
         "note": "Asset 686708108 matches the publisher checksum and GitHub digest. Six regular files and two directories were inspected; exact size and SHA-256 reject replacement bytes despite the non-immutable GitHub release. See docs/grout-5.4.1.0.md for inventory and lifecycle validation."

@@ -27,6 +27,19 @@
     "evidence": [
       {
         "kind": "real-device-test",
+        "url": "https://ampcode.com/threads/T-01a184fd-5491-7371-9d0d-5d2a4bbddb02",
+        "note": "Owner reconfirmed all current apps working and tested on TSP. Uses the previously confirmed Knulli AArch64 1280x720 TSP matrix; separate lifecycle results were not supplied.",
+        "tester": "dunghd",
+        "date": "2026-10-30",
+        "package_version": "2.3.0-alpha1",
+        "firmware": "knulli",
+        "architecture": "aarch64",
+        "device": "trimui-smart-pro",
+        "resolution": "1280x720",
+        "result": "passed"
+      },
+      {
+        "kind": "real-device-test",
         "url": "https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b",
         "note": "Historical 2026-10-25 owner confirmation covers RAOfflineProxy 2.2.0-alpha1 on TrimUI Smart Pro only, not 2.3.0-alpha1. Separate lifecycle steps were not reported.",
         "tester": "dunghd",
@@ -111,7 +124,7 @@
     "executables": ["bin/raofflineproxy", "bin/raofflineproxy-uninstall"],
     "upstream_managed": true,
     "menu_command": ["/userdata/system/raofflineproxy/bin/raofflineproxy", "menu"],
-    "warning": "Untested; GitHub digest only, no publisher checksum. Runtime writes/updates are not sandboxed. ZIP hashing needs free userdata space. Close app before Store operations; Repair restores pinned code. Before removal: stop proxy, disable autostart, run bin/raofflineproxy remove-boot-hook. Config and awards stay; upstream Uninstall deletes them. Restore custom emulator/PCSX2 paths manually; keep those paths unchanged until Stop.",
+    "warning": "Experimental; GitHub digest only, no publisher checksum. Runtime writes/updates are not sandboxed. ZIP hashing needs free userdata space. Close app before Store operations; Repair restores pinned code. Before removal: stop proxy, disable autostart, run bin/raofflineproxy remove-boot-hook. Config and awards stay; upstream Uninstall deletes them. Restore custom emulator/PCSX2 paths manually; keep those paths unchanged until Stop.",
     "menu": {
       "gamelist": "/userdata/roms/tools/gamelist.xml",
       "path": "./RAOfflineProxy.sh",
