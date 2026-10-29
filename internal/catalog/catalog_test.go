@@ -17,8 +17,8 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first.Packages) != 7 || len(second.Packages) != 7 {
-		t.Fatalf("expected seven packages, got %d and %d", len(first.Packages), len(second.Packages))
+	if len(first.Packages) != 8 || len(second.Packages) != 8 {
+		t.Fatalf("expected eight packages, got %d and %d", len(first.Packages), len(second.Packages))
 	}
 	// RetSend now uses upstream releases, but its recorded approval remains
 	// the maintainer's decision rather than community or device verification.
@@ -28,6 +28,7 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 		"io.github.jellydn.random-game-picker":   "maintainer",
 		"io.github.jellydn.retsend":              "maintainer",
 		"io.github.misantronic.raofflineproxy":   "community",
+		"io.github.squirbie.handheld-link-cores": "maintainer",
 		"io.github.tomtombombadil.pocketcurator": "community",
 		"io.github.unitreign.playtime":           "community",
 		"org.retroshelf.knulli":                  "",
@@ -63,8 +64,8 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 			}
 		}
 	}
-	if experimental != 7 || verified != 0 {
-		t.Fatalf("expected seven experimental packages and no current device-verified release, got %d and %d", experimental, verified)
+	if experimental != 8 || verified != 0 {
+		t.Fatalf("expected eight experimental packages and no current device-verified release, got %d and %d", experimental, verified)
 	}
 }
 

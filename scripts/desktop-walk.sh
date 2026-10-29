@@ -168,7 +168,7 @@ walk catalogue-tabs keyboard \
 # The former PocketCurator candidate now opens an upstream-managed install
 # confirmation. Never confirm a download in this offline flow.
 walk upstream-managed-confirmation keyboard \
-  "down,down,enter" \
+  "down,down,down,enter" \
   "catalogue,confirm"
 
 # Leaving is the Select chord and nothing else: Escape at the catalogue does

@@ -75,10 +75,12 @@ printf 'GLIBC_2.17\nGLIBC_2.34\nGLIBC_2.40\n' >"$ROOT/lib/libc.so.6"
 : >"$ROOT/usr/lib/libSDL2_gfx-1.0.so.0"
 : >"$ROOT/lib/libresolv.so.2"
 : >"$ROOT/lib/libpthread.so.0"
+: >"$ROOT/lib/libm.so.6"
 mkdir -p "$ROOT/usr/bin" \
          "$ROOT/usr/lib/python3.12/site-packages/pygame" \
          "$ROOT/userdata/system/.local/share/PortMaster"
 : >"$ROOT/usr/bin/python3.12"
+: >"$ROOT/usr/bin/retroarch"
 : >"$ROOT/usr/lib/python3.12/site-packages/pygame/__init__.py"
 : >"$ROOT/userdata/system/.local/share/PortMaster/control.txt"
 

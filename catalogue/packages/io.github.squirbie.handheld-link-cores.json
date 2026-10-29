@@ -1,0 +1,57 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "io.github.squirbie.handheld-link-cores",
+  "name": "Handheld Link Cores (mGBA Dual)",
+  "version": "2026.10.29.1",
+  "type": "integration",
+  "summary": "Manually load the mGBA Dual link-cable core in RetroArch; no system integration.",
+  "repository": "https://github.com/Squirbie/handheld-link-cores",
+  "license": "MPL-2.0",
+  "review": {
+    "status": "experimental",
+    "approval": {"provenance": "maintainer"},
+    "notes": [
+      "User-authorized /userdata-only integration reviewed on 2026-10-29. This entry installs only the mGBA Dual asset from Handheld Link Cores 2026.10.29.1, not the all-cores bundle or knulli-scripts. No firmware patch, symlink, shared configuration edit, game hook, service, overlay save or remote installer is used.",
+      "Independently downloaded ZIP: 387153 bytes, SHA-256 864a9ddd26d2f56520d7273e1e3d446e3ce35f29149cdfc6723e83cb5446aaee. Matches publisher SHA256SUMS.txt and GitHub asset 688030452. Four regular files, 1267929 extracted bytes; no unsafe paths, duplicates, links or special entries. Strip one gba-mgba-dual/ prefix.",
+      "The shared library is the package entry point recorded in launcher. It is loaded by RetroArch, not executed as a process. No executable modes or menu metadata are declared. The Store only checks this archive entry and installs verified regular files into a private destination.",
+      "ELF64 little-endian AArch64; DT_NEEDED libc.so.6 and libm.so.6; highest required glibc symbol GLIBC_2.35. The Store requires Knulli, aarch64 glibc >=2.35, libc, libm and an existing RetroArch binary. No runtime or firmware-specific core integration is installed. No exact-device testing is claimed.",
+      "Use RetroArch Load Core to browse to the private .so, then load a legally supplied GBA ROM. Both devices need the same core and game. Configure netplay and the 1P/2P display manually. Automatic EmulationStation selection, lobby Join/Solo, own-save exchange, paired editions and guest single-pak setup are not provided. The supplied .info file is retained beside the core but is not registered in /usr.",
+      "The core uses RetroArch-provided save, state, BIOS and ROM paths and local netplay. Source patches also access /tmp/hb_dual_screen, /tmp/hb_dual_p2rom and /tmp/hb_ownsave for upstream helper integration; those helpers are not installed or run. Do not combine this package with an active upstream installation without reviewing its shared runtime files. Use copies of saves for testing. No ROM, BIOS, firmware or update downloader is included in this asset.",
+      "Close RetroArch before Update, Repair or removal. Saves and BIOS outside the package directory are untouched. Private config/, saves/ and states/ paths are preserved if the user chooses them. No shared hooks are created, so no automatic cleanup or removal checks are needed. See docs/handheld-link-cores.md for scope, evidence and test instructions."
+    ],
+    "evidence": [
+      {"kind": "tagged-release", "url": "https://github.com/Squirbie/handheld-link-cores/releases/tag/2026.10.29.1", "note": "Version-pinned direct upstream download. Exact bytes are pinned even though the GitHub release is not marked immutable."},
+      {"kind": "publisher-checksum", "url": "https://github.com/Squirbie/handheld-link-cores/releases/download/2026.10.29.1/SHA256SUMS.txt", "note": "The mGBA Dual ZIP checksum matches independently hashed downloaded bytes and the release API digest."},
+      {"kind": "release-integrity", "url": "https://api.github.com/repos/Squirbie/handheld-link-cores/releases/assets/688030452", "note": "387153 bytes; SHA-256 864a9ddd26d2f56520d7273e1e3d446e3ce35f29149cdfc6723e83cb5446aaee."},
+      {"kind": "license", "url": "https://github.com/Squirbie/handheld-link-cores/blob/ceed2f8d15c35893a0b9c57d096c0d4d5115eef7/LICENSES/mgba_LICENSE", "note": "The selected asset contains the full Mozilla Public License 2.0. Other cores have different licences and are not included."},
+      {"kind": "runtime-dependency-review", "url": "https://github.com/Squirbie/handheld-link-cores/blob/ceed2f8d15c35893a0b9c57d096c0d4d5115eef7/cores/gba-mgba-dual/README.md", "note": "Inspected the actual binary with readelf -h -d --version-info: AArch64, libc/libm, GLIBC_2.35. Upstream hardware claims do not establish Store lifecycle or exact-device evidence."},
+      {"kind": "filesystem-and-network-review", "url": "https://github.com/Squirbie/handheld-link-cores/tree/ceed2f8d15c35893a0b9c57d096c0d4d5115eef7/cores/gba-mgba-dual/patches", "note": "Reviewed core save and /tmp helper behavior. Store writes only its private package destination and its own transaction/state records. Runtime game/save paths are chosen through RetroArch; network use is netplay, not content acquisition."}
+    ]
+  },
+  "release": {
+    "url": "https://github.com/Squirbie/handheld-link-cores/releases/download/2026.10.29.1/gba-mgba-dual-linux-aarch64.zip",
+    "sha256": "864a9ddd26d2f56520d7273e1e3d446e3ce35f29149cdfc6723e83cb5446aaee",
+    "size": 387153,
+    "installed_size": 1267929,
+    "format": "zip",
+    "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "minimum_version": "",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "minimum_glibc": "2.35",
+    "dependencies": ["libc", "libm", "retroarch"],
+    "device_scope": "any"
+  },
+  "install": {
+    "destination": "/userdata/system/handheld-link-cores/mgba-dual",
+    "strip_components": 1,
+    "launcher": "mgba_dual_libretro.so",
+    "warning": "Untested experimental mGBA Dual only. Manual RetroArch Load Core required; no Tools entry or EmulationStation integration. No Join/Solo, own-save exchange or other cores. Use copies of saves. Store keeps saves. Close RetroArch before Store operations. Store writes only the private package directory; no /usr changes or upstream installer.",
+    "preserve": ["config", "saves", "states"],
+    "network": true,
+    "allowed_write_paths": ["/userdata/system/handheld-link-cores/mgba-dual"]
+  }
+}
