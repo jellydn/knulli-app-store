@@ -69,7 +69,7 @@ To test a separately prepared, unpublished build without replacing the productio
 
 ## Catalogue and safety
 
-On 2026-10-25 (Asia/Singapore), the [owner confirmed](https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b) seven package versions tested on TrimUI Smart Pro only, Knulli AArch64 at 1280×720. That report covers Picker 0.2.0, Grout 5.2.0.0 and retroshelf 0.5.6, not Picker 0.2.2, Grout 5.4.1.0 or retroshelf 0.6.3. The other four previously listed versions retain passed package evidence on that matrix only, not separate lifecycle results. The new Handheld Link Cores entry has no Store device-test evidence. New badges require exact-version evidence. MagicX Zero 28 and other matrices remain untested for every package. All eight manifest review statuses remain **experimental**:
+On 2026-10-25 (Asia/Singapore), the [owner confirmed](https://ampcode.com/threads/T-01a17039-648c-7024-abe9-8785444a2b5b) seven package versions tested on TrimUI Smart Pro only, Knulli AArch64 at 1280×720. That report covers Picker 0.2.0, Grout 5.2.0.0, retroshelf 0.5.6 and RAOfflineProxy 2.2.0-alpha1, not Picker 0.2.2, Grout 5.4.1.0, retroshelf 0.6.3 or RAOfflineProxy 2.3.0-alpha1. The other three previously listed versions retain passed package evidence on that matrix only, not separate lifecycle results. The new Handheld Link Cores entry has no Store device-test evidence. New badges require exact-version evidence. MagicX Zero 28 and other matrices remain untested for every package. All eight manifest review statuses remain **experimental**:
 
 | Package | Current manifest version | Purpose |
 | --- | --- | --- |
@@ -79,7 +79,7 @@ On 2026-10-25 (Asia/Singapore), the [owner confirmed](https://ampcode.com/thread
 | Random Game Picker | 0.2.2 | Select from existing EmulationStation games |
 | RetSend | 1.0.0 | Transfer files over local Wi-Fi with LocalSend peers |
 | PocketCurator | 1.1.2 | Manage your ROM collection; requires PortMaster |
-| RAOfflineProxy | 2.2.0-alpha1 | Offline casual RetroAchievements; requires Python 3.12 and pygame |
+| RAOfflineProxy | 2.3.0-alpha1 | Offline casual RetroAchievements; requires Python 3.12 and pygame; [release review](docs/raofflineproxy-2.3.0-alpha1.md) |
 | retroshelf | 0.6.3 | Sync game sessions; requires an account and Wi-Fi; [release review](docs/retroshelf-0.6.3.md) |
 
 Firmware, architecture, ABI, and runtime dependencies still gate installation. Device identity and display scope are advisory. **UNTESTED** means no passed report matches the exact package version and device matrix. See the [evidence and its limits](docs/real-device-tests.md#2026-10-25-current-owner-confirmation). [Picker 0.2.2](https://github.com/jellydn/knulli-random-game-picker/releases/tag/v0.2.2) excludes Tools and Emulators application systems before gamelist parsing, from selection and during Play revalidation. Path-only candidates use boundary-aware application-root checks. It adds no hardware gameplay evidence. Its launcher, settings schema, `state/` preservation and exact-path ES launch contract are unchanged. It still requires glibc ≥2.34, firmware SDL2/image/ttf/gfx, and the loopback EmulationStation API. Its requirements are separate from the Store's.

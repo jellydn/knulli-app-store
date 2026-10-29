@@ -173,6 +173,48 @@ func TestUpstreamManagedInstallRepairAndGuardedRemoval(t *testing.T) {
 	assertMissing(t, root, "userdata/system/demo/launch.sh")
 }
 
+func TestRAOfflineProxyRemovalRequiresRestoredRetroArchCustomConfig(t *testing.T) {
+	pkg, err := manifest.Load("../../catalogue/packages/io.github.misantronic.raofflineproxy.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	asset := zipBytes(t, map[string]string{
+		"scripts/launcher-raofflineproxy":           "reviewed launcher",
+		"scripts/launcher-raofflineproxy-uninstall": "never executed",
+	})
+	pkg.Release = testPackage(pkg.Release.URL, asset, pkg.Version).Release
+	pkg.Install.StripComponents = 0
+	server := serveAsset(t, asset)
+	defer server.Close()
+	root := t.TempDir()
+	info := testPlatform()
+	info.Dependencies = append(info.Dependencies, "python3.12", "pygame")
+	manager := Manager{Root: root, Client: rewriteClient(t, server), DeferGameListRefresh: true}.WithPlatform(info)
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+		t.Fatal(err)
+	}
+	const config = "userdata/system/.config/retroarch/retroarchcustom.cfg"
+	const redirected = "cheevos_custom_host = \"http://127.0.0.1:8080\"\n"
+	writeRootFile(t, root, config, redirected)
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err == nil {
+		t.Fatal("removal accepted an emulator still pointing to the proxy")
+	}
+	assertRootFile(t, root, config, redirected)
+	assertRootFile(t, root, "userdata/system/raofflineproxy/bin/raofflineproxy", "reviewed launcher")
+	assertContains(t, root, "userdata/roms/tools/gamelist.xml", "./RAOfflineProxy.sh")
+	if status, err := manager.Status(pkg.ID); err != nil || !status.Healthy {
+		t.Fatalf("blocked removal changed installed health: %#v, %v", status, err)
+	}
+	const restored = "cheevos_custom_host = \"\"\n"
+	writeRootFile(t, root, config, restored)
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, config, restored)
+	assertMissing(t, root, "userdata/system/raofflineproxy/bin/raofflineproxy")
+	assertMissing(t, root, "userdata/roms/tools/RAOfflineProxy.sh")
+}
+
 func TestHandheldCoreLifecycleLeavesFirmwareAndSavesUntouched(t *testing.T) {
 	pkg, err := manifest.Load("../../catalogue/packages/io.github.squirbie.handheld-link-cores.json")
 	if err != nil {
