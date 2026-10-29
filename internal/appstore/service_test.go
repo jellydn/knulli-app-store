@@ -50,10 +50,6 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 	experimental := 0
 	verified := 0
 	for _, item := range items {
-		wantTested := item.Package.ID != "io.github.jellydn.random-game-picker"
-		if item.DeviceTested != wantTested {
-			t.Fatalf("wrong exact-version Smart Pro test badge for %s: got %v, want %v", item.Package.ID, item.DeviceTested, wantTested)
-		}
 		if item.Package.Installable() {
 			if item.Package.Experimental() {
 				experimental++
@@ -72,6 +68,34 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 	}
 	if experimental != 7 || verified != 0 {
 		t.Fatalf("expected seven experimental and no universally verified packages, got %d and %d", experimental, verified)
+	}
+}
+
+func TestServiceDeviceTestBadgeRequiresExactVersion(t *testing.T) {
+	for _, version := range []string{"1.0.0", "1.1.0"} {
+		t.Run(version, func(t *testing.T) {
+			pkg := installablePackage()
+			pkg.Version = version
+			pkg.Review.Evidence = []manifest.Evidence{{
+				Kind: "real-device-test", URL: "https://example.com/report", Tester: "Tester", Date: "2026-10-25",
+				PackageVersion: "1.0.0", Firmware: "knulli", Architecture: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720", Result: "passed",
+			}}
+			service := &Service{
+				index: catalog.Index{Packages: []catalog.Entry{{ID: pkg.ID, Package: pkg}}},
+				manager: installer.Manager{Root: t.TempDir()}.WithPlatform(platform.Info{
+					Firmware: "knulli", Version: "2026.05", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40",
+					Dependencies: []string{"sdl2"}, Device: "trimui-smart-pro", Resolution: "1280x720",
+				}),
+			}
+			items, err := service.Items(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantTested := version == "1.0.0"
+			if len(items) != 1 || items[0].DeviceTested != wantTested {
+				t.Fatalf("version %s: want tested=%v, got %#v", version, wantTested, items)
+			}
+		})
 	}
 }
 
