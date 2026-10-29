@@ -24,20 +24,18 @@ func run(arguments []string) error {
 	flags := flag.NewFlagSet("check-updates", flag.ContinueOnError)
 	directory := flags.String("catalogue", "catalogue/packages", "package manifest directory")
 	output := flags.String("output", "build/update-report", "report path without extension")
+	apply := flags.Bool("apply", false, "prepare verified experimental release proposals for human review")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
-	return writeReports(updatecheck.Checker{Token: os.Getenv("GITHUB_TOKEN")}, *directory, *output, time.Now())
+	return writeReports(updatecheck.Checker{Token: os.Getenv("GITHUB_TOKEN")}, *directory, *output, time.Now(), *apply)
 }
 
 // writeReports builds the index, compares every reviewed package against its
 // upstream releases, and writes the JSON and Markdown reports. It is separate
 // from run so a report can be produced without the caller's flags, which is what
-// lets the weekly checker be exercised offline.
-//
-// The checker never downloads an asset and never edits a manifest: it reports
-// metadata for a human to review.
-func writeReports(checker updatecheck.Checker, directory, output string, now time.Time) error {
+// lets the checker be exercised offline. It stays read-only unless apply is set.
+func writeReports(checker updatecheck.Checker, directory, output string, now time.Time, apply bool) error {
 	catalogueIndex, err := catalog.Build(directory)
 	if err != nil {
 		return err
@@ -47,6 +45,11 @@ func writeReports(checker updatecheck.Checker, directory, output string, now tim
 		packages[index] = catalogueIndex.Packages[index].Package
 	}
 	report := checker.Check(context.Background(), packages, now)
+	if apply {
+		if err := checker.Apply(context.Background(), directory, &report); err != nil {
+			return err
+		}
+	}
 	jsonData, err := updatecheck.JSON(report)
 	if err != nil {
 		return err

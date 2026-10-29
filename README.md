@@ -102,6 +102,8 @@ PortMaster is an external provider: the Store does not install its catalogue. RO
 
 See [package manifests](catalogue/packages/), [package contribution guidance](docs/how-to-add-a-package.md), [RetSend review](docs/retsend-upstream-1.0.0.md), and the [security model](docs/security-model.md) for preserved paths and boundaries.
 
+The daily [catalogue update check](https://github.com/jellydn/knulli-app-store/actions/workflows/catalogue-updates.yml) runs at 12:00 PM Singapore time. It verifies eligible experimental release proposals, tests changed metadata, and drafts a PR for human review; ambiguous releases and patch-dependent packages remain manual. It never approves or merges a package. After human merge to `main`, successful normal checks automatically publish an experimental prerelease; full releases require a `v*` tag. See [contribution guidance](CONTRIBUTING.md) for permissions and validation.
+
 ## Build and test
 
 Use **Go 1.27.1 exactly** for the development/check toolchain to match the analyzer; do not substitute a newer patch version. GUI builds and `make check` also need SDL development files. On Debian or Ubuntu:

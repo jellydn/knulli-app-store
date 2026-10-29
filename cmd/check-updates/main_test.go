@@ -26,7 +26,7 @@ func TestWriteReportsWritesBothReportsFromTheLiveCatalogue(t *testing.T) {
 
 	output := filepath.Join(t.TempDir(), "reports", "catalogue-update-report")
 	checker := updatecheck.Checker{BaseURL: server.URL, Client: server.Client()}
-	if err := writeReports(checker, filepath.Join("..", "..", "catalogue", "packages"), output, time.Now()); err != nil {
+	if err := writeReports(checker, filepath.Join("..", "..", "catalogue", "packages"), output, time.Now(), false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -69,7 +69,7 @@ func TestWriteReportsCoversEveryReviewedPackage(t *testing.T) {
 
 	output := filepath.Join(t.TempDir(), "report")
 	checker := updatecheck.Checker{BaseURL: server.URL, Client: server.Client()}
-	if err := writeReports(checker, filepath.Join("..", "..", "catalogue", "packages"), output, time.Now()); err != nil {
+	if err := writeReports(checker, filepath.Join("..", "..", "catalogue", "packages"), output, time.Now(), false); err != nil {
 		t.Fatal(err)
 	}
 	jsonData, err := os.ReadFile(output + ".json")
@@ -101,7 +101,7 @@ func TestWriteReportsCoversEveryReviewedPackage(t *testing.T) {
 
 func TestWriteReportsRejectsAMissingCatalogueDirectory(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "report")
-	if err := writeReports(updatecheck.Checker{}, filepath.Join(t.TempDir(), "absent"), output, time.Now()); err == nil {
+	if err := writeReports(updatecheck.Checker{}, filepath.Join(t.TempDir(), "absent"), output, time.Now(), false); err == nil {
 		t.Fatal("a missing catalogue directory produced a report instead of an error")
 	}
 	if _, err := os.Stat(output + ".json"); err == nil {
