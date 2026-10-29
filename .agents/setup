@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-go_version=1.27.1
+go_version=1.27.3
 install_go=true
 if command -v go >/dev/null 2>&1 && command -v gofmt >/dev/null 2>&1; then
   current_version=$(go version | awk '{ sub(/^go/, "", $3); print $3 }')
@@ -15,11 +15,11 @@ if "$install_go"; then
   case "$(uname -m)" in
     x86_64)
       go_arch=amd64
-      go_sha256=63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445
+      go_sha256=65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40
       ;;
     aarch64)
       go_arch=arm64
-      go_sha256=3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec
+      go_sha256=a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49
       ;;
     *)
       echo "unsupported architecture for Go setup: $(uname -m)" >&2
