@@ -13,10 +13,11 @@ import (
 )
 
 type fakeBackend struct {
-	items      []appstore.Item
-	err        error
-	action     appstore.Action
-	completion string
+	items       []appstore.Item
+	err         error
+	action      appstore.Action
+	completion  string
+	runProgress func(func(string))
 }
 
 func (fake *fakeBackend) SetPlatform(platform.Info) {}
@@ -32,10 +33,61 @@ func (fake *fakeBackend) Items(context.Context) ([]appstore.Item, error) {
 func (fake *fakeBackend) Execute(_ context.Context, _ string, action appstore.Action, progress func(string)) error {
 	fake.action = action
 	progress("Working")
+	if fake.runProgress != nil {
+		fake.runProgress(progress)
+	}
 	if fake.completion != "" {
 		progress(fake.completion)
 	}
 	return fake.err
+}
+
+func TestModelKeepsLatestProgressWithoutDelayingOperation(t *testing.T) {
+	for _, failure := range []string{"", "SHA-256 mismatch"} {
+		t.Run("result-"+failure, func(t *testing.T) {
+			reported, resume := make(chan struct{}), make(chan struct{})
+			backend := &fakeBackend{
+				items:      []appstore.Item{{Package: manifest.Package{ID: "org.example.alpha", Name: "Alpha"}, Actions: []appstore.Action{appstore.Install}}},
+				completion: "Install completed",
+				runProgress: func(progress func(string)) {
+					for range 1000 {
+						progress("Downloading: 17%")
+					}
+					progress("Downloading: 99%")
+					close(reported)
+					<-resume
+				},
+			}
+			if failure != "" {
+				backend.err = errors.New(failure)
+			}
+			model := New(backend)
+			if err := model.Load(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			model.Select(context.Background())
+			model.Select(context.Background())
+			select {
+			case <-reported:
+			case <-time.After(time.Second):
+				close(resume)
+				t.Fatal("progress blocked the operation while the UI was not polling")
+			}
+			model.Poll()
+			if !model.Busy || model.Message != "Downloading: 99%" {
+				t.Errorf("latest progress was not shown: busy=%v message=%q", model.Busy, model.Message)
+			}
+			close(resume)
+			waitForModel(t, model)
+			if model.Error != failure {
+				t.Fatalf("completion lost error: %q", model.Error)
+			}
+			model.Poll()
+			if model.Busy || strings.HasPrefix(model.Message, "Downloading") {
+				t.Fatal("stale progress replaced the completed result")
+			}
+		})
+	}
 }
 
 // A completion nobody has to act on is a notice, not a status: it is shown in

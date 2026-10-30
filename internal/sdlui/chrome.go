@@ -68,7 +68,7 @@ func (c *consoleCanvas) status(frame *image.RGBA, model *storeui.Model, controls
 func (c *consoleCanvas) footer(frame *image.RGBA, model *storeui.Model, controls *storeinput.Session) {
 	fill(frame, image.Rect(0, 427, c.width, 480), palette.panel)
 	if model.Busy {
-		c.label(frame, "Verifying and applying / controls locked", 444, 24, c.width-48, palette.muted, false)
+		c.label(frame, "Please wait / controls locked", 444, 24, c.width-48, palette.muted, false)
 		return
 	}
 	hints := footerHints(model, controls)

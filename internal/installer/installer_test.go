@@ -30,6 +30,79 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/safefs"
 )
 
+func TestApplyReportsMeasuredProgressBeforeDownloadFinishes(t *testing.T) {
+	asset := zipBytes(t, map[string]string{"launch.sh": "launcher", "data": strings.Repeat("x", 90_000), "config.ini": "defaults"})
+	for _, mode := range []string{"known-size", "chunked", "cancelled", "truncated"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			releaseDownload := make(chan struct{})
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if mode == "known-size" {
+					w.Header().Set("Content-Length", strconv.Itoa(len(asset)))
+				}
+				_, _ = w.Write(asset[:len(asset)/3])
+				w.(http.Flusher).Flush()
+				select {
+				case <-releaseDownload:
+				case <-r.Context().Done():
+					return
+				}
+				if mode != "truncated" {
+					_, _ = w.Write(asset[len(asset)/3:])
+				}
+			}))
+			defer server.Close()
+			root := t.TempDir()
+			pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+			var messages []string
+			released := false
+			manager := Manager{Root: root, Client: rewriteClient(t, server), Progress: func(message string) {
+				messages = append(messages, message)
+				if message == "Downloading: 33%" && !released {
+					released = true
+					if mode == "cancelled" {
+						cancel()
+					}
+					close(releaseDownload)
+				}
+			}}.WithPlatform(testPlatform())
+			_, err := manager.Apply(ctx, OpInstall, pkg)
+			if !released {
+				t.Fatalf("no measured progress while download was waiting: %v, %v", messages, err)
+			}
+			if mode == "cancelled" || mode == "truncated" {
+				if err == nil {
+					t.Fatal("incomplete download succeeded")
+				}
+				if strings.Contains(strings.Join(messages, "\n"), "Extracting") {
+					t.Fatalf("incomplete download advanced to extraction: %v", messages)
+				}
+				if _, err := os.Stat(filepath.Join(root, "userdata/roms/tools/demo/launch.sh")); !os.IsNotExist(err) {
+					t.Fatalf("incomplete download changed destination: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := []string{"Preparing installation", "Downloading: 0%", "Downloading: 33%", "Downloading: 100%", "Verifying release", "Extracting release", "Installing files: 0% (0/3)", "Installing files: 33% (1/3)", "Installing files: 66% (2/3)", "Installing files: 100% (3/3)", "Finalizing installation"}
+			for _, message := range messages {
+				if len(want) > 0 && message == want[0] {
+					want = want[1:]
+				}
+			}
+			if len(want) != 0 {
+				t.Fatalf("missing or out-of-order progress %v in %v", want, messages)
+			}
+			status, err := manager.Status(pkg.ID)
+			if err != nil || !status.Healthy {
+				t.Fatalf("install was not healthy: %#v, %v", status, err)
+			}
+		})
+	}
+}
+
 func TestPocketCuratorLauncherFindsPrivatePayloadAfterInstallAndRepair(t *testing.T) {
 	// Only reproduce the launcher's directory selection, not its downloads,
 	// mounts, cleanup or application code.

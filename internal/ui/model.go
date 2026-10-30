@@ -45,7 +45,7 @@ type operationEvent struct {
 }
 
 func New(backend appstore.Backend) *Model {
-	return &Model{backend: backend, events: make(chan operationEvent, 8)}
+	return &Model{backend: backend, events: make(chan operationEvent, 1)}
 }
 
 func (m *Model) Load(ctx context.Context) error {
@@ -342,7 +342,14 @@ func (m *Model) start(ctx context.Context) {
 			completion = message
 			select {
 			case m.events <- operationEvent{message: message}:
-			case <-ctx.Done():
+			default:
+				// Only this worker writes events. Before completion, every
+				// pending event is progress and may be replaced by newer data.
+				select {
+				case <-m.events:
+				default:
+				}
+				m.events <- operationEvent{message: message}
 			}
 		})
 		operationErr := err

@@ -57,7 +57,7 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		"force-review":  {Items: []appstore.Item{recovery}, Focus: storeui.Confirm, Action: 1},
 		"force-confirm": {Items: []appstore.Item{recovery}, Focus: storeui.ForceConfirm, Action: 1},
 		"error":         {Items: []appstore.Item{item}, Error: "SHA-256 mismatch. Package files were not changed."},
-		"progress":      {Items: []appstore.Item{item}, Busy: true, Message: "Downloading and verifying Random Game Picker"},
+		"progress":      {Items: []appstore.Item{item}, Busy: true, Message: "Downloading: 37%"},
 		"manage":        {Items: []appstore.Item{recovery}},
 		"update":        {Items: []appstore.Item{update}},
 		"store-update":  {Items: []appstore.Item{storeUpdate}},
@@ -67,6 +67,13 @@ func TestRenderRepresentativeStates(t *testing.T) {
 	notice := &storeui.Model{Items: []appstore.Item{installed}}
 	notice.Toasts.Push("Install completed; game list refresh requested", time.Now())
 	states["notice"] = notice
+	for name, message := range map[string]string{
+		"preparing": "Preparing installation", "verifying": "Verifying release",
+		"extracting": "Extracting release", "installing": "Installing files: 66% (2/3)",
+		"finalizing": "Finalizing installation",
+	} {
+		states[name] = &storeui.Model{Items: []appstore.Item{item}, Busy: true, Message: message}
+	}
 	index, err := catalog.Build("../../catalogue/packages")
 	if err != nil {
 		t.Fatal(err)
@@ -95,6 +102,9 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		controls.Connected, controls.Mode = true, storeinput.Normal
 		for mode, session := range map[string]*storeinput.Session{"": controls, "-keyboard": storeinput.NewDesktopSession(t.TempDir(), "")} {
 			for name, model := range states {
+				if model.Busy && fitText(canvas.body, model.Message, canvas.width-48) != model.Message {
+					t.Fatalf("%s %s: progress was truncated", size.name, name)
+				}
 				frame := canvas.draw(model, "KNULLI", session)
 				if frame.Bounds() != image.Rect(0, 0, logicalWidth(size.width, size.height), 480) {
 					t.Fatal(frame.Bounds())

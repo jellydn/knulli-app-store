@@ -407,7 +407,12 @@ func TestExecuteInstallOnUnknownDeviceFailureAndUninstall(t *testing.T) {
 	if err := service.Execute(context.Background(), pkg.ID, Install, func(message string) { progress = append(progress, message) }); err != nil {
 		t.Fatalf("install through Execute: %v", err)
 	}
-	if len(progress) != 2 || !strings.Contains(progress[1], "completed") {
+	for _, phase := range []string{"Preparing ", "Downloading: 0%", "Downloading: 100%", "Verifying release", "Extracting release", "Installing files: 100%", "Finalizing installation"} {
+		if !strings.Contains(strings.Join(progress, "\n"), phase) {
+			t.Fatalf("install progress omitted %q: %v", phase, progress)
+		}
+	}
+	if !strings.Contains(progress[len(progress)-1], "completed") {
 		t.Fatalf("install progress did not consume returned outcome: %v", progress)
 	}
 	incompatibleManager := manager.WithPlatform(platform.Info{Firmware: "other", Arch: "aarch64", Device: "trimui-smart-pro", Resolution: "1280x720"})
@@ -424,8 +429,12 @@ func TestExecuteInstallOnUnknownDeviceFailureAndUninstall(t *testing.T) {
 	broken.Version = "2.0.0"
 	broken.Release.SHA256 = strings.Repeat("0", 64)
 	service.index.Packages[0].Package = broken
-	if err := service.Execute(context.Background(), pkg.ID, Update, func(string) {}); err == nil || !strings.Contains(err.Error(), "SHA-256 mismatch") {
+	progress = nil
+	if err := service.Execute(context.Background(), pkg.ID, Update, func(message string) { progress = append(progress, message) }); err == nil || !strings.Contains(err.Error(), "SHA-256 mismatch") {
 		t.Fatalf("update failure through Execute = %v", err)
+	}
+	if progress[len(progress)-1] != "Verifying release" {
+		t.Fatalf("failed verification advanced progress: %v", progress)
 	}
 	service.index.Packages[0].Package = pkg
 	if err := service.Execute(context.Background(), pkg.ID, Uninstall, func(string) {}); err != nil {
