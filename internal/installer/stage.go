@@ -166,10 +166,11 @@ func (m Manager) stage(ctx context.Context, operation string, pkg manifest.Packa
 		client = defaultHTTPClient()
 	}
 	m.event("download_start", "package", pkg.ID, "url", pkg.Release.URL, "expected_bytes", fmt.Sprint(pkg.Release.Size))
-	if err := download(ctx, client, *pkg.Release, archivePath); err != nil {
+	if err := download(ctx, client, *pkg.Release, archivePath, m.report); err != nil {
 		return nil, fmt.Errorf("download release: %w", err)
 	}
 	m.event("download_verified", "package", pkg.ID, "bytes", fmt.Sprint(pkg.Release.Size), "sha256", pkg.Release.SHA256)
+	m.report("Extracting release")
 	var files []storearchive.File
 	if pkg.Release.Base64Offset > 0 {
 		files, err = storearchive.ExtractBase64TarGZ(ctx, archivePath, pkg.Release.Base64Offset, filepath.Join(work, "staging"), pkg.Install.StripComponents, pkg.Release.InstalledSize)

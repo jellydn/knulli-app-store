@@ -20,6 +20,7 @@ import (
 // ownership, and the installed-state record are written together and rolled
 // back as one on failure.
 func (m Manager) commit(ctx context.Context, operation string, pkg manifest.Package, staged *stagedRelease, outcome *OperationOutcome) (result error) {
+	m.report("Installing / preparing transaction")
 	guard := staged.guard
 	old := staged.old
 	tx, err := safefs.Begin(guard, staged.session.managerHost)
@@ -46,6 +47,7 @@ func (m Manager) commit(ctx context.Context, operation string, pkg manifest.Pack
 	if err != nil {
 		return err
 	}
+	m.report("Finalizing installation")
 	if err := installMenuLauncher(tx, guard, pkg, &state, old, operation == "adopt"); err != nil {
 		return err
 	}
@@ -91,7 +93,8 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 	if launcher := pkg.Install.MenuLauncherPath(); launcher != "" {
 		newPaths[launcher] = true
 	}
-	for _, file := range files {
+	for index, file := range files {
+		m.report(fmt.Sprintf("Installing files: %d%% (%d/%d)", index*100/len(files), index, len(files)))
 		virtual := path.Join(pkg.Install.Destination, file.Relative)
 		newPaths[virtual] = true
 		host, err := guard.Resolve(virtual)
@@ -133,6 +136,7 @@ func (m Manager) installFiles(tx *safefs.Transaction, guard *safefs.Guard, pkg m
 		}
 		state.Files = append(state.Files, InstalledFile{Path: virtual, SHA256: file.SHA256, Mode: uint32(installedInfo.Mode().Perm()), Preserved: preserved})
 	}
+	m.report(fmt.Sprintf("Installing files: 100%% (%d/%d)", len(files), len(files)))
 	if old != nil {
 		for _, stale := range old.Files {
 			if newPaths[stale.Path] || stale.Preserved {

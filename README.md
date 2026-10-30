@@ -40,6 +40,8 @@ Successful `main` builds also publish dated experimental pre-releases. A release
 4. Safely eject, start Knulli, refresh game lists or reboot, then open **Knulli App Store** in **Ports**.
 5. Select an app, read its warnings, and confirm the action.
 
+The status line shows preparation, download, verification, extraction, file installation, and finalization. Download percentage measures received bytes against the pinned release size; installation percentage measures processed release files, not the whole operation. Other phases show no estimated percentage. Controls stay locked until the operation ends. Success appears as a brief notice; a failure stays visible for review or retry.
+
 An existing copy offers **Manage existing**: matching release files become owned without reinstalling; uncertain files remain unmanaged and are backed up before replacement. Empty directories do not count as external copies. **Repair** restores pinned code and keeps declared data. **Uninstall** removes owned files, restores originals where applicable, and keeps declared data. Close apps before Store operations.
 
 The GUI requests one menu refresh on exit if package operations changed the game list, not after each install. One-shot CLI commands still refresh immediately. Menu refresh **accepted** means queued, not completed. Refresh or restart EmulationStation if an entry is missing.

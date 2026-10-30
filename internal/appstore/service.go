@@ -142,18 +142,20 @@ func (s *Service) Execute(ctx context.Context, id string, action Action, progres
 		return fmt.Errorf("record lifecycle state: %w", err)
 	}
 	s.manager.LifecycleEvent(lifecycle, item.HealthReason)
+	manager := s.manager
+	manager.Progress = progress
 	var outcome installer.OperationOutcome
 	switch action {
 	case Install:
-		outcome, err = s.manager.Apply(ctx, installer.OpInstall, entry.Package)
+		outcome, err = manager.Apply(ctx, installer.OpInstall, entry.Package)
 	case Adopt:
-		outcome, err = s.manager.Apply(ctx, installer.OpAdopt, entry.Package)
+		outcome, err = manager.Apply(ctx, installer.OpAdopt, entry.Package)
 	case Update:
-		outcome, err = s.manager.Apply(ctx, installer.OpUpdate, entry.Package)
+		outcome, err = manager.Apply(ctx, installer.OpUpdate, entry.Package)
 	case Repair:
-		outcome, err = s.manager.Apply(ctx, installer.OpRepair, entry.Package)
+		outcome, err = manager.Apply(ctx, installer.OpRepair, entry.Package)
 	case ForceReinstall:
-		outcome, err = s.manager.Apply(ctx, installer.OpForceReinstall, entry.Package)
+		outcome, err = manager.Apply(ctx, installer.OpForceReinstall, entry.Package)
 	case Uninstall:
 		outcome, err = s.manager.Uninstall(ctx, id)
 	default:
@@ -351,7 +353,7 @@ func operationMessage(action Action, name string) string {
 		return "Inventorying and backing up existing " + name
 	}
 	if action == Install || action == Update || action == Repair || action == ForceReinstall {
-		return "Downloading, verifying, and applying " + name
+		return "Preparing " + name
 	}
 	return "Removing managed files and restoring backups for " + name
 }

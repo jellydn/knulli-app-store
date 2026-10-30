@@ -178,7 +178,7 @@ func (m Manager) UpdateStore(ctx context.Context, update StoreUpdate) (err error
 		client = defaultHTTPClient()
 	}
 	archivePath := filepath.Join(work, "release.zip")
-	if err := download(ctx, client, update.Release, archivePath); err != nil {
+	if err := download(ctx, client, update.Release, archivePath, nil); err != nil {
 		return err
 	}
 	files, err := storearchive.Extract(ctx, archivePath, "zip", filepath.Join(work, "staging"), 0, manifest.MaxPackageBytes)

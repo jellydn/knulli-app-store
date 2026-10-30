@@ -15,9 +15,12 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 )
 
-func download(ctx context.Context, client *http.Client, release manifest.Release, destination string) error {
+func download(ctx context.Context, client *http.Client, release manifest.Release, destination string, progress func(string)) error {
 	if release.Size > manifest.MaxPackageBytes {
 		return fmt.Errorf("release size %d exceeds the %d-byte limit", release.Size, manifest.MaxPackageBytes)
+	}
+	if progress != nil {
+		progress("Downloading: 0%")
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, release.URL, nil)
 	if err != nil {
@@ -42,7 +45,8 @@ func download(ctx context.Context, client *http.Client, release manifest.Release
 		return err
 	}
 	hash := sha256.New()
-	written, copyErr := io.Copy(io.MultiWriter(output, hash), io.LimitReader(response.Body, release.Size+1))
+	meter := &downloadProgress{total: release.Size, report: progress}
+	written, copyErr := io.Copy(io.MultiWriter(output, hash, meter), io.LimitReader(response.Body, release.Size+1))
 	syncErr := output.Sync()
 	closeErr := output.Close()
 	if copyErr != nil {
@@ -57,11 +61,34 @@ func download(ctx context.Context, client *http.Client, release manifest.Release
 	if written != release.Size {
 		return fmt.Errorf("download size is %d, expected %d", written, release.Size)
 	}
+	if progress != nil {
+		progress("Verifying release")
+	}
 	actual := hex.EncodeToString(hash.Sum(nil))
 	if actual != release.SHA256 {
 		return fmt.Errorf("SHA-256 mismatch: got %s", actual)
 	}
 	return nil
+}
+
+// The pinned size is the denominator even when HTTP uses chunked transfer.
+// Report only whole-percent changes so network reads cannot flood a frontend.
+type downloadProgress struct {
+	written, total int64
+	percent        int64
+	report         func(string)
+}
+
+func (p *downloadProgress) Write(data []byte) (int, error) {
+	p.written += int64(len(data))
+	if p.report != nil && p.total > 0 {
+		percent := min(int64(100), p.written*100/p.total)
+		if percent != p.percent {
+			p.percent = percent
+			p.report(fmt.Sprintf("Downloading: %d%%", percent))
+		}
+	}
+	return len(data), nil
 }
 
 func defaultHTTPClient() *http.Client {

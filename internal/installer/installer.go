@@ -30,6 +30,8 @@ type Manager struct {
 	Diagnostics          *diagnostics.Log
 	Now                  func() time.Time
 	AvailableBytes       func(string) (uint64, error)
+	// Progress runs synchronously during an operation; it must not block.
+	Progress func(string)
 
 	platform    platform.Info
 	statusCache *StatusCache
@@ -94,6 +96,7 @@ func (m Manager) Apply(ctx context.Context, op Op, pkg manifest.Package) (Operat
 
 func (m Manager) apply(ctx context.Context, operation string, pkg manifest.Package, outcome *OperationOutcome) (result error) {
 	m.event("operation_start", "package", pkg.ID, "action", operation)
+	m.report("Preparing installation")
 	defer func() {
 		if result != nil {
 			m.event("operation_error", "package", pkg.ID, "action", operation, "error", result.Error())
@@ -133,6 +136,12 @@ func (m Manager) checkPreconditions(operation string, pkg manifest.Package) erro
 func (m Manager) event(name string, fields ...string) {
 	if m.Diagnostics != nil {
 		m.Diagnostics.Event(name, fields...)
+	}
+}
+
+func (m Manager) report(message string) {
+	if m.Progress != nil {
+		m.Progress(message)
 	}
 }
 
