@@ -57,8 +57,8 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 			if item.Package.Review.Status == "verified" {
 				verified++
 			}
-			if !item.Compatible || !item.DeviceTested || len(item.Actions) != 1 || item.Actions[0] != Install {
-				t.Fatalf("owner-tested TSP package is not tested and installable: %#v", item)
+			if !item.Compatible || len(item.Actions) != 1 || item.Actions[0] != Install {
+				t.Fatalf("reviewed package is not installable: %#v", item)
 			}
 			continue
 		}
@@ -94,6 +94,13 @@ func TestServiceDeviceTestBadgeRequiresExactVersion(t *testing.T) {
 			wantTested := version == "1.0.0"
 			if len(items) != 1 || items[0].DeviceTested != wantTested {
 				t.Fatalf("version %s: want tested=%v, got %#v", version, wantTested, items)
+			}
+			if !items[0].Compatible || items[0].Verdict.State != StateAvailable {
+				t.Fatalf("version %s: package is not available: %#v", version, items[0])
+			}
+			assertActions(t, items[0].Actions, Install)
+			if !wantTested && !hasReason(items[0].Verdict, ReasonReview, "Untested on this device; installation is allowed") {
+				t.Fatalf("version %s: missing untested warning: %#v", version, items[0])
 			}
 		})
 	}
