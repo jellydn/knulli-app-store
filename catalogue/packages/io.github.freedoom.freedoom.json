@@ -16,9 +16,14 @@
       "Knulli distribution ab3a6809286b3cff1648fb8c96a0200bc869beb6 declares the prboom system, .wad extension, libretro/prboom runtime and its installed /usr/lib/libretro/prboom_libretro.so. That core's pinned source recognizes freedoom1.wad and freedoom2.wad and passes IWAD content through -iwad. Host architecture/ABI are Knulli AArch64/glibc, not a claim that WAD data contains native AArch64 instructions. Installation requires detected RetroArch and PrBoom; no Store-generated shell wrapper or executable mode is needed.",
       "Store writes are limited to /userdata/roms/prboom/Freedoom and /userdata/roms/prboom/gamelist.xml, plus normal Store state. Both WADs are one directory below the system root. The Store adds only Phase 1's exact menu path. Phase 2 is found by the normal system scanner; refresh game lists and browse PrBoom/Freedoom. Existing system settings, prboom.wad and PortMaster installations are never changed. PortMaster Doom Engines also includes Freedoom, but this package is separate original-publisher data for Knulli's own core, not its catalog or installer.",
       "Knulli configgen directs savefiles and savestates to /userdata/saves/prboom. The reviewed core creates freedoom1 and freedoom2 subdirectories for in-game saves/configuration. If that location is unavailable it falls back to the WAD directory. Runtime-created files are not Store-owned and remain after Repair or removal; prboom.cfg is explicitly preserved. Store operations never write shared emulator saves/settings or execute the game. Close the game before Store operations.",
-      "The payload has no executable code, updater or network client. Knulli supplies controller mapping, engine configuration, audio and rendering. Install downloads the pinned archive from GitHub; ordinary single-player play requires no network. Fixture-root checks cover lifecycle and preservation, not device gameplay. No physical-device, audio, performance or controller result is claimed; status stays experimental and the tested badge stays UNTESTED."
+      "The payload has no executable code, updater or network client. Knulli supplies controller mapping, engine configuration, audio and rendering. Install downloads the pinned archive from GitHub; ordinary single-player play requires no network. Fixture-root checks cover lifecycle and preservation, not device gameplay. The owner reports both phases work well on their TSP with Store v2026.11.02-f193885. Firmware, architecture, observed resolution and separate lifecycle/save/control/audio/performance results were not supplied. Status stays experimental and the exact-matrix tested badge stays UNTESTED."
     ],
     "evidence": [
+      {
+        "kind": "owner-gameplay-report",
+        "url": "https://github.com/jellydn/knulli-app-store/blob/main/docs/real-device-tests.md#2026-11-02-freedoom-phase-1-and-phase-2-on-tsp",
+        "note": "Recorded 2026-11-02: owner reports Freedoom 0.13.0 Phase 1 and Phase 2 both work well on TSP using Store v2026.11.02-f193885. No firmware, architecture, observed resolution or separate lifecycle/save/control/audio/performance results supplied. Partial evidence, not an exact-matrix real-device-test."
+      },
       {
         "kind": "tagged-release",
         "url": "https://github.com/freedoom/freedoom/releases/tag/v0.13.0",
@@ -89,13 +94,13 @@
     "destination": "/userdata/roms/prboom/Freedoom",
     "strip_components": 1,
     "launcher": "freedoom1.wad",
-    "warning": "Untested on physical Knulli devices. Requires firmware RetroArch and PrBoom. Includes both campaigns: Phase 1 has a Store menu entry; find freedoom2.wad in PrBoom/Freedoom after refreshing game lists. No commercial files needed. Close the game before Store operations. Saves/settings remain after removal.",
+    "warning": "Owner reports both phases work well on TSP; firmware/resolution and lifecycle/save results were not supplied. Exact-device badge remains UNTESTED. Requires RetroArch and PrBoom. Phase 1 has a Store menu entry; find Phase 2 in PrBoom/Freedoom after refreshing game lists. Close the game before Store operations. Saves/settings remain after removal.",
     "preserve": ["prboom.cfg"],
     "menu": {
       "gamelist": "/userdata/roms/prboom/gamelist.xml",
       "path": "./Freedoom/freedoom1.wad",
       "name": "Freedoom: Phase 1",
-      "description": "Four free FPS episodes. This package also installs freedoom2.wad (Phase 2) in the same folder. Requires Knulli's PrBoom core; no commercial Doom files. Untested on physical devices."
+      "description": "Four free FPS episodes. This package also installs freedoom2.wad (Phase 2) in the same folder. Requires Knulli's PrBoom core; no commercial Doom files. Owner reports both phases work well on TSP; exact firmware/resolution and lifecycle results not supplied."
     },
     "network": false,
     "allowed_write_paths": ["/userdata/roms/prboom/Freedoom", "/userdata/roms/prboom/gamelist.xml"]

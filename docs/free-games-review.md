@@ -45,9 +45,58 @@ Source review uses KNULLI distribution commit `ab3a6809286b3cff1648fb8c96a0200bc
 
 [PortMaster Doom Engines](https://github.com/PortsMaster/PortMaster-New/blob/15b1a91425f915ec604cc0bf062bd5c657e53c83/ports/doomengines/port.json) also bundles Freedoom. It owns its separate Ports launcher and `doomengines` tree. This Store package uses neither that archive nor those paths. Users who already play Freedoom there do not need a second copy. Grout was not duplicated. The separately reviewed zitch integration is outside this game addition.
 
-## Exclusions and deferred entries
+## Complete source inventory — follow-up review
 
-These are findings from the reviewed shortlist, not a claim that every other source entry is illegal or incompatible.
+The follow-up inspected all **85 game/runtime entries** at the same spruce commit (including hidden entries and `game_v2.json`), plus the three app entries and fourteen eBooks for scope. It read the game metadata, bundled notices and native launchers. The table below accounts for every game/runtime entry. A missing rights grant or a missing reviewed release is a blocker, not a finding that the game is illegal. A compatible emulator alone does not clear release provenance, asset rights or save-path review.
+
+**No additional game cleared every gate.** Freedoom's two source entries remain one Store package. No Nursery asset was imported, no candidate with unclear asset rights was added, and no checksum exception was broadened. In particular, a GitHub-generated digest is not a publisher checksum for an ordinary game-data package; the existing exception is limited to authorized upstream-managed experimental packages. These exclusions can be reviewed again when the missing evidence is available.
+
+Source links below refer to the pinned [spruce tree](https://github.com/spruceUI/Ports-and-Free-Games/tree/a981c7601bb4e47a28985b9ec6860311ae5e609e). Bundled notices are discovery evidence, not independent publisher authorization. Original-publisher checks are listed separately below.
+
+| Source group / every entry | Blocking evidence or result |
+| --- | --- |
+| Arduboy: Ardynia; CastleBoy; Catacombs of the Damned; Dark and Under; Nineteen44 | Notices show MIT/BSD code or conditional whole-game distribution (Ardynia); they do not by themselves authenticate an original release. KNULLI does declare Arduboy with the Arduous core, so these are **not** excluded as an unsupported system. Catacombs' publisher release 1.0 supplies `Catacombs.arduboy`, but no publisher checksum asset/text was found in the inspected release. The other entries have no fully reviewed publisher archive/checksum pair. No spruce HEX/ZIP is substituted. CastleBoy/Nineteen44 also require care over demake asset rights. |
+| Commodore 64: Balls Like A Frog; C64anabalt; Doc Cosmos; Endless Forms Most Beautiful; Fire!; Lester; LuftrauserZ; Mario's Cement Factory; Old Tower; Ooze; Robot Jet Action; Robots Rumble; Super Bread Box 64; Tenebra; Yoomp! 64; You Have To Win The Game | Every bundled notice says only that the title was hosted online for free, with an opt-out email. That is not a rights grant for code and assets. No original-publisher rights plus pinned archive/checksum contract was established. Official conversions and free download prices do not supply it. |
+| Doom: Doom1; Freedoom1; Freedoom2 | Doom1 is proprietary/shareware. Freedoom1 and Freedoom2 are already supplied together by the reviewed original v0.13.0 archive. No duplicate package. |
+| EasyRPG: Dandelion; Dead Again; Grimm's Hollow; Ib; Lavender; OFF; Return of Touhou Mother; Spring Eternal; Touhou Mother; Yume Nikki | Notices link archive.org, itch.io, Steam or fan translations rather than granting complete redistribution rights. Ib's notice expressly restricts redistribution of images/music. No complete publisher release/rights contract for the game and bundled RPG Maker assets was established. EasyRPG support is not the blocker by itself. |
+| Game Boy Advance: Apotris | Publisher offers versioned GBA ZIPs, including v4.2.0. The download page has no publisher checksum, and GitHub lists no releases. Thus a self-calculated digest would not satisfy the required checksum evidence. Do not replace the GBA build with a PortMaster archive. |
+| Game Boy Advance: Sips | Music attribution exists, but the notice does not establish all game/audio rights or a pinned publisher archive/checksum pair. |
+| Game Boy Color: Metamorphosis Collection DEMO | No complete bundled rights notice or reviewed original-publisher versioned archive/checksum contract established. A free demo is not redistribution permission. |
+| Game Boy Color: Nine Lives Sudoku; Sudoku Thrice; Sumset | Notices grant inclusion specifically in spruce Game Nursery. No grant to this Store was established. |
+| Game Boy: GB-Wordyl; Tobu Tobu Girl Deluxe | Known open-source projects, but inspected publisher GitHub releases contain no playable assets. Do not use Nursery copies or source snapshots in place of a reviewed playable release. See the detailed findings below. |
+| Game Boy: The Bouncing Ball | Notice cites CC-BY-SA-4.0 and author download pages, but no authenticated version-pinned publisher ZIP/tar.gz plus checksum pair was established. |
+| Game Boy: The Mayor of Sanctuary | Notice identifies the author and termination of a prior distributor's license, not a grant to this Store. No complete rights/release contract established. |
+| Game Tank: A Very Hard Game; Accursed Fiend; Brick Game; Cubicle Knight; Sivani; Tetris | No GameTank system/runtime is declared in the reviewed KNULLI system matrix. These spruce entries install their emulator under `Emu/GAMETANK`; that is not KNULLI integration. Brick Game additionally records permission to spruce only. MIT notices for other entries do not resolve runtime/release requirements. |
+| J2ME: FreeJ2ME | A runtime bundle plus Java and three midlets, not one reviewed game release. The bundled core/runtime and Bomber 2, jtris and Crossword Solver need separate publisher/rights/ABI review; spruce's device list is not KNULLI evidence. No runtime or extra games imported. |
+| NES: From Below | Bundled notice records permission specifically to the spruce team with free-access conditions. No independent Store distribution grant or reviewed publisher archive/checksum pair established. |
+| NES: Squatch Quest Demo | Notice describes a prerelease demo and commercial full-game link, not a full redistribution grant. No reviewed publisher archive/checksum contract established. |
+| NES: Super Tilt Bro | Publisher releases API lists no releases. Current mapper support also needs review; see below. |
+| Ports: 2048; Anarch; CaveStory; Dinothawr; Mr. Boom; Pong (Gong) | Spruce launchers call `/mnt/SDCARD/RetroArch` and private supplied cores; these are not KNULLI launch paths. Dinothawr has no publisher GitHub release assets; the advertised historical downloads are HTTP Windows bundles. Mr. Boom publishes source tarballs, not a reviewed KNULLI runtime package; KNULLI already declares its own MrBoom system/core. No Store package should claim those shared firmware paths or just install a dummy launcher. CaveStory's engine license does not establish data rights. |
+| Ports: Cannonball; Resonance; Sonic Mania | Metadata explicitly requires additional commercial files. Excluded, including the hidden entries. |
+| Ports: Celeste Classic | Original ccleste releases inspected through v1.4.0 supply Windows ZIP and 3DS assets, not a supported KNULLI AArch64 package. Spruce launcher sends signals to `joystickinput`; do not copy it. |
+| Ports: Digger | Publisher v0.5 supplies source, Windows/macOS and Debian/Ubuntu package bundles, not a reviewed directly extractable KNULLI runtime/launcher. No remote build/install script or nested system package extraction is introduced. |
+| Ports: Dino Jump; Planet Merge; nKaruga | Spruce launchers use spruce processes, library paths or `/mnt/SDCARD` save/runtime paths. No reviewed original-publisher KNULLI archive with complete asset rights and required checksum established. |
+| Ports: Hydra Castle Labyrinth | Port publisher v0.1.0 now has ARM64 ZIPs, so absence of ARM64 builds is **not** claimed. No publisher checksum asset/text or complete original game-data rights was established. Spruce's GPL engine notice alone does not license all data. |
+| Ports: L'Abbaye des Morts | Inspected publisher releases supply an x86_64 glibc-2.35 archive (v2.0.4), not a reviewed KNULLI AArch64 package. The spruce launcher also depends on `joystickinput` and spruce paths. |
+| Ports: Project Starfighter; Rocks'n'Diamonds | Open engines do not make spruce bundles portable. Launchers depend on spruce libraries/processes/save paths. No reviewed original-publisher directly extractable KNULLI release with all bundled-content rights and checksum evidence established. Do not substitute PortMaster builds. |
+| Ports: Jazz Jackrabbit; Rick Dangerous; Streets of Rage Remake; Super Mario War | No verified rights for all proprietary/shareware or commercial-IP assets established. An engine's open license or a free download is insufficient. |
+| Ports: Tyrian 2000 | OpenTyrian publishes ARM64 archives, but OpenTyrian is not proof of rights or runtime support for spruce's separate OpenTyrian2000 payload/data. No reviewed Tyrian 2000 publisher data release/checksum contract established. No commercial data or PortMaster asset substituted. |
+| SNES: Super Sudoku; Sure Instinct | MIT notices exist, but no supported publisher release/archive/checksum contract established; see details below. |
+| ZX Spectrum: Automated Cave Explorer; Che-Man; Dreamwalker; Gravibots; Mars Mare-Alienation; Nixy and the Seeds of Doom | Every bundled notice is the same free-hosting/opt-out statement used for C64. It does not grant distribution rights for code and assets. No complete publisher rights/release evidence established. |
+
+### Original-publisher release checks
+
+- [Apotris downloads](https://akouzoukos.com/apotris/downloads): inspected the full download page, including the versioned [v4.2.0 GBA ZIP](https://apotrisstorage.blob.core.windows.net/binaries/Apotris-v4.2.0GBA.zip). ARM64 desktop builds also exist; do not claim otherwise. No checksum is published on that page. [GitHub releases](https://api.github.com/repos/akouzoukos/apotris/releases) returned an empty list.
+- [Catacombs of the Damned 1.0](https://github.com/jhhoward/Arduboy3D/releases/tag/1.0): one `.arduboy` asset; no separate publisher checksum or checksum in the release text. An `.arduboy` may itself be ZIP data; the filename alone is not a compatibility rejection.
+- [ccleste v1.4.0](https://github.com/lemon-sherbet/ccleste/releases/tag/v1.4.0), [Digger v0.5](https://github.com/sobomax/digger/releases/tag/v0.5), [Hydra Castle Labyrinth v0.1.0](https://github.com/ptitSeb/hydracastlelabyrinth/releases/tag/v0.1.0), [L'Abbaye des Morts releases](https://github.com/nevat/abbayedesmorts-gpl/releases), [MrBoom 5.5](https://github.com/Javanaise/mrboom-libretro/releases/tag/5.5), and [OpenTyrian v2.1.20260913](https://github.com/opentyrian/opentyrian/releases/tag/v2.1.20260913): inspected release text and asset inventories, rather than assuming that the spruce binary is the publisher's supported package.
+- [Dinothawr publisher](https://github.com/Themaister/Dinothawr): no GitHub releases; README advertises historical HTTP Windows/Android bundles and describes the separately needed data/core. A mutable libretro content download is not a version-pinned publisher release.
+- [KNULLI system matrix](https://github.com/knulli-cfw/distribution/blob/ab3a6809286b3cff1648fb8c96a0200bc869beb6/package/batocera/emulationstation/batocera-es-system/es_systems.yml): confirms Arduous, GBA, GB/GBC, NES, SNES, PrBoom, EasyRPG and MrBoom configuration. No GameTank entry. This is source review, not proof that any particular device build includes every optional core.
+
+The three Apps entries are outside the game import: Grout and zitch are apps, and AestheticSpruce is a spruce theme tool, not a game. All fourteen eBooks are outside the game scope. PortMaster remains external-only.
+
+## Earlier detailed exclusions
+
+These detailed findings remain useful alongside the complete source inventory above. They are not claims that unaccepted games are illegal.
 
 | Entry or group | Reason not added |
 | --- | --- |
@@ -61,7 +110,6 @@ These are findings from the reviewed shortlist, not a claim that every other sou
 | Super Sudoku | Publisher repository has version-named ROMs in `releases/`, but no GitHub releases or tags. Raw ROMs/source snapshots are not accepted release ZIP/tar.gz assets under the unchanged release contract. |
 | Sure Instinct | MIT source is available; playable versioned ZIPs are offered through itch.io. No stable publisher release URL plus required checksum evidence was established here. |
 | Anarch, 2048 | Inspected spruce launchers hardcode `/mnt/SDCARD/RetroArch`; Anarch bundles an ARM32 core. No compatible original-publisher KNULLI release was established. Do not infer AArch64 support. |
-| Other native ports, ROMs, EasyRPG, J2ME, Game Tank, ZX Spectrum, C64, Arduboy and eBooks | Not promoted: complete original-release, rights and KNULLI runtime/lifecycle review was not completed. eBooks are outside this game addition. No blanket licensing or compatibility conclusion is made. |
 
 ## Verification limits
 
@@ -71,6 +119,6 @@ The actual publisher archive also passed install, repair, health/hash and remova
 
 An x86_64 build of KNULLI's pinned PrBoom source loaded each original IWAD with an empty system directory (no external `prboom.wad`). A temporary libretro harness ran 400 cycles per game with simulated Start/A input: each produced 403 video callbacks, with 109 distinct frame hashes for Phase 1 and 322 for Phase 2, and created its per-WAD save/configuration directory. The harness initially omitted the logging interface required by this core; adding that callback resolved its null-function crash. This is a host smoke check, not a KNULLI frontend or device result, and does not prove completed levels or in-game save/reload.
 
-Physical device startup, menu scanning, controller input, audio, performance and in-game save/reload still require testing. Neither phase earns a tested badge. The publisher checksum signature was not authenticated against an independently trusted signing key.
+The [owner's later report](real-device-tests.md#2026-11-02-freedoom-phase-1-and-phase-2-on-tsp) says both phases work well on TSP with experimental Store v2026.11.02-f193885. It supplies no firmware, architecture, observed resolution or separate menu/controller/audio/performance/lifecycle/save results. Those details still need testing. Neither phase earns an exact-matrix tested badge. The publisher checksum signature was not authenticated against an independently trusted signing key.
 
 JSON Schema checks passed for the new manifest, 16 license/status/upstream-managed game cases, the existing utility license exception, and unknown-type rejection. A catalog-wide schema probe also found an existing unrelated mismatch: `io.github.squirbie.handheld-link-cores` has an empty `compatibility.minimum_version`, while the schema requires a nonempty value. That entry was not changed; the Go catalog validator accepts it.

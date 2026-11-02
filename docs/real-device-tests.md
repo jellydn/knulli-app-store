@@ -1,5 +1,14 @@
 # Real-device test evidence
 
+## 2026-11-02: Freedoom Phase 1 and Phase 2 on TSP
+
+- Source: [owner report relayed through the Puck thread](https://ampcode.com/threads/T-01a19bd4-80cf-744e-8f17-6cb8e8daf389).
+- Date recorded: 2026-11-02 (Asia/Singapore).
+- Report: the owner tested Freedoom Phase 1 and Phase 2 from experimental Store release [v2026.11.02-f193885](https://github.com/jellydn/knulli-app-store/releases/tag/v2026.11.02-f193885) on their TSP (TrimUI Smart Pro); both work well.
+- Package: Freedoom 0.13.0, containing both phases.
+
+This is owner-reported hardware evidence, not an agent-run device test. The report supplies no firmware identifier, architecture, observed resolution, separate control/audio/performance results, or Install, Repair, removal, save/load or save-retention results. None are inferred from the device model, Store archive name, or earlier reports for other packages. The package remains experimental. This partial report does not grant an exact-matrix tested badge; the UI can still show UNTESTED.
+
 ## 2026-10-30: Current owner confirmation
 
 - Source: [owner confirmation in the maintenance thread](https://ampcode.com/threads/T-01a184fd-5491-7371-9d0d-5d2a4bbddb02).
