@@ -37,13 +37,23 @@ Package code runs with access to user files. A complete review protects ROMs, sa
 
 A `candidate` can retain validated `release` metadata without `compatibility` or `install`. This lets later review reuse pinned bytes without exposing any lifecycle action. To promote it, add the reviewed runtime and installation definitions and an experimental warning. Do not treat the candidate's checksum as proof that its runtime is safe.
 
+## Free games and homebrew
+
+[ADR 0011](adr/0011-reviewed-free-games.md) permits `type: game` for native free games, legally redistributable homebrew ROMs, and game data used by a Knulli-supplied engine. A game always requires a verified license, even as a candidate or upstream-managed package. Establish rights to all bundled graphics, music, text and levels, not just engine code; retain notices and attribution. Exclude commercial files, games requiring them, unclear rights, and permission limited to another distributor. Free download and spruce's `requires_files: false` are not permission.
+
+Use original publishers' version-pinned ZIP/tar.gz release assets and existing checksum evidence rules. Do not import spruce Nursery or PortMaster assets, repack them, or copy spruce launch paths. Keep PortMaster external-only, avoid duplicate Store entries, and do not take ownership of its files.
+
+For a ROM or game-data package, `install.launcher` names the file opened by EmulationStation. Leave `executables` empty unless the archive includes an actual required native executable. Architecture and ABI describe the supported Knulli host, not the ROM CPU. Require and detect the emulator/core; inspect the firmware's system extensions, launch configuration, controller mapping, saves and settings. Install in a private directory within that system. Retain shared saves without declaring them Store-owned writes. A multi-game publisher bundle may use system scanning for additional ROMs; the existing single menu entry names the primary file.
+
+Verify installation, repair, menu ownership, save retention and removal in a fixture root, including failures before mutation. Start at experimental without exact-device results. Publish the new catalog only with a Store binary that accepts `game`; old binaries reject this added v1 enum value. See the [Freedoom review](free-games-review.md) for the first package and exclusions.
+
 ## Upstream-managed installation
 
 Use `install.upstream_managed: true` only with `experimental` status. Download directly from the publisher, verify the pinned bytes and extract without running installer scripts. Keep a private package destination, not the entire shared Tools or Ports directory. Document first-launch setup, runtime writes, runtime downloads and the app's updater: none is sandboxed or verified by the Store. Explain that Store Repair restores pinned code; users must close the app first. Preserve settings and never claim runtime-created files as Store-owned.
 
 If no publisher checksum is available, this experimental model may use the GitHub release asset's API digest. Record the API URL, compare it with an independently calculated hash, and pin that hash and byte size in the manifest. The install warning must disclose the missing publisher checksum. This trusts the publisher's GitHub account and GitHub, not independent publisher authentication. Never fetch a new expected digest during installation or promote this exception beyond experimental.
 
-When a license cannot be verified, an upstream-managed experimental manifest may omit `license` only if its visible install warning discloses the license uncertainty. Do not mirror or redistribute that asset, invent an SPDX identifier, or promote it beyond experimental.
+When a license cannot be verified, a non-game upstream-managed experimental manifest may omit `license` only if its visible install warning discloses the license uncertainty. Games never use this exception. Do not mirror or redistribute that asset, invent an SPDX identifier, or promote it beyond experimental.
 
 Declare `install.uninstall_checks` for shared hooks and active-service state. Each check has an absolute `path` below `/userdata` and a cleanup `message`. Without `contains`, an existing path blocks removal. With `contains`, the Store searches the file or directory tree for that case-insensitive text. A match, symlink, unreadable entry or file over 1 MiB blocks removal before package mutation. Checks are read-only; never run an upstream uninstall script or delete a shared hook. Check documented hook locations and warn about custom upstream path overrides. Retest these checks when upstream changes its hook layout.
 

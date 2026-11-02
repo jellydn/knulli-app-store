@@ -55,7 +55,7 @@ ARCH=${WALK_ARCH:-aarch64}
 RESOLUTION=${WALK_RESOLUTION:-1280x720}
 TIMEOUT=${WALK_TIMEOUT:-60s}
 # Where the walkthrough looks for an installed package when it tampers with one.
-PACKAGE_PATH=${WALK_PACKAGE_PATH:-/userdata/roms/tools/Grout}
+PACKAGE_PATH=${WALK_PACKAGE_PATH:-/userdata/roms/prboom/Freedoom}
 
 if [ ! -x "$BIN" ]; then
   echo "missing $BIN: run 'make build-ui' first" >&2
@@ -168,8 +168,9 @@ walk catalogue-tabs keyboard \
 # The former PocketCurator candidate now opens an upstream-managed install
 # confirmation. Never confirm a download in this offline flow.
 walk upstream-managed-confirmation keyboard \
-  "down,down,down,enter" \
-  "catalogue,confirm"
+  "down,down,down,down,enter" \
+  "catalogue,confirm" \
+  "io.github.tomtombombadil.pocketcurator"
 
 # Leaving is the Select chord and nothing else: Escape at the catalogue does
 # not leave it, and a held Tab plus Y does.

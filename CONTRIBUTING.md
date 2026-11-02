@@ -12,7 +12,9 @@ Read [How to add a package](docs/how-to-add-a-package.md) before you open a pack
    An authorized `install.upstream_managed` package can use verified download/extraction while leaving runtime setup and updates to the app. It must stay experimental, disclose these risks, preserve user data, and declare cleanup checks for external hooks. An unverified license needs a visible warning and direct upstream download without redistribution. See [upstream-managed installation](docs/how-to-add-a-package.md#upstream-managed-installation).
 6. Use `verified` only when a linked report shows a successful test on the exact device, firmware, architecture, and resolution in the manifest.
 
-A README statement alone is not compatibility evidence. Do not add installers that pipe remote data to a shell or that need unrestricted writes. Do not add ROM-download sources.
+A README statement alone is not compatibility evidence. Do not add installers that pipe remote data to a shell or that need unrestricted writes. Do not add ROM-download services, commercial game files, or games with unclear distribution rights.
+
+Native free games and legally redistributable homebrew ROMs/game data use `type: game` under [ADR 0011](docs/adr/0011-reviewed-free-games.md). A game always needs a verified license, including candidates and upstream-managed packages; check code and bundled assets separately. Use the original publisher's pinned ZIP/tar.gz release, never the mutable spruce Nursery or a PortMaster archive. Keep PortMaster external-only and leave its managed paths alone. ROM/data launch files use Knulli's existing system integration, not a copied spruce launcher. Record the required core, saves, menu and removal paths, and fixture-root lifecycle results. See the [game review rules](docs/how-to-add-a-package.md#free-games-and-homebrew).
 
 ## Code changes
 

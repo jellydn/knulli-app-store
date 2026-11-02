@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-09-15
+- ADR 0011 supersedes only the package-type restriction below; the external PortMaster decision remains in force.
 
 ## Context
 

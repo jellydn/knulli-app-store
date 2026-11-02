@@ -180,8 +180,11 @@ func (p Package) Validate() error {
 	if strings.TrimSpace(p.Name) == "" {
 		problems = append(problems, "name is required")
 	}
-	if !oneOf(p.Type, "utility", "theme", "integration") {
-		problems = append(problems, "type must be utility, theme, or integration")
+	if !oneOf(p.Type, "utility", "theme", "integration", "game") {
+		problems = append(problems, "type must be utility, theme, integration, or game")
+	}
+	if p.Type == "game" && strings.TrimSpace(p.License) == "" {
+		problems = append(problems, "games require a verified license for code and bundled content")
 	}
 	if strings.TrimSpace(p.Summary) == "" {
 		problems = append(problems, "summary is required")

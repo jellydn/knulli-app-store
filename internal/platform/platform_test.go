@@ -35,7 +35,7 @@ func TestDetectReadsKnulliDeviceAndFramebuffer(t *testing.T) {
 
 func TestDetectUpstreamAppPrerequisites(t *testing.T) {
 	root := t.TempDir()
-	for _, dependency := range []string{"python3.12", "pygame", "portmaster", "sdl2-gfx", "libm", "retroarch"} {
+	for _, dependency := range []string{"python3.12", "pygame", "portmaster", "sdl2-gfx", "libm", "retroarch", "libretro-prboom"} {
 		if includes(Resolve(root).Dependencies, dependency) {
 			t.Fatalf("missing dependency reported present: %s", dependency)
 		}
@@ -50,7 +50,11 @@ func TestDetectUpstreamAppPrerequisites(t *testing.T) {
 	writePlatformFile(t, root, "usr/lib/libSDL2_gfx-1.0.so.0", "")
 	writePlatformFile(t, root, "usr/lib/libm.so.6", "")
 	writePlatformFile(t, root, "usr/bin/retroarch", "")
-	for _, dependency := range []string{"python3.12", "pygame", "portmaster", "sdl2-gfx", "libm", "retroarch"} {
+	if includes(Resolve(root).Dependencies, "libretro-prboom") {
+		t.Fatal("RetroArch alone satisfied the PrBoom core dependency")
+	}
+	writePlatformFile(t, root, "usr/lib/libretro/prboom_libretro.so", "")
+	for _, dependency := range []string{"python3.12", "pygame", "portmaster", "sdl2-gfx", "libm", "retroarch", "libretro-prboom"} {
 		if !includes(Resolve(root).Dependencies, dependency) {
 			t.Fatalf("installed prerequisite not detected: %s", dependency)
 		}

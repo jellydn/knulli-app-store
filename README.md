@@ -1,6 +1,6 @@
 # Knulli App Store
 
-A community package manager for [Knulli](https://knulli.org/) utilities, themes, and integrations. Install, manage, update, repair, and remove reviewed packages with a controller or the CLI.
+A community package manager for [Knulli](https://knulli.org/) utilities, themes, integrations, and reviewed free games. Install, manage, update, repair, and remove reviewed packages with a controller or the CLI.
 
 The Store verifies downloads and journals file changes for rollback. It never runs downloaded installers. Installed apps are **not sandboxed**.
 
@@ -84,9 +84,11 @@ On 2026-10-30 (Asia/Singapore), the [owner reconfirmed](https://ampcode.com/thre
 | RAOfflineProxy | 2.3.0-alpha1 | Offline casual RetroAchievements; requires Python 3.12 and pygame; [release review](docs/raofflineproxy-2.3.0-alpha1.md) |
 | retroshelf | 0.6.3 | Sync game sessions; requires an account and Wi-Fi; [release review](docs/retroshelf-0.6.3.md) |
 
+The catalog now also includes **Freedoom: Phase 1 + Phase 2 0.13.0**, one experimental package containing two free FPS campaigns. It downloads the original publisher's checksum-pinned ZIP and uses Knulli's firmware RetroArch/PrBoom core; no commercial Doom files or PortMaster install are needed. Phase 1 has a Store-created menu entry. After refreshing game lists, find Phase 2 as `freedoom2.wad` in PrBoom/Freedoom. Saves/settings stay after removal. **Neither game has physical-device test evidence.** See the [release, paths and exclusions review](docs/free-games-review.md).
+
 Firmware, architecture, ABI, and runtime dependencies still gate installation. Device identity and display scope are advisory. **UNTESTED** means no passed report matches the exact package version and device matrix. See the [evidence and its limits](docs/real-device-tests.md#2026-10-30-current-owner-confirmation). [Picker 0.2.2](https://github.com/jellydn/knulli-random-game-picker/releases/tag/v0.2.2) excludes Tools and Emulators application systems before gamelist parsing, from selection and during Play revalidation. Path-only candidates use boundary-aware application-root checks. Its launcher, settings schema, `state/` preservation and exact-path ES launch contract are unchanged. It still requires glibc ≥2.34, firmware SDL2/image/ttf/gfx, and the loopback EmulationStation API. Its requirements are separate from the Store's.
 
-PortMaster is an external provider: the Store does not install its catalogue. ROM-download sources are outside official catalogue policy. Use only ROMs you have the right to use and servers you trust.
+PortMaster remains an external provider: the Store does not import its catalog, use its release archives, or modify its installations. [ADR 0011](docs/adr/0011-reviewed-free-games.md) allows directly reviewed native free games and legally redistributable homebrew ROMs/game data from original publishers. Games require verified code and asset rights; commercial game files, unclear rights and ROM-download services remain excluded. The new `game` manifest type needs a compatible Store binary; do not copy a game-containing index into an older Store release. Use only ROMs you have the right to use and servers you trust.
 
 - Reviewed manifests pin HTTPS release URLs, exact sizes, and SHA-256 hashes. Device builds verify a signed bundled catalogue.
 - Archives are bounded to 512 MiB compressed and installed; unsafe paths, links, and non-regular entries are rejected.

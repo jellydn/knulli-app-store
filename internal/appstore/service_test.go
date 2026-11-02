@@ -35,7 +35,7 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 		t.Fatal(err)
 	}
 	service, err := Open(indexPath, installer.Manager{Root: t.TempDir()}.WithPlatform(platform.Info{
-		Firmware: "knulli", Version: "scarab", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "sdl2-gfx", "libc", "libresolv", "libpthread", "python3.12", "pygame", "portmaster", "libm", "retroarch"}, Device: "trimui-smart-pro", Resolution: "1280x720",
+		Firmware: "knulli", Version: "scarab", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "sdl2-gfx", "libc", "libresolv", "libpthread", "python3.12", "pygame", "portmaster", "libm", "retroarch", "libretro-prboom"}, Device: "trimui-smart-pro", Resolution: "1280x720",
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -44,8 +44,8 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 8 {
-		t.Fatalf("expected eight catalogue items, got %d", len(items))
+	if len(items) != 9 {
+		t.Fatalf("expected nine catalogue items, got %d", len(items))
 	}
 	experimental := 0
 	verified := 0
@@ -66,8 +66,8 @@ func TestServiceExposesOnlyReviewedPackagesAsActionable(t *testing.T) {
 			t.Fatalf("candidate became actionable: %#v", item)
 		}
 	}
-	if experimental != 8 || verified != 0 {
-		t.Fatalf("expected eight experimental and no universally verified packages, got %d and %d", experimental, verified)
+	if experimental != 9 || verified != 0 {
+		t.Fatalf("expected nine experimental and no universally verified packages, got %d and %d", experimental, verified)
 	}
 }
 
@@ -158,7 +158,7 @@ func TestLatestKnulliMetadataAllowsOnlyExperimentalDeviceMatrix(t *testing.T) {
 	detected.Arch = "aarch64"
 	detected.ABI = "linux-aarch64-glibc"
 	detected.GLIBCVersion = "2.40"
-	detected.Dependencies = []string{"sdl2", "sdl2-image", "sdl2-ttf", "sdl2-gfx", "libc", "libresolv", "libpthread", "python3.12", "pygame", "portmaster", "libm", "retroarch"}
+	detected.Dependencies = []string{"sdl2", "sdl2-image", "sdl2-ttf", "sdl2-gfx", "libc", "libresolv", "libpthread", "python3.12", "pygame", "portmaster", "libm", "retroarch", "libretro-prboom"}
 	if detected.Resolution != "" {
 		t.Fatalf("corrupt framebuffer virtual size became compatible: %#v", detected)
 	}
@@ -196,7 +196,7 @@ func TestPackagedAppsAreAvailableOnUntestedAndUnknownDevices(t *testing.T) {
 		{"unknown", "", ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			detected := platform.Info{Firmware: "knulli", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "sdl2-gfx", "libc", "libresolv", "libpthread", "python3.12", "pygame", "portmaster", "libm", "retroarch"}, Device: test.device, Resolution: test.resolution}
+			detected := platform.Info{Firmware: "knulli", Arch: "aarch64", ABI: "linux-aarch64-glibc", GLIBCVersion: "2.40", Dependencies: []string{"sdl2", "sdl2-image", "sdl2-ttf", "sdl2-gfx", "libc", "libresolv", "libpthread", "python3.12", "pygame", "portmaster", "libm", "retroarch", "libretro-prboom"}, Device: test.device, Resolution: test.resolution}
 			service, err := Open(indexPath, installer.Manager{Root: t.TempDir()}.WithPlatform(detected))
 			if err != nil {
 				t.Fatal(err)

@@ -103,6 +103,76 @@ func TestApplyReportsMeasuredProgressBeforeDownloadFinishes(t *testing.T) {
 	}
 }
 
+func TestFreedoomLifecycleKeepsSavesAndOtherInstallations(t *testing.T) {
+	pkg, err := manifest.Load("../../catalogue/packages/io.github.freedoom.freedoom.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	asset := zipBytesWithModes(t, map[string]zipFixture{
+		"freedoom-0.13.0/freedoom1.wad": {body: "phase one fixture, never executed", mode: 0644},
+		"freedoom-0.13.0/freedoom2.wad": {body: "phase two fixture, never executed", mode: 0644},
+		"freedoom-0.13.0/COPYING.txt":   {body: "license fixture", mode: 0644},
+	})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg.Release = testPackage(pkg.Release.URL, asset, pkg.Version).Release
+	root := t.TempDir()
+	writeRootFile(t, root, "userdata/roms/prboom/gamelist.xml", `<gameList><game><path>./other.wad</path><name>Other game</name></game></gameList>`)
+	writeRootFile(t, root, "userdata/roms/prboom/prboom.wad", "firmware data")
+	writeRootFile(t, root, "userdata/roms/ports/doomengines/iwads/FREEDOOM1.WAD", "PortMaster data")
+	detected := testPlatform()
+	detected.Dependencies = append(detected.Dependencies, "retroarch")
+	manager := Manager{Root: root, Client: rewriteClient(t, server), DeferGameListRefresh: true}.WithPlatform(detected)
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err == nil || !strings.Contains(err.Error(), "libretro-prboom") {
+		t.Fatalf("installed without the required core: %v", err)
+	}
+	assertMissing(t, root, "userdata/roms/prboom/Freedoom/freedoom1.wad")
+	detected.Dependencies = append(detected.Dependencies, "libretro-prboom")
+	manager = manager.WithPlatform(detected)
+	for _, operation := range []Op{OpInstall, OpRepair} {
+		if _, err := manager.Apply(context.Background(), operation, pkg); err != nil {
+			t.Fatal(err)
+		}
+		assertRootFile(t, root, "userdata/roms/prboom/Freedoom/freedoom1.wad", "phase one fixture, never executed")
+		assertRootFile(t, root, "userdata/roms/prboom/Freedoom/freedoom2.wad", "phase two fixture, never executed")
+		assertRootFile(t, root, "userdata/roms/prboom/Freedoom/COPYING.txt", "license fixture")
+		assertContains(t, root, "userdata/roms/prboom/gamelist.xml", "./Freedoom/freedoom1.wad")
+		for _, name := range []string{"freedoom1.wad", "freedoom2.wad"} {
+			info, err := os.Stat(filepath.Join(root, "userdata/roms/prboom/Freedoom", name))
+			if err != nil || info.Mode()&0111 != 0 {
+				t.Fatalf("ROM was made executable: %s, %v", name, err)
+			}
+		}
+		if operation == OpRepair {
+			assertRootFile(t, root, "userdata/roms/prboom/Freedoom/prboom.cfg", "user settings")
+			assertRootFile(t, root, "userdata/roms/prboom/Freedoom/prbmsav0.dsg", "fallback save")
+			assertRootFile(t, root, "userdata/saves/prboom/freedoom1/prbmsav0.dsg", "phase one save")
+			assertRootFile(t, root, "userdata/saves/prboom/freedoom2/prbmsav0.dsg", "phase two save")
+		}
+		writeRootFile(t, root, "userdata/roms/prboom/Freedoom/prboom.cfg", "user settings")
+		writeRootFile(t, root, "userdata/roms/prboom/Freedoom/prbmsav0.dsg", "fallback save")
+		writeRootFile(t, root, "userdata/saves/prboom/freedoom1/prbmsav0.dsg", "phase one save")
+		writeRootFile(t, root, "userdata/saves/prboom/freedoom2/prbmsav0.dsg", "phase two save")
+	}
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"freedoom1.wad", "freedoom2.wad", "COPYING.txt"} {
+		assertMissing(t, root, "userdata/roms/prboom/Freedoom/"+name)
+	}
+	assertRootFile(t, root, "userdata/roms/prboom/Freedoom/prboom.cfg", "user settings")
+	assertRootFile(t, root, "userdata/roms/prboom/Freedoom/prbmsav0.dsg", "fallback save")
+	assertRootFile(t, root, "userdata/saves/prboom/freedoom1/prbmsav0.dsg", "phase one save")
+	assertRootFile(t, root, "userdata/saves/prboom/freedoom2/prbmsav0.dsg", "phase two save")
+	assertRootFile(t, root, "userdata/roms/prboom/prboom.wad", "firmware data")
+	assertRootFile(t, root, "userdata/roms/ports/doomengines/iwads/FREEDOOM1.WAD", "PortMaster data")
+	assertContains(t, root, "userdata/roms/prboom/gamelist.xml", "./other.wad")
+	data, err := os.ReadFile(filepath.Join(root, "userdata/roms/prboom/gamelist.xml"))
+	if err != nil || strings.Contains(string(data), "./Freedoom/freedoom1.wad") {
+		t.Fatalf("owned game menu entry remained after removal: %s, %v", data, err)
+	}
+}
+
 func TestPocketCuratorLauncherFindsPrivatePayloadAfterInstallAndRepair(t *testing.T) {
 	// Only reproduce the launcher's directory selection, not its downloads,
 	// mounts, cleanup or application code.

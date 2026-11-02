@@ -1,0 +1,103 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "io.github.freedoom.freedoom",
+  "name": "Freedoom: Phase 1 + Phase 2",
+  "version": "0.13.0",
+  "type": "game",
+  "summary": "Two free FPS campaigns for Knulli's PrBoom core; no commercial Doom files needed.",
+  "repository": "https://github.com/freedoom/freedoom",
+  "license": "BSD-3-Clause",
+  "review": {
+    "status": "experimental",
+    "notes": [
+      "Reviewed 2026-11-02. Discovered as Doom/Freedoom1 and Doom/Freedoom2 in spruceUI/Ports-and-Free-Games at a981c7601bb4e47a28985b9ec6860311ae5e609e. No Nursery archive, spruce launcher, emulator, commercial IWAD or BIOS is used. This is one original-publisher bundle, not two duplicate installs of the same archive.",
+      "Publisher v0.13.0 resolves to commit cfb8644b1a8dc7d7d2177e6a892ccaa2922bdaae. Independently downloaded ZIP: 24143781 bytes, SHA-256 3f9b264f3e3ce503b4fb7f6bdcb1f419d93c7b546f4df3e874dd878db9688f59, matching the publisher's signed CHECKSUM text. The signature's trust chain was not independently authenticated. The pinned size and digest reject replacement bytes; no claim of GitHub-enforced release immutability is made.",
+      "ZIP inventory: one directory and ten regular files, 61716528 extracted bytes; no links, special entries, duplicate names or unsafe paths. Strip only freedoom-0.13.0/. Keep COPYING.txt, both credit files, NEWS.html, README.html, all three manuals and both unmodified IWADs. COPYING grants source and binary redistribution of the project's content under BSD-3-Clause; no commercial Doom data is required.",
+      "Knulli distribution ab3a6809286b3cff1648fb8c96a0200bc869beb6 declares the prboom system, .wad extension, libretro/prboom runtime and its installed /usr/lib/libretro/prboom_libretro.so. That core's pinned source recognizes freedoom1.wad and freedoom2.wad and passes IWAD content through -iwad. Host architecture/ABI are Knulli AArch64/glibc, not a claim that WAD data contains native AArch64 instructions. Installation requires detected RetroArch and PrBoom; no Store-generated shell wrapper or executable mode is needed.",
+      "Store writes are limited to /userdata/roms/prboom/Freedoom and /userdata/roms/prboom/gamelist.xml, plus normal Store state. Both WADs are one directory below the system root. The Store adds only Phase 1's exact menu path. Phase 2 is found by the normal system scanner; refresh game lists and browse PrBoom/Freedoom. Existing system settings, prboom.wad and PortMaster installations are never changed. PortMaster Doom Engines also includes Freedoom, but this package is separate original-publisher data for Knulli's own core, not its catalog or installer.",
+      "Knulli configgen directs savefiles and savestates to /userdata/saves/prboom. The reviewed core creates freedoom1 and freedoom2 subdirectories for in-game saves/configuration. If that location is unavailable it falls back to the WAD directory. Runtime-created files are not Store-owned and remain after Repair or removal; prboom.cfg is explicitly preserved. Store operations never write shared emulator saves/settings or execute the game. Close the game before Store operations.",
+      "The payload has no executable code, updater or network client. Knulli supplies controller mapping, engine configuration, audio and rendering. Install downloads the pinned archive from GitHub; ordinary single-player play requires no network. Fixture-root checks cover lifecycle and preservation, not device gameplay. No physical-device, audio, performance or controller result is claimed; status stays experimental and the tested badge stays UNTESTED."
+    ],
+    "evidence": [
+      {
+        "kind": "tagged-release",
+        "url": "https://github.com/freedoom/freedoom/releases/tag/v0.13.0",
+        "note": "Original publisher's ZIP contains both Phase 1 and Phase 2. Source tag resolves to cfb8644b1a8dc7d7d2177e6a892ccaa2922bdaae."
+      },
+      {
+        "kind": "publisher-checksum",
+        "url": "https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0-CHECKSUM",
+        "note": "Downloaded ZIP agrees with the SHA-256 in the publisher's PGP-signed checksum file; signing-key identity is not independently authenticated."
+      },
+      {
+        "kind": "license",
+        "url": "https://github.com/freedoom/freedoom/blob/cfb8644b1a8dc7d7d2177e6a892ccaa2922bdaae/COPYING.adoc",
+        "note": "BSD-3-Clause permission covers Freedoom content; original COPYING.txt and all credits remain in the installed ZIP payload."
+      },
+      {
+        "kind": "game-data-and-rights",
+        "url": "https://github.com/freedoom/freedoom/blob/cfb8644b1a8dc7d7d2177e6a892ccaa2922bdaae/README.adoc",
+        "note": "Free replacement IWADs; needs a compatible engine, not the commercial Doom or Doom II data."
+      },
+      {
+        "kind": "knulli-system-integration",
+        "url": "https://github.com/knulli-cfw/distribution/blob/ab3a6809286b3cff1648fb8c96a0200bc869beb6/package/batocera/emulationstation/batocera-es-system/es_systems.yml",
+        "note": "prboom accepts wad/iwad/pwad and selects the libretro PrBoom core; this package uses that system, not spruce's Roms/DOOM layout."
+      },
+      {
+        "kind": "knulli-runtime",
+        "url": "https://github.com/knulli-cfw/distribution/blob/ab3a6809286b3cff1648fb8c96a0200bc869beb6/package/batocera/emulators/retroarch/libretro/libretro-prboom/libretro-prboom.mk",
+        "note": "Builds upstream 6ec854969fd9dec33bb2cab350f05675d1158969 for AArch64 and installs /usr/lib/libretro/prboom_libretro.so. Detect the core separately from RetroArch."
+      },
+      {
+        "kind": "save-and-controller-paths",
+        "url": "https://github.com/knulli-cfw/distribution/blob/ab3a6809286b3cff1648fb8c96a0200bc869beb6/package/batocera/core/batocera-configgen/configgen/configgen/generators/libretro/libretroConfig.py",
+        "note": "savefile_directory and savestate_directory use SAVES/system.name. PrBoom defaults to a RetroPad controller."
+      },
+      {
+        "kind": "core-launch-and-save-review",
+        "url": "https://github.com/libretro/libretro-prboom/blob/6ec854969fd9dec33bb2cab350f05675d1158969/libretro/libretro.c",
+        "note": "IWAD launch, per-WAD save directories with content-directory fallback, and internal PrBoom data fallback if prboom.wad is absent. No copied firmware data file is required in the private package directory."
+      },
+      {
+        "kind": "iwad-recognition",
+        "url": "https://github.com/libretro/libretro-prboom/blob/6ec854969fd9dec33bb2cab350f05675d1158969/src/d_main.c",
+        "note": "Recognizes both Freedoom filenames and IWAD map directories. Missing external prboom.wad uses internal default data."
+      },
+      {
+        "kind": "portmaster-ownership-review",
+        "url": "https://github.com/PortsMaster/PortMaster-New/blob/15b1a91425f915ec604cc0bf062bd5c657e53c83/ports/doomengines/port.json",
+        "note": "Doom Engines owns its separate Ports launcher and doomengines directory. No Store path overlaps them; no PortMaster archive or installer is used."
+      }
+    ]
+  },
+  "release": {
+    "url": "https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip",
+    "sha256": "3f9b264f3e3ce503b4fb7f6bdcb1f419d93c7b546f4df3e874dd878db9688f59",
+    "size": 24143781,
+    "installed_size": 61716528,
+    "format": "zip",
+    "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "dependencies": ["retroarch", "libretro-prboom"]
+  },
+  "install": {
+    "destination": "/userdata/roms/prboom/Freedoom",
+    "strip_components": 1,
+    "launcher": "freedoom1.wad",
+    "warning": "Untested on physical Knulli devices. Requires firmware RetroArch and PrBoom. Includes both campaigns: Phase 1 has a Store menu entry; find freedoom2.wad in PrBoom/Freedoom after refreshing game lists. No commercial files needed. Close the game before Store operations. Saves/settings remain after removal.",
+    "preserve": ["prboom.cfg"],
+    "menu": {
+      "gamelist": "/userdata/roms/prboom/gamelist.xml",
+      "path": "./Freedoom/freedoom1.wad",
+      "name": "Freedoom: Phase 1",
+      "description": "Four free FPS episodes. This package also installs freedoom2.wad (Phase 2) in the same folder. Requires Knulli's PrBoom core; no commercial Doom files. Untested on physical devices."
+    },
+    "network": false,
+    "allowed_write_paths": ["/userdata/roms/prboom/Freedoom", "/userdata/roms/prboom/gamelist.xml"]
+  }
+}

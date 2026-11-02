@@ -47,6 +47,11 @@ func TestUpstreamManagedRequiresExperimentalStatusAndLicenseDisclosure(t *testin
 	if err := pkg.Validate(); err != nil {
 		t.Fatal(err)
 	}
+	pkg.Type = "game"
+	if err := pkg.Validate(); err == nil || !strings.Contains(err.Error(), "games require a verified license") {
+		t.Fatalf("game accepted the utility license exception: %v", err)
+	}
+	pkg.Type = "utility"
 	pkg.Install.UpstreamManaged = false
 	if err := pkg.Validate(); err == nil {
 		t.Fatal("normal package accepted an unknown license")
@@ -55,6 +60,26 @@ func TestUpstreamManagedRequiresExperimentalStatusAndLicenseDisclosure(t *testin
 	pkg.Review.Status = "installable"
 	if err := pkg.Validate(); err == nil {
 		t.Fatal("upstream-managed package claimed completed technical review")
+	}
+}
+
+func TestGameRequiresLicenseEvenAsCandidate(t *testing.T) {
+	for _, candidate := range []bool{false, true} {
+		pkg := validPackage()
+		pkg.Type = "game"
+		if candidate {
+			pkg.Review.Status = "candidate"
+			pkg.Compatibility, pkg.Install = nil, nil
+		}
+		if err := pkg.Validate(); err != nil {
+			t.Fatalf("licensed game rejected (candidate=%v): %v", candidate, err)
+		}
+		for _, license := range []string{"", " \t\n"} {
+			pkg.License = license
+			if err := pkg.Validate(); err == nil || !strings.Contains(err.Error(), "games require a verified license") {
+				t.Fatalf("unlicensed game accepted (candidate=%v): %v", candidate, err)
+			}
+		}
 	}
 }
 
@@ -253,7 +278,7 @@ func TestValidateRejectsMalformedCoreFields(t *testing.T) {
 		{name: "id is not reverse-domain", mutate: func(p *Package) { p.ID = "demo" }, problem: "stable reverse-domain identifier"},
 		{name: "id has an upper-case segment", mutate: func(p *Package) { p.ID = "org.Example.demo" }, problem: "stable reverse-domain identifier"},
 		{name: "blank name", mutate: func(p *Package) { p.Name = "   " }, problem: "name is required"},
-		{name: "unknown type", mutate: func(p *Package) { p.Type = "plugin" }, problem: "type must be utility, theme, or integration"},
+		{name: "unknown type", mutate: func(p *Package) { p.Type = "plugin" }, problem: "type must be utility, theme, integration, or game"},
 		{name: "blank summary", mutate: func(p *Package) { p.Summary = "\t\n" }, problem: "summary is required"},
 		{name: "unknown review status", mutate: func(p *Package) { p.Review.Status = "blessed" }, problem: "review.status must be candidate"},
 		{name: "repository is not https", mutate: func(p *Package) { p.Repository = "http://github.com/example/demo" }, problem: "repository must use HTTPS"},

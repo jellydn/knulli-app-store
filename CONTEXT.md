@@ -4,7 +4,9 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 ## Catalogue
 
-**Package** — A utility, theme, or integration offered for installation on a reviewed Knulli device. Identified by a reverse-domain id.
+**Package** — A utility, theme, integration, or reviewed free game offered for installation on a Knulli host. Identified by a reverse-domain id. Games include legally redistributable homebrew ROMs and game data, not commercial files or ROM-download services.
+
+**Game launch file** — A native launcher, homebrew ROM, or game-data file that Knulli's EmulationStation opens with its configured runtime. Recorded as `install.launcher`; ROMs and data are not made executable. Compatibility architecture and ABI describe the Knulli host, not the ROM's CPU.
 
 **Manifest** — The reviewed JSON contract for one package. A README statement is not evidence; the manifest plus its evidence URLs are.
 

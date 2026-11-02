@@ -17,14 +17,15 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first.Packages) != 8 || len(second.Packages) != 8 {
-		t.Fatalf("expected eight packages, got %d and %d", len(first.Packages), len(second.Packages))
+	if len(first.Packages) != 9 || len(second.Packages) != 9 {
+		t.Fatalf("expected nine packages, got %d and %d", len(first.Packages), len(second.Packages))
 	}
 	// RetSend now uses upstream releases, but its recorded approval remains
 	// the maintainer's decision rather than community or device verification.
 	// An empty provenance requires no approval record.
 	provenance := map[string]string{
 		"app.romm.grout":                         "community",
+		"io.github.freedoom.freedoom":            "",
 		"io.github.jellydn.random-game-picker":   "maintainer",
 		"io.github.jellydn.retsend":              "maintainer",
 		"io.github.misantronic.raofflineproxy":   "community",
@@ -64,8 +65,8 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 			}
 		}
 	}
-	if experimental != 8 || verified != 0 {
-		t.Fatalf("expected eight experimental packages and no current device-verified release, got %d and %d", experimental, verified)
+	if experimental != 9 || verified != 0 {
+		t.Fatalf("expected nine experimental packages and no current device-verified release, got %d and %d", experimental, verified)
 	}
 }
 
