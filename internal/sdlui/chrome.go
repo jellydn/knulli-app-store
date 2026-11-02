@@ -13,7 +13,6 @@ import (
 
 func (c *consoleCanvas) header(frame *image.RGBA, model *storeui.Model, controls *storeinput.Session) {
 	c.text(frame, "KNULLI APP STORE", 16, 24, c.width-48, palette.text, true)
-	fill(frame, image.Rect(24, 84, c.width-24, 85), palette.panel)
 	context := "Library"
 	switch model.Focus {
 	case storeui.Actions:
@@ -29,17 +28,39 @@ func (c *consoleCanvas) header(frame *image.RGBA, model *storeui.Model, controls
 		context = "Working / please wait"
 	}
 	if model.Focus != storeui.Browse || model.Busy || (controls != nil && controls.Mode != storeinput.Normal) {
+		fill(frame, image.Rect(24, 84, c.width-24, 85), palette.panel)
 		c.text(frame, context, 56, 24, c.width-48, palette.accent, false)
 		return
 	}
+	fill(frame, image.Rect(24, 109, c.width-24, 110), palette.panel)
+	cell := (c.width - 152) / len(storeui.CategoryOrder)
+	c.text(frame, "←→ Type", 48, 24, 100, palette.muted, false)
+	for index, category := range storeui.CategoryOrder {
+		left := 128 + index*cell
+		shade := palette.muted
+		if category == model.Tabs.Category() {
+			shade = palette.accent
+			fill(frame, image.Rect(left+4, 73, left+cell-4, 76), shade)
+		}
+		c.label(frame, category.Label(), 48, left, cell, shade, false)
+	}
+	statusKeys := "L1/R1"
+	if controls != nil && controls.Source == storeinput.KeyboardSourceName {
+		statusKeys = "PgUp/Dn"
+	}
+	c.text(frame, statusKeys, 80, 24, 100, palette.muted, false)
 	for index, tab := range storeui.TabOrder {
-		left := 24 + index*120
+		left := 128 + index*cell
 		shade := palette.muted
 		if tab == model.Tab() {
 			shade = palette.accent
-			fill(frame, image.Rect(left, 80, left+108, 83), shade)
+			fill(frame, image.Rect(left+4, 105, left+cell-4, 108), shade)
 		}
-		c.label(frame, tab.Label(), 53, left, 108, shade, false)
+		label := tab.Label()
+		if tab == storeui.TabAll {
+			label = "ALL STATES"
+		}
+		c.label(frame, label, 80, left, cell, shade, false)
 	}
 }
 
@@ -58,7 +79,7 @@ func (c *consoleCanvas) status(frame *image.RGBA, model *storeui.Model, controls
 		return
 	}
 	if model.Focus == storeui.Browse && len(model.Items) > 0 {
-		c.text(frame, fmt.Sprintf("%d / %d packages", model.Selected+1, len(model.Items)), 397, 24, c.width/2-24, palette.muted, false)
+		c.text(frame, fmt.Sprintf("%s / %d of %d", model.Tab().Label(), model.Selected+1, len(model.Items)), 397, 24, c.width/2-24, palette.muted, false)
 	}
 	if controls != nil && !model.Busy && model.Focus != storeui.Confirm && model.Focus != storeui.ForceConfirm {
 		c.label(frame, controls.QuitChord()+": Quit", 397, c.width/2, c.width/2-24, palette.muted, false)
@@ -80,7 +101,7 @@ func (c *consoleCanvas) footer(frame *image.RGBA, model *storeui.Model, controls
 		}
 	}
 	if model.Focus == storeui.Browse && (controls == nil || controls.Mode == storeinput.Normal) {
-		visible = append(visible, storeinput.Hint{Action: storeinput.PageUp, With: storeinput.PageDown, Verb: "Filters"})
+		visible = append(visible, storeinput.Hint{Action: storeinput.PageUp, With: storeinput.PageDown, Verb: "Status"})
 	}
 	if len(visible) == 0 {
 		return

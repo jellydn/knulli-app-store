@@ -130,7 +130,7 @@ and operation completions. A timeout or missing expected screen fails the flow.
 
 `summary.tsv` lists each flow's screens and result. Beside frames, `walk.tsv`
 records file, state, key, item, focus, action, busy, mode, tab, session message,
-message, toast, and error. The toast column carries operation completion.
+message, toast, error, and category. The toast column carries operation completion.
 
 ## Fixture and limits
 
@@ -140,8 +140,9 @@ runtime-library, and framebuffer evidence below a throwaway root. Its
 relative paths, and unmarked non-empty directories. Installs, logs, recovery
 backups and diagnostics remain below the fixture root.
 
-The Library starts on All; up/down browse rows, and left/right also work.
-L1/R1 (Page Up/Down) step All, Ready and Installed. Filters remember selection.
+The Library starts on All types / All states. Up/down browse rows; left/right
+select All types, Games or Apps. L1/R1 (Page Up/Down) select All, Ready or
+Installed within that category. Each combination remembers its selection.
 Operation notices clear after three seconds; failures remain until answered.
 Normal runs poll at 30 Hz but redraw only after input, window/controller events,
 held navigation repeats, operation events or notice expiry. Screenshot and

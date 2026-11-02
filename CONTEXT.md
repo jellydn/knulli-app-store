@@ -26,9 +26,11 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Tab** — One view of the catalogue: the whole list, the packages with something to act on, or the packages installed on this device. A tab filters on a package's typed state, never on its rendered state label.
 
-**Library browsing** — Moving through a stable package list with up/down (left/right also work). An outline marks the selected row; its title, version, summary, test evidence and installation state appear in a persistent detail pane. Neighbouring packages stay visible. Y opens More for details and secondary actions. A opens confirmation for the first permitted action; an issue opens its health check first.
+**Library browsing** — Moving through a stable package list with up/down. An outline marks the selected row; its category, title, version, summary, technical status, test evidence and installation state appear in a persistent detail pane. Neighbouring packages stay visible. Y opens More for details and secondary actions. A opens confirmation for the first permitted action; an issue opens its health check first.
 
-**Filtering** — Switching All, Ready and Installed with L1/R1 (Page Up/Page Down on a keyboard). Each view remembers the selected package. An empty filter still permits switching to another view.
+**Category** — All types, Games or Apps, selected with left/right while browsing. Games match the manifest's `game` type; Apps match utilities, themes and integrations, including tools with “game” in their name. A category does not grant installation permission or change technical status.
+
+**Filtering** — Switching All, Ready and Installed status tabs with L1/R1 (Page Up/Page Down on a keyboard), within the selected category. Each category/status combination remembers its selected package. Empty views still permit changing either selector. Selectors are locked during operations and package review screens.
 
 ## Install lifecycle
 

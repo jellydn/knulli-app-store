@@ -146,8 +146,8 @@ func TestWalkDetailKeepsMessagesInsideOneTSVRecord(t *testing.T) {
 	if strings.ContainsAny(detail, "\r\n") {
 		t.Fatalf("detail contains a line break: %q", detail)
 	}
-	if fields := strings.Split(detail, "\t"); len(fields) != 10 {
-		t.Fatalf("detail has %d fields, want 10: %q", len(fields), detail)
+	if fields := strings.Split(detail, "\t"); len(fields) != 11 {
+		t.Fatalf("detail has %d fields, want 11: %q", len(fields), detail)
 	}
 }
 
@@ -245,7 +245,7 @@ func TestNilWalkRunnerIsInert(t *testing.T) {
 
 func TestWalkRecordCarriesTheEvidenceColumns(t *testing.T) {
 	shot := WalkShot{File: "001-enter-catalogue.png", State: "catalogue", Key: KeyConfirm}
-	record := WalkRecord(shot, "io.github.unitreign.playtime\tbrowse\tinstall\tfalse\tnormal\tall\t\t\t\t")
+	record := WalkRecord(shot, "io.github.unitreign.playtime\tbrowse\tinstall\tfalse\tnormal\tall\t\t\t\t\tall types")
 	fields := strings.Split(strings.TrimSuffix(record, "\n"), "\t")
 	if len(fields) != len(strings.Split(strings.TrimSuffix(WalkHeader, "\n"), "\t")) {
 		t.Fatalf("record has %d columns for the %d column header: %q", len(fields), len(strings.Split(WalkHeader, "\t")), record)

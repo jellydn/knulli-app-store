@@ -56,7 +56,7 @@ func footerHints(model *storeui.Model, controls *storeinput.Session) []storeinpu
 		}
 		if model.Focus == storeui.Browse {
 			return []storeinput.Hint{
-				{Action: storeinput.Left, With: storeinput.Right, Verb: "Browse"},
+				{Action: storeinput.Up, With: storeinput.Down, Verb: "Browse"},
 				confirm,
 				{Action: storeinput.Diagnostics, Verb: "More"},
 				quit,

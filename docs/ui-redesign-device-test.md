@@ -48,12 +48,15 @@ Record the build ID, ZIP checksum, exact KNULLI version, board, display size,
 controller name/GUID and Ports layout mode. Take a screenshot of each result.
 
 - Open the test twice; confirm the second launch works and quit returns to ES.
-- Browse with D-pad up/down and left/right. Row heights must stay fixed; focus
+- Browse with D-pad up/down. Use left/right for All types, Games and Apps.
+  Row heights must stay fixed; focus
   must be visible. The selected package's details must match its row.
 - Check long names and summaries, separate test/install status, and the last
   row. No text may overlap the detail pane, status area or footer.
-- Use L1/R1 to visit All, Ready and the empty Installed filter, then return.
-  Check selection memory. An empty filter must still show a way out.
+- Use L1/R1 to visit All, Ready and Installed within each category, then return.
+  Games must contain Freedoom; Apps must include tools such as Random Game
+  Picker, not Freedoom. Check selection memory for each combination. Both
+  selectors must work from an empty view, including Games / Installed.
 - Press A once to review an install, then B. No operation must start. Selection
   must return to the same package. Start must **not** confirm.
 - Press Y for More, then B; repeat and press Y to export diagnostics. Check the

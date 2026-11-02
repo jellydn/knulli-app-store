@@ -63,7 +63,51 @@ type Tabs struct {
 	// at is the package each tab was last left on. A view selector that forgot
 	// would send a reader back to the top of a list they had already crossed,
 	// which is the one thing coming back to a tab should not do.
-	at map[Tab]string
+	at       map[view]string
+	category Category
+}
+
+type view struct {
+	tab      Tab
+	category Category
+}
+
+type Category int
+
+const (
+	CategoryAll Category = iota
+	CategoryGames
+	CategoryApps
+)
+
+var CategoryOrder = []Category{CategoryAll, CategoryGames, CategoryApps}
+
+func (category Category) Label() string {
+	switch category {
+	case CategoryGames:
+		return "GAMES"
+	case CategoryApps:
+		return "APPS"
+	default:
+		return "ALL TYPES"
+	}
+}
+
+func (category Category) Match(item appstore.Item) bool {
+	switch category {
+	case CategoryGames:
+		return item.Package.Type == "game"
+	case CategoryApps:
+		return item.Package.Type == "utility" || item.Package.Type == "theme" || item.Package.Type == "integration"
+	default:
+		return true
+	}
+}
+
+func (tabs Tabs) Category() Category { return tabs.category }
+
+func (tabs *Tabs) CycleCategory(delta int) {
+	tabs.category = Category(wrap(int(tabs.category)+delta, len(CategoryOrder)))
 }
 
 // Active is the tab whose packages the list shows.
@@ -79,15 +123,15 @@ func (tabs *Tabs) Remember(id string) {
 		return
 	}
 	if tabs.at == nil {
-		tabs.at = make(map[Tab]string)
+		tabs.at = make(map[view]string)
 	}
-	tabs.at[tabs.active] = id
+	tabs.at[view{tabs.active, tabs.category}] = id
 }
 
 // Remembered is the package the active tab was last left on, or empty when the
 // user has not been in it before.
 func (tabs Tabs) Remembered() string {
-	return tabs.at[tabs.active]
+	return tabs.at[view{tabs.active, tabs.category}]
 }
 
 // Cycle steps to the previous or next tab. The bar is a ring: right from the

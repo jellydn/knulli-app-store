@@ -54,11 +54,12 @@ For an older build, custom location, or **text file busy** failure, verify the Z
 
 ## Controls
 
-The **Library** uses a stable package list beside a persistent detail pane. A mint outline marks focus; **All / Ready / Installed** filters stay visible. Test evidence and installation state are separate, and long titles and summaries wrap in the detail pane. Controller glyphs and keyboard hints name the active controls. This Zitch-led presentation revision starts with v2026.10.27.1. No setup wizard or custom mapping editor is needed.
+The **Library** uses a stable package list beside a persistent detail pane. A mint outline marks focus. **All types / Games / Apps** categories and **All states / Ready / Installed** filters stay visible in separate rows. Apps include utilities, themes and integrations; a game picker is still an app. Each category/status view remembers its selection, including after package operations. Technical review status, test evidence and installation state are separate. Long titles and summaries wrap in the detail pane. No setup wizard or custom mapping editor is needed.
 
 | Action | Knulli controller | Desktop keyboard |
 | --- | --- | --- |
-| Browse apps | D-pad up/down; left/right also work | Arrow keys |
+| Browse packages | D-pad up/down | Up/Down |
+| Category: All types, Games, Apps | D-pad left/right | Left/Right |
 | Filter All, Ready, Installed | L1/R1 | Page Up/Page Down |
 | Review or confirm | A | Enter |
 | Cancel or go back | B | Escape |

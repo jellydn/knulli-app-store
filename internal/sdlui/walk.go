@@ -101,6 +101,7 @@ func WalkDetail(model *storeui.Model, controls *storeinput.Session) string {
 	action := ""
 	busy := "false"
 	tab := "none"
+	category := "none"
 	message := ""
 	notice := ""
 	problem := ""
@@ -112,6 +113,7 @@ func WalkDetail(model *storeui.Model, controls *storeinput.Session) string {
 		focus = walkFocusName(model.Focus)
 		busy = fmt.Sprint(model.Busy)
 		tab = strings.ToLower(model.Tab().Label())
+		category = strings.ToLower(model.Tabs.Category().Label())
 		message = model.Message
 		// A completion is a notice rather than a status, so the record has to
 		// read the notice bar to say what the screen actually showed.
@@ -127,7 +129,7 @@ func WalkDetail(model *storeui.Model, controls *storeinput.Session) string {
 	if controls != nil {
 		mode = string(controls.Mode)
 	}
-	fields := []string{item, focus, action, busy, mode, tab, sessionMessage, message, notice, problem}
+	fields := []string{item, focus, action, busy, mode, tab, sessionMessage, message, notice, problem, category}
 	for index := range fields {
 		fields[index] = walkField(fields[index])
 	}
@@ -167,7 +169,7 @@ func WalkFile(step int, key Key, state string) string {
 
 // WalkHeader names the columns of the walkthrough record. A script reads this
 // record instead of the pixels: it says which screen each key reached.
-const WalkHeader = "file\tstate\tkey\titem\tfocus\taction\tbusy\tmode\ttab\tsession_message\tmessage\ttoast\terror\n"
+const WalkHeader = "file\tstate\tkey\titem\tfocus\taction\tbusy\tmode\ttab\tsession_message\tmessage\ttoast\terror\tcategory\n"
 
 // WalkShot is one piece of walkthrough evidence.
 type WalkShot struct {

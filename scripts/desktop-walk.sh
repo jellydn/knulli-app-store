@@ -156,14 +156,20 @@ walk catalogue-walk keyboard \
   "right,left,enter,esc,y,enter,esc,esc,tab,y" \
   "catalogue,actions,confirm"
 
-# The tab bar: the whole list leads, R1 walks onto Ready and then the
-# installed tab, and L1 walks back. Nothing is installed in a fresh fixture,
+# Status is independent of category: R1 walks through Ready and Installed,
+# and L1 walks back. Nothing is installed in a fresh fixture,
 # so the installed tab is empty and the same key steps out of it. The record's
 # tab column names the view each key reached.
 walk catalogue-tabs keyboard \
   "pgdown,pgdown,pgup" \
   "catalogue" \
   "installed"
+
+# Both axes must stay usable from empty category/status combinations.
+walk catalogue-categories keyboard \
+  "right,pgdown,pgdown,right,pgup,pgup,left,enter,esc" \
+  "catalogue,confirm" \
+  "io.github.freedoom.freedoom"
 
 # The former PocketCurator candidate now opens an upstream-managed install
 # confirmation. Never confirm a download in this offline flow.

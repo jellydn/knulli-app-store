@@ -80,6 +80,66 @@ func TestTabsMatchPackagesByVerdictState(t *testing.T) {
 	}
 }
 
+func TestCategoriesUsePackageTypeNotNameOrInstallState(t *testing.T) {
+	for _, kind := range []string{"game", "utility", "theme", "integration"} {
+		for _, state := range []appstore.State{appstore.StateAvailable, appstore.StateInstalled, appstore.StateIssue, appstore.StateCandidate, appstore.StateIncompatible} {
+			item := tabItem("org.example.game-picker", state)
+			item.Package.Type = kind
+			if CategoryGames.Match(item) != (kind == "game") || CategoryApps.Match(item) != (kind != "game") {
+				t.Fatalf("wrong category for type %s in state %s", kind, state)
+			}
+		}
+	}
+
+	game := tabItem("org.example.freedoom", appstore.StateAvailable)
+	game.Package.Type = "game"
+	picker := tabItem("org.example.random-game-picker", appstore.StateInstalled)
+	picker.Package.Type = "utility"
+	theme := tabItem("org.example.theme", appstore.StateAvailable)
+	theme.Package.Type = "theme"
+	model := loadedModel(t, game, picker, theme)
+	model.Horizontal(1)
+	if got := visibleIDs(model); len(got) != 1 || got[0] != game.Package.ID {
+		t.Fatalf("Games shows %v", got)
+	}
+	model.Horizontal(1)
+	if got := visibleIDs(model); len(got) != 2 || got[0] != picker.Package.ID || got[1] != theme.Package.ID {
+		t.Fatalf("Apps shows %v", got)
+	}
+	model.Move(1)
+	model.Horizontal(-1)
+	model.Horizontal(1)
+	if got := model.Items[model.Selected].Package.ID; got != theme.Package.ID {
+		t.Fatalf("Apps forgot selection: %s", got)
+	}
+	game.Verdict.State = appstore.StateInstalled
+	model.setCatalogue([]appstore.Item{game, picker, theme})
+	model.Horizontal(-1)
+	if got := visibleIDs(model); len(got) != 1 || got[0] != game.Package.ID {
+		t.Fatalf("installed game left Games: %v", got)
+	}
+	model.CycleTab(1)
+	if len(model.Items) != 0 || model.Tabs.Category() != CategoryGames {
+		t.Fatal("Games + Ready must exclude installed games without changing category")
+	}
+	model.CycleTab(1)
+	if got := visibleIDs(model); len(got) != 1 || got[0] != game.Package.ID {
+		t.Fatalf("Games + Installed shows %v", got)
+	}
+	model.Horizontal(1)
+	if got := visibleIDs(model); len(got) != 1 || got[0] != picker.Package.ID {
+		t.Fatalf("Apps + Installed shows %v", got)
+	}
+	model.Horizontal(1)
+	if model.Tabs.Category() != CategoryAll || len(model.Items) != 2 {
+		t.Fatal("category did not wrap to All types within Installed")
+	}
+	model.Horizontal(-1)
+	if model.Tabs.Category() != CategoryApps || len(model.Items) != 1 {
+		t.Fatal("category did not wrap backwards")
+	}
+}
+
 // Filter cycling narrows the catalogue without reloading its index.
 func TestCycleStepsTabsOnTheCatalogue(t *testing.T) {
 	model := loadedModel(t,
@@ -254,7 +314,8 @@ func TestBusyModelDoesNotSwitchTabs(t *testing.T) {
 	model := loadedModel(t, tabItem("org.example.alpha", appstore.StateAvailable))
 	model.Busy = true
 	model.CycleTab(1)
-	if model.Tab() != TabAll {
-		t.Fatalf("a tab switched during an operation: %q", model.Tab().Label())
+	model.Horizontal(1)
+	if model.Tab() != TabAll || model.Tabs.Category() != CategoryAll {
+		t.Fatal("a selector changed during an operation")
 	}
 }

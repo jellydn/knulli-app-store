@@ -179,16 +179,15 @@ func TestHandleFiltersAndBrowsesCards(t *testing.T) {
 		t.Fatalf("down selected row %d", model.Selected)
 	}
 	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyRight})
-	if model.Selected != 0 || model.Tab() != storeui.TabAll {
-		t.Fatal("right must wrap to the first card, not change its filter")
+	if model.Tabs.Category() != storeui.CategoryGames || len(model.Items) != 0 || model.Tab() != storeui.TabAll {
+		t.Fatal("right must change category, not status")
 	}
 	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyLeft})
-	if model.Selected != 1 {
-		t.Fatal("left must wrap to the last card")
+	if model.Tabs.Category() != storeui.CategoryAll || model.Selected != 1 {
+		t.Fatal("left must restore the category's selected package")
 	}
 
-	// R1 steps onto the Ready tab, where both packages still have a row, so
-	// the selection follows the package the user was reading.
+	// Shoulders change status without changing category.
 	Handle(context.Background(), model, controls, logger, Event{Kind: EventKey, Key: KeyPageDown})
 	if model.Tab() != storeui.TabReady {
 		t.Fatalf("right landed on %q", model.Tab().Label())

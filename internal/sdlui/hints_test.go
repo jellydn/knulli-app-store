@@ -17,7 +17,7 @@ func TestAutomaticFooterAtEveryFocus(t *testing.T) {
 		controls := storeinput.NewSession(t.TempDir(), "trimui-smart-pro")
 		controls.Connect(storeinput.Identity{Name: "Pad"}, true)
 		model := catalogueModel()
-		if got := footerText(model, controls); got != "Browse (DPAD LEFT/DPAD RIGHT)  Confirm (A)  More (Y)  Quit (SELECT + Y)" {
+		if got := footerText(model, controls); got != "Browse (DPAD UP/DPAD DOWN)  Confirm (A)  More (Y)  Quit (SELECT + Y)" {
 			t.Fatal(got)
 		}
 		for _, focus := range []storeui.Focus{storeui.Confirm, storeui.ForceConfirm} {
@@ -28,7 +28,7 @@ func TestAutomaticFooterAtEveryFocus(t *testing.T) {
 		}
 		model.Focus = storeui.Browse
 		model.Items = make([]appstore.Item, listRows+1)
-		if got := footerText(model, controls); got != "Browse (DPAD LEFT/DPAD RIGHT)  Confirm (A)  More (Y)  Quit (SELECT + Y)" || len(got) > footerCharacterLimit {
+		if got := footerText(model, controls); got != "Browse (DPAD UP/DPAD DOWN)  Confirm (A)  More (Y)  Quit (SELECT + Y)" || len(got) > footerCharacterLimit {
 			t.Fatal(got)
 		}
 		model.Busy = true
@@ -49,7 +49,7 @@ func TestDesktopFooterFitsAndNamesKeys(t *testing.T) {
 	controls := storeinput.NewDesktopSession(t.TempDir(), "")
 	model := &storeui.Model{Items: make([]appstore.Item, listRows+1)}
 	got := footerText(model, controls)
-	if got != "Browse (LEFT/RIGHT)  Confirm (ENTER)  More (Y)  Quit (TAB + Y)" || len(got) > footerCharacterLimit || strings.Contains(got, "\n") {
+	if got != "Browse (UP/DOWN)  Confirm (ENTER)  More (Y)  Quit (TAB + Y)" || len(got) > footerCharacterLimit || strings.Contains(got, "\n") {
 		t.Fatal(got)
 	}
 }

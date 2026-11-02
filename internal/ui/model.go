@@ -124,9 +124,21 @@ func (m *Model) Window(rows int) (int, int) {
 	return start, start + rows
 }
 
-// Horizontal browses app cards or moves between a package's action buttons.
+// Horizontal changes package category while browsing. Up/down keep their
+// list role, so categories never compete with row navigation for a control.
 func (m *Model) Horizontal(delta int) {
-	m.Move(delta)
+	if m.Focus != Browse {
+		m.Move(delta)
+		return
+	}
+	if m.Busy {
+		return
+	}
+	carried := m.selectedID()
+	m.Tabs.Remember(carried)
+	m.Tabs.CycleCategory(delta)
+	m.filter(m.Tabs.Remembered(), carried)
+	m.Error = ""
 }
 
 // CycleTab keeps filtering separate from browsing individual app cards.
@@ -157,7 +169,7 @@ func (m *Model) filter(preferred ...string) {
 	}
 	visible := make([]appstore.Item, 0, len(m.catalogue))
 	for _, item := range m.catalogue {
-		if m.Tabs.Active().Match(item) {
+		if m.Tabs.Active().Match(item) && m.Tabs.Category().Match(item) {
 			visible = append(visible, item)
 		}
 	}
