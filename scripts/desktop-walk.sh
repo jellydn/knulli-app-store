@@ -54,8 +54,8 @@ DEVICE=${WALK_DEVICE:-trimui-smart-pro}
 ARCH=${WALK_ARCH:-aarch64}
 RESOLUTION=${WALK_RESOLUTION:-1280x720}
 TIMEOUT=${WALK_TIMEOUT:-60s}
-# Where the walkthrough looks for an installed package when it tampers with one.
-PACKAGE_PATH=${WALK_PACKAGE_PATH:-/userdata/roms/prboom/Freedoom}
+# Tamper with a managed ROM, not Apotris's preserved custom-audio directory.
+PACKAGE_PATH=${WALK_PACKAGE_PATH:-/userdata/roms/gba/Apotris/Apotris.gba}
 
 if [ ! -x "$BIN" ]; then
   echo "missing $BIN: run 'make build-ui' first" >&2
@@ -169,12 +169,12 @@ walk catalogue-tabs keyboard \
 walk catalogue-categories keyboard \
   "right,pgdown,pgdown,right,pgup,pgup,left,enter,esc" \
   "catalogue,confirm" \
-  "io.github.freedoom.freedoom"
+  "com.akouzoukos.apotris"
 
 # The former PocketCurator candidate now opens an upstream-managed install
 # confirmation. Never confirm a download in this offline flow.
 walk upstream-managed-confirmation keyboard \
-  "down,down,down,down,enter" \
+  "right,right,down,down,down,enter" \
   "catalogue,confirm" \
   "io.github.tomtombombadil.pocketcurator"
 
@@ -202,7 +202,11 @@ walk blocked-export-diagnostics auto \
 tamper() {
   name=$1
   destination="$ROOT/$name$PACKAGE_PATH"
-  file=$(find "$destination" -type f | head -1)
+  if [ -f "$destination" ]; then
+    file=$destination
+  else
+    file=$(find "$destination" -type f | head -1)
+  fi
   if [ -z "$file" ]; then
     echo "FAIL: nothing installed at $destination to tamper with" >&2
     exit 1

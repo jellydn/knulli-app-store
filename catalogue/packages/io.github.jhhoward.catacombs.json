@@ -1,0 +1,58 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "io.github.jhhoward.catacombs",
+  "name": "Catacombs of the Damned",
+  "version": "1.0",
+  "type": "game",
+  "summary": "A free Arduboy dungeon crawler with randomly generated floors and monsters.",
+  "repository": "https://github.com/jhhoward/Arduboy3D",
+  "license": "MIT",
+  "review": {
+    "status": "experimental",
+    "notes": [
+      "Reviewed 2026-11-03 under ADR 0012. Original publisher release 1.0 resolves to c888154575bb61a8d5126e84cca24bb29d609724. The .arduboy asset is a ZIP container, not a new archive format. No publisher checksum is available; Store-pinned size and SHA-256 trust the publisher's GitHub HTTPS download at review time, not independent publisher authentication. No Nursery or PortMaster asset is used.",
+      "ZIP inventory: five regular files, 84934 bytes: Arduboy3D.hex, banner.png, info.json, screen1.png and screen2.png. No links, special entries, duplicates or unsafe paths. All files are copied unchanged; Arduboy3D.hex is mapped to Catacombs.hex for a distinct save basename. Main HEX SHA-256: 3f024b048c4137c6cc86bf36ff5f2146bd7c352f85c20e6d815c40b0e2980eeb. The game's code and original sprite data are covered by the publisher repository's MIT licence. Its description says inspired by Catacomb 3D; it does not require commercial data or BIOS files.",
+      "KNULLI distribution ab3a6809286b3cff1648fb8c96a0200bc869beb6 declares arduboy with HEX support and the Arduous core. Its recipe pins libretro/arduous 2273b485628790a2ce954941341b5b071c3fb30e and installs /usr/lib/libretro/arduous_libretro.so. The core reads Intel HEX, exposes EEPROM through RETRO_MEMORY_SAVE_RAM and maps the RetroPad controls. Require both firmware RetroArch and Arduous; do not install an emulator. AArch64/glibc describe the KNULLI host, not the Arduboy ROM CPU.",
+      "Store writes only the private /userdata/roms/arduboy/Catacombs directory, its exact entry in /userdata/roms/arduboy/gamelist.xml, and normal Store state. KNULLI configgen uses /userdata/saves/arduboy for RetroArch saves/states. Runtime-created files, local fallback saves and shared saves/settings are unowned and survive Repair/removal. No shared firmware or PortMaster path is claimed. Close the game before operations. No runtime downloads, updater or network client are in this ROM. Fixture checks are not physical-device gameplay or completed save/load evidence.",
+      "Original publisher licence, reproduced with this package in the signed catalogue and installed-state manifest: MIT License\n\nCopyright (c) 2019 James Howard\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
+    ],
+    "evidence": [
+      { "kind": "publisher-download", "url": "https://github.com/jhhoward/Arduboy3D/releases/tag/1.0", "note": "Original publisher's playable ZIP-container asset, version 1.0." },
+      { "kind": "store-checksum", "url": "https://github.com/jhhoward/Arduboy3D/releases/download/1.0/Catacombs.arduboy", "note": "Independently downloaded 33307 bytes; SHA-256 0b64ec835bc8e94f1e11f0c0c10e4925b46925ed6864dd64cf76ccda3bf33af7. No publisher checksum; owner-approved ADR 0012 exception." },
+      { "kind": "license", "url": "https://github.com/jhhoward/Arduboy3D/blob/c888154575bb61a8d5126e84cca24bb29d609724/LICENSE", "note": "MIT licence covers the published project, including original game assets. Notice reproduced in review notes because the release container lacks licence text." },
+      { "kind": "game-data-and-rights", "url": "https://github.com/jhhoward/Arduboy3D/tree/c888154575bb61a8d5126e84cca24bb29d609724/Source/Arduboy3D", "note": "Game and embedded image/sound data in the publisher project, not a commercial Catacomb data pack." },
+      { "kind": "knulli-system-integration", "url": "https://github.com/knulli-cfw/distribution/blob/ab3a6809286b3cff1648fb8c96a0200bc869beb6/package/batocera/emulationstation/batocera-es-system/es_systems.yml", "note": "arduboy declares hex and libretro/arduous." },
+      { "kind": "knulli-runtime", "url": "https://github.com/knulli-cfw/distribution/blob/ab3a6809286b3cff1648fb8c96a0200bc869beb6/package/batocera/emulators/retroarch/libretro/libretro-arduous/libretro-arduous.mk", "note": "Pinned core and firmware install path." },
+      { "kind": "core-launch-and-save-review", "url": "https://github.com/libretro/arduous/blob/2273b485628790a2ce954941341b5b071c3fb30e/src/libretro/libretro.cpp", "note": "HEX input, RetroPad bindings and EEPROM save RAM; RetroArch owns persistence." },
+      { "kind": "save-and-controller-paths", "url": "https://github.com/knulli-cfw/distribution/blob/ab3a6809286b3cff1648fb8c96a0200bc869beb6/package/batocera/core/batocera-configgen/configgen/generators/libretro/libretroConfig.py", "note": "Per-system shared saves and states stay outside Store ownership." }
+    ]
+  },
+  "release": {
+    "url": "https://github.com/jhhoward/Arduboy3D/releases/download/1.0/Catacombs.arduboy",
+    "sha256": "0b64ec835bc8e94f1e11f0c0c10e4925b46925ed6864dd64cf76ccda3bf33af7",
+    "size": 33307,
+    "installed_size": 84934,
+    "format": "zip",
+    "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "dependencies": ["retroarch", "libretro-arduous"]
+  },
+  "install": {
+    "destination": "/userdata/roms/arduboy/Catacombs",
+    "file_mappings": { "Arduboy3D.hex": "Catacombs.hex" },
+    "launcher": "Catacombs.hex",
+    "warning": "No publisher checksum: Store-pinned bytes trust the publisher HTTPS download at review time. Requires firmware RetroArch and Arduous. No device gameplay/save-load test supplied. Close the game before Store operations; saves/settings remain after removal. Licence and attribution accompany the signed catalogue and installed-state record.",
+    "menu": {
+      "gamelist": "/userdata/roms/arduboy/gamelist.xml",
+      "path": "./Catacombs/Catacombs.hex",
+      "name": "Catacombs of the Damned",
+      "description": "James Howard's free Arduboy dungeon crawler. Requires firmware Arduous. Experimental and untested on this device."
+    },
+    "network": false,
+    "allowed_write_paths": ["/userdata/roms/arduboy/Catacombs", "/userdata/roms/arduboy/gamelist.xml"]
+  }
+}

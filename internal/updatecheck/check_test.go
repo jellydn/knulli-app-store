@@ -42,6 +42,18 @@ func TestReleaseAssessmentStates(t *testing.T) {
 	}
 }
 
+func TestOriginalPublisherGameNeedsManualUpdateReview(t *testing.T) {
+	pkg, err := manifest.Load("../../catalogue/packages/com.akouzoukos.apotris.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := (Checker{}).Check(context.Background(), []manifest.Package{pkg}, time.Unix(0, 0))
+	got := report.Packages[0]
+	if got.Status != "manual-source-review" || got.DiscoveredVersion != "" || !strings.Contains(got.Error, "original publisher") {
+		t.Fatalf("publisher download was hidden or treated as a GitHub metadata failure: %#v", got)
+	}
+}
+
 func TestMalformedMetadataIsReported(t *testing.T) {
 	server := metadataServer(t, func(writer http.ResponseWriter, _ *http.Request) { fmt.Fprint(writer, `{`) })
 	defer server.Close()

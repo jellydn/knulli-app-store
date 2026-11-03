@@ -14,7 +14,7 @@ Add the `game` package type for native free games, homebrew ROMs, and freely red
 
 Keep PortMaster external-only under ADR 0005. Do not mirror its catalog, use its release archives, or replace its installer. Avoid duplicate Store entries and check PortMaster for conflicting ownership. A directly reviewed original-publisher game must not take ownership of PortMaster-managed paths or modify an existing PortMaster installation.
 
-Use original publishers' version-pinned ZIP or tar.gz release assets with exact size, SHA-256, and the existing checksum evidence rules. Do not import Nursery assets, repack them as Store releases, or assume that matching hardware makes a spruce port compatible. No new archive format or remote installer is introduced.
+Use original publishers' version-pinned ZIP or tar.gz release assets with exact size, SHA-256, and the existing checksum evidence rules, as amended by [ADR 0012](0012-reviewed-game-checksums.md) for explicitly reviewed experimental games without a publisher checksum. Do not import Nursery assets, repack them as Store releases, or assume that matching hardware makes a spruce port compatible. No new archive format or remote installer is introduced.
 
 Reuse the existing manifest, archive, transaction, preservation, and menu contracts. For an emulated game, `install.launcher` names the ROM or game-data file opened by EmulationStation; it is not made executable. Compatibility architecture and ABI describe the supported KNULLI host, not the ROM's instruction set. Require the actual emulator/core as a detected dependency and review the firmware's extension, system, launch, controller, and save configuration. Keep native executables in `install.executables`. No emulator or commercial BIOS is supplied by the Store.
 

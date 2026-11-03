@@ -1,0 +1,62 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "com.akouzoukos.apotris",
+  "name": "Apotris",
+  "version": "4.2.0",
+  "type": "game",
+  "summary": "A free block-stacking game for KNULLI's firmware Game Boy Advance emulator.",
+  "repository": "https://gitea.com/akouzoukos/apotris",
+  "license": "AGPL-3.0-only",
+  "review": {
+    "status": "experimental",
+    "notes": [
+      "Reviewed 2026-11-03 under owner-approved ADR 0012. The publisher's download page links the version-pinned Apotris-v4.2.0GBA.zip on its Azure blob host. This is the original GBA release, not a PortMaster asset or native Linux build. Independently downloaded 17394174 bytes; SHA-256 92b0f8cfb4844ffb69b68418b78a43e4548db81d808d31184815177bcb79222a. No publisher checksum exists. This pins bytes reviewed over publisher HTTPS, not independent publisher authentication or a claim of server-enforced immutability.",
+      "Publisher source moved from GitHub to https://gitea.com/akouzoukos/apotris. Tag v4.2.0 resolves to commit c0b7d1a5ca7475a429666632807d1e471b8d144b. The project-wide AGPL-3.0 licence applies to the game source/assets; separately licensed libraries retain the supplied licence directory. All original music credits embedded in the game are retained. Corresponding source, build instructions and full licence are linked in the evidence and accompany the installed-state manifest. No source snapshot is used as a playable release and no game bytes are mirrored by this Store.",
+      "ZIP inventory: 82 regular files, 26419546 bytes. No links, special entries, duplicate names or unsafe paths. Apotris.gba is 4194304 bytes; SHA-256 4691845d1b45608f162479b5e7d1eed56088dc7720d2591d74b274d5c103f83b. Keep README.txt, audio, patches, tools and third-party licence files unchanged. Bundled build scripts and tools are data only during installation: the Store never runs them or patches/rebuilds the GBA ROM. No executable mode is requested. The alternative base ROM under tools/ is mapped to support/Apotris-base.gba.data so it is not scanned as another game.",
+      "KNULLI distribution ab3a6809286b3cff1648fb8c96a0200bc869beb6 declares gba, the .gba extension and firmware libretro/mgba. Its recipe pins mGBA 3571b112dc821d3612e5073afb8b6be41a35dc55 and installs /usr/lib/libretro/mgba_libretro.so. Require that core and RetroArch; no emulator or BIOS is supplied. AArch64/glibc describe the KNULLI host, not the GBA ROM CPU. KNULLI supplies RetroPad mapping and audio/rendering.",
+      "Store writes only /userdata/roms/gba/Apotris, its exact entry in /userdata/roms/gba/gamelist.xml, and normal Store state. KNULLI configgen directs saves/states to /userdata/saves/gba; mGBA exposes save RAM to RetroArch. Shared Apotris saves and runtime-created local files remain unowned. The audio directory is preserved for custom tracks; Repair restores the pinned Apotris.gba but never runs its custom-audio rebuild scripts. An existing GBA ROM with the same basename may share RetroArch saves; back it up before testing. Native PortMaster Apotris files/saves are not claimed. Close the game before Store operations.",
+      "The GBA build uses local cartridge/link interfaces, not the PC/PortMaster online multiplayer client. No runtime downloader or updater is supplied. Installing needs publisher HTTPS; gameplay does not need a network. Fixture lifecycle and host smoke checks do not prove physical controls, performance, in-game save/load or link play. Remains experimental with no exact-device tested badge.",
+      "Licence notice: Apotris by akouzoukos, GNU Affero General Public License version 3. Retain the game's credits and supplied third-party notices. Full licence: https://gitea.com/akouzoukos/apotris/raw/commit/c0b7d1a5ca7475a429666632807d1e471b8d144b/LICENSE.txt . Corresponding source for this unchanged publisher release: https://gitea.com/akouzoukos/apotris/archive/v4.2.0.tar.gz . The Store links the publisher's binary download directly; it does not redistribute or rebuild it."
+    ],
+    "evidence": [
+      { "kind": "publisher-download", "url": "https://akouzoukos.com/apotris/downloads", "note": "Original publisher v4.2.0 page links the exact versioned GBA ZIP on apotrisstorage.blob.core.windows.net." },
+      { "kind": "store-checksum", "url": "https://apotrisstorage.blob.core.windows.net/binaries/Apotris-v4.2.0GBA.zip", "note": "Independently downloaded 17394174 bytes; SHA-256 92b0f8cfb4844ffb69b68418b78a43e4548db81d808d31184815177bcb79222a. No publisher checksum; ADR 0012 exception, not an independently authenticated checksum." },
+      { "kind": "license", "url": "https://gitea.com/akouzoukos/apotris/src/commit/c0b7d1a5ca7475a429666632807d1e471b8d144b/LICENSE.txt", "note": "Publisher's tagged source licence; all supplied third-party licence files and in-game music credits remain." },
+      { "kind": "corresponding-source", "url": "https://gitea.com/akouzoukos/apotris/archive/v4.2.0.tar.gz", "note": "Original corresponding source and build instructions at v4.2.0, commit c0b7d1a5ca7475a429666632807d1e471b8d144b. Available from the original publisher, not a Store mirror or substitute playable asset." },
+      { "kind": "game-data-and-rights", "url": "https://gitea.com/akouzoukos/apotris/src/commit/c0b7d1a5ca7475a429666632807d1e471b8d144b/assets", "note": "Game graphics/audio belong to the licensed source project; retain source credits in source/screenCredits.cpp and the unmodified game's credits screen." },
+      { "kind": "knulli-system-integration", "url": "https://github.com/knulli-cfw/distribution/blob/ab3a6809286b3cff1648fb8c96a0200bc869beb6/package/batocera/emulationstation/batocera-es-system/es_systems.yml", "note": "GBA system extension and mGBA emulator entry; no spruce paths or native ABI assumptions." },
+      { "kind": "knulli-runtime", "url": "https://github.com/knulli-cfw/distribution/blob/ab3a6809286b3cff1648fb8c96a0200bc869beb6/package/batocera/emulators/retroarch/libretro/libretro-mgba/libretro-mgba.mk", "note": "Pinned firmware mGBA core and its detected path." },
+      { "kind": "core-launch-and-save-review", "url": "https://github.com/mgba-emu/mgba/blob/3571b112dc821d3612e5073afb8b6be41a35dc55/src/platform/libretro/libretro.c", "note": "GBA loading, RetroPad controls and save RAM through RetroArch." },
+      { "kind": "save-and-controller-paths", "url": "https://github.com/knulli-cfw/distribution/blob/ab3a6809286b3cff1648fb8c96a0200bc869beb6/package/batocera/core/batocera-configgen/configgen/generators/libretro/libretroConfig.py", "note": "Per-system shared save/state directories are not Store write paths." }
+    ]
+  },
+  "release": {
+    "url": "https://apotrisstorage.blob.core.windows.net/binaries/Apotris-v4.2.0GBA.zip",
+    "sha256": "92b0f8cfb4844ffb69b68418b78a43e4548db81d808d31184815177bcb79222a",
+    "size": 17394174,
+    "installed_size": 26419546,
+    "format": "zip",
+    "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "dependencies": ["retroarch", "libretro-mgba"]
+  },
+  "install": {
+    "destination": "/userdata/roms/gba/Apotris",
+    "file_mappings": { "tools/Apotris-base.gba": "support/Apotris-base.gba.data" },
+    "launcher": "Apotris.gba",
+    "warning": "No publisher checksum: Store-pinned bytes trust the publisher HTTPS download at review time. Requires firmware RetroArch and mGBA. No device gameplay/save-load test supplied. Close before Store operations. Saves and custom audio remain; Repair restores the pinned ROM without rebuilding audio. Back up saves if another GBA ROM is also named Apotris.",
+    "preserve": ["audio"],
+    "menu": {
+      "gamelist": "/userdata/roms/gba/gamelist.xml",
+      "path": "./Apotris/Apotris.gba",
+      "name": "Apotris",
+      "description": "Free GBA block-stacking game by akouzoukos. Uses firmware mGBA, not the separate PortMaster version. Experimental and untested on this device."
+    },
+    "network": false,
+    "allowed_write_paths": ["/userdata/roms/gba/Apotris", "/userdata/roms/gba/gamelist.xml"]
+  }
+}

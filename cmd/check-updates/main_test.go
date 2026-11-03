@@ -50,7 +50,11 @@ func TestWriteReportsWritesBothReportsFromTheLiveCatalogue(t *testing.T) {
 		t.Fatal("the report covers no packages")
 	}
 	for _, item := range report.Packages {
-		if item.Status != "no-stable-release" {
+		want := "no-stable-release"
+		if item.ID == "com.akouzoukos.apotris" {
+			want = "manual-source-review"
+		}
+		if item.Status != want {
 			t.Fatalf("%s reported %q with no upstream release; the report invented a finding", item.ID, item.Status)
 		}
 		if item.ID == "" || item.Repository == "" {

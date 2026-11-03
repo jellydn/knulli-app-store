@@ -250,8 +250,29 @@ func (p Package) validateRelease() []string {
 	if p.Release == nil {
 		problems = append(problems, "installable packages require release metadata")
 	} else {
-		if !immutableReleaseURL(p.Release.URL, p.Repository) || !p.Release.Immutable {
-			problems = append(problems, "release URL must be a version-pinned GitHub release for the declared repository and be declared immutable")
+		storeChecksum := false
+		for _, evidence := range p.Review.Evidence {
+			if evidence.Kind != "store-checksum" {
+				continue
+			}
+			if p.Type != "game" || !p.Experimental() || p.Install == nil || evidence.URL != p.Release.URL || strings.TrimSpace(evidence.Note) == "" || !strings.Contains(strings.ToLower(p.Install.Warning), "no publisher checksum") {
+				problems = append(problems, "store-checksum evidence requires an experimental game, the exact release URL, review notes and a no publisher checksum warning")
+			} else {
+				storeChecksum = true
+			}
+		}
+		pinned := immutableReleaseURL(p.Release.URL, p.Repository)
+		if !pinned && storeChecksum {
+			u, err := url.Parse(p.Release.URL)
+			// External publisher paths have a human-reviewed provenance record.
+			// Do not let that exception bypass GitHub's repository ownership check.
+			if err == nil && u.Scheme == "https" && u.Host != "" && !strings.EqualFold(u.Hostname(), "github.com") && u.User == nil && u.RawQuery == "" && u.Fragment == "" && p.Version != "" {
+				version := regexp.MustCompile(`(?:^|[^0-9])` + regexp.QuoteMeta(p.Version) + `(?:[^0-9]|$)`)
+				pinned = version.MatchString(u.Path)
+			}
+		}
+		if !pinned || !p.Release.Immutable {
+			problems = append(problems, "release URL must be a version-pinned GitHub release for the declared repository or a reviewed experimental game publisher download, and be declared immutable")
 		}
 		if !sha256Pattern.MatchString(p.Release.SHA256) {
 			problems = append(problems, "release SHA-256 must be 64 lowercase hexadecimal characters")

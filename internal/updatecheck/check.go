@@ -156,6 +156,12 @@ func (checker Checker) releases(ctx context.Context, repository string) ([]relea
 
 func assess(pkg manifest.Package, releases []release, err error) PackageReport {
 	result := PackageReport{ID: pkg.ID, Repository: pkg.Repository, CurrentVersion: pkg.Version, Status: "no-stable-release"}
+	repository, _ := url.Parse(pkg.Repository)
+	if pkg.Type == "game" && pkg.Experimental() && repository != nil && repository.Host != "github.com" {
+		result.Status = "manual-source-review"
+		result.Error = "Check the original publisher's versioned downloads manually; no GitHub release API or automatic checksum proposal applies."
+		return result
+	}
 	if err != nil {
 		result.Status = "metadata-error"
 		result.Error = err.Error()

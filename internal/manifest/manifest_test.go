@@ -601,6 +601,61 @@ func TestImmutableReleaseURLRequiresAPinnedGithubDownloadForTheSameRepository(t 
 	}
 }
 
+func TestStoreChecksumExceptionRequiresReviewedExperimentalGame(t *testing.T) {
+	const download = "https://publisher.example/binaries/Demo-v1.0.0GBA.zip"
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Package)
+		valid  bool
+	}{
+		{name: "reviewed publisher archive", valid: true},
+		{name: "no review evidence", mutate: func(p *Package) { p.Review.Evidence = nil }},
+		{name: "evidence for different bytes", mutate: func(p *Package) { p.Review.Evidence[0].URL += ".other" }},
+		{name: "no disclosure", mutate: func(p *Package) { p.Install.Warning = "Experimental game." }},
+		{name: "not a game", mutate: func(p *Package) { p.Type = "utility" }},
+		{name: "promotion", mutate: func(p *Package) { p.Review.Status = "installable" }},
+		{name: "version absent", mutate: func(p *Package) { p.Version = "2.0.0" }},
+		{name: "numeric version suffix", mutate: func(p *Package) {
+			p.Version = "1.0.0"
+			p.Release.URL = "https://publisher.example/Demo-v1.0.01.zip"
+			p.Review.Evidence[0].URL = p.Release.URL
+		}},
+		{name: "query", mutate: func(p *Package) { p.Release.URL += "?expires=123"; p.Review.Evidence[0].URL = p.Release.URL }},
+		{name: "fragment", mutate: func(p *Package) { p.Release.URL += "#v1.0.0"; p.Review.Evidence[0].URL = p.Release.URL }},
+		{name: "credentials", mutate: func(p *Package) {
+			p.Release.URL = "https://user@publisher.example/Demo-v1.0.0.zip"
+			p.Review.Evidence[0].URL = p.Release.URL
+		}},
+		{name: "http", mutate: func(p *Package) {
+			p.Release.URL = "http://publisher.example/Demo-v1.0.0.zip"
+			p.Review.Evidence[0].URL = p.Release.URL
+		}},
+		{name: "another GitHub repository", mutate: func(p *Package) {
+			p.Release.URL = "https://github.com/other/demo/releases/download/v1.0.0/demo.zip"
+			p.Review.Evidence[0].URL = p.Release.URL
+		}},
+		{name: "same GitHub repository", mutate: func(p *Package) {
+			p.Release.URL = p.Repository + "/releases/download/v1.0.0/demo.zip"
+			p.Review.Evidence[0].URL = p.Release.URL
+		}, valid: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pkg := validPackage()
+			pkg.Type = "game"
+			pkg.Review.Status = "experimental"
+			pkg.Release.URL = download
+			pkg.Review.Evidence = []Evidence{{Kind: "store-checksum", URL: download, Note: "Reviewed original publisher download; Store pins the downloaded bytes."}}
+			pkg.Install.Warning = "No publisher checksum. Trusts the publisher HTTPS download at review time."
+			if tc.mutate != nil {
+				tc.mutate(&pkg)
+			}
+			if err := pkg.Validate(); (err == nil) != tc.valid {
+				t.Fatalf("valid=%v, want %v: %v", err == nil, tc.valid, err)
+			}
+		})
+	}
+}
+
 // The catalogue digest is computed over Canonical, so the encoding has to be
 // stable and compact: two builds of the same manifest must hash the same, and a
 // decoded manifest must re-encode to the same bytes.

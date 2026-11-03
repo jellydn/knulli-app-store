@@ -17,22 +17,25 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first.Packages) != 9 || len(second.Packages) != 9 {
-		t.Fatalf("expected nine packages, got %d and %d", len(first.Packages), len(second.Packages))
+	if len(first.Packages) != 12 || len(second.Packages) != 12 {
+		t.Fatalf("expected twelve packages, got %d and %d", len(first.Packages), len(second.Packages))
 	}
 	// RetSend now uses upstream releases, but its recorded approval remains
 	// the maintainer's decision rather than community or device verification.
 	// An empty provenance requires no approval record.
 	provenance := map[string]string{
-		"app.romm.grout":                         "community",
-		"io.github.freedoom.freedoom":            "",
-		"io.github.jellydn.random-game-picker":   "maintainer",
-		"io.github.jellydn.retsend":              "maintainer",
-		"io.github.misantronic.raofflineproxy":   "community",
-		"io.github.squirbie.handheld-link-cores": "maintainer",
-		"io.github.tomtombombadil.pocketcurator": "community",
-		"io.github.unitreign.playtime":           "community",
-		"org.retroshelf.knulli":                  "",
+		"app.romm.grout":                             "community",
+		"com.akouzoukos.apotris":                     "",
+		"io.github.freedoom.freedoom":                "",
+		"io.github.garage-collective.dark-and-under": "",
+		"io.github.jhhoward.catacombs":               "",
+		"io.github.jellydn.random-game-picker":       "maintainer",
+		"io.github.jellydn.retsend":                  "maintainer",
+		"io.github.misantronic.raofflineproxy":       "community",
+		"io.github.squirbie.handheld-link-cores":     "maintainer",
+		"io.github.tomtombombadil.pocketcurator":     "community",
+		"io.github.unitreign.playtime":               "community",
+		"org.retroshelf.knulli":                      "",
 	}
 	experimental := 0
 	verified := 0
@@ -65,8 +68,8 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 			}
 		}
 	}
-	if experimental != 9 || verified != 0 {
-		t.Fatalf("expected nine experimental packages and no current device-verified release, got %d and %d", experimental, verified)
+	if experimental != 12 || verified != 0 {
+		t.Fatalf("expected twelve experimental packages and no current device-verified release, got %d and %d", experimental, verified)
 	}
 }
 

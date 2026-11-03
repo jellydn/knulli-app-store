@@ -83,6 +83,8 @@ mkdir -p "$ROOT/usr/bin" \
 : >"$ROOT/usr/bin/python3.12"
 : >"$ROOT/usr/bin/retroarch"
 : >"$ROOT/usr/lib/libretro/prboom_libretro.so"
+: >"$ROOT/usr/lib/libretro/mgba_libretro.so"
+: >"$ROOT/usr/lib/libretro/arduous_libretro.so"
 : >"$ROOT/usr/lib/python3.12/site-packages/pygame/__init__.py"
 : >"$ROOT/userdata/system/.local/share/PortMaster/control.txt"
 

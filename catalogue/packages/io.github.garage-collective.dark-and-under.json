@@ -1,0 +1,59 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "io.github.garage-collective.dark-and-under",
+  "name": "Dark & Under",
+  "version": "2.0.2",
+  "type": "game",
+  "summary": "Explore an Arduboy dungeon, fight monsters and recover the dragon's treasure.",
+  "repository": "https://github.com/Garage-Collective/Dark-And-Under",
+  "license": "BSD-3-Clause",
+  "review": {
+    "status": "experimental",
+    "notes": [
+      "Reviewed 2026-11-03 under ADR 0012. Publisher tag v2.0.2 resolves to 07be2009b8c455d99e6b39ac3643b90c49e55886. Use that version's original .arduboy ZIP container; v2.0.3 offers only a raw HEX, not a supported archive. No publisher checksum exists; Store-pinned bytes trust the publisher's GitHub HTTPS download at review time. No Nursery, PortMaster or third-party emulator payload is used.",
+      "ZIP inventory: fifteen regular files, 186692 bytes: two HEX builds, info.json, banner.png and eleven screenshots. No links, special entries, duplicate names or unsafe paths. The main Dark-And-Under.hex SHA-256 is 46df766280e4d027c149f54fc138779955ec10a0aa79fafa82ef32c17c9c6a9b. Retain all bytes, attribution and screenshots. Map the alternate Devkit HEX to support/Dark-And-Under-Devkit.hex.txt so KNULLI does not scan the wrong hardware build as a second game.",
+      "Garage Collective publishes the whole project under BSD-3-Clause, with code by Simon Holmes and art by Cyril Guichard. No commercial game data or BIOS is required. The release lacks the licence file, so the publisher's notice is reproduced below in the signed catalogue and installed-state manifest.",
+      "KNULLI distribution ab3a6809286b3cff1648fb8c96a0200bc869beb6 declares the arduboy system, HEX input and firmware Arduous 2273b485628790a2ce954941341b5b071c3fb30e. Require RetroArch and /usr/lib/libretro/arduous_libretro.so. Core RetroPad input, EEPROM save RAM and serialization are reviewed source behavior, not physical controls or completed in-game save/load evidence. Host AArch64/glibc does not describe the ROM CPU.",
+      "Store writes only /userdata/roms/arduboy/DarkAndUnder, its exact entry in /userdata/roms/arduboy/gamelist.xml, and normal Store state. KNULLI configgen directs savefiles/states to /userdata/saves/arduboy. No shared save, emulator setting, firmware or PortMaster file is Store-owned. Runtime-created local fallback files are unowned and survive Repair/removal. Close the game before operations. No runtime network client, downloader or updater is present. This is an experimental package without exact-device evidence.",
+      "Original publisher notice: BSD 3-Clause License\n\nCopyright (c) 2017,\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:\n\n* Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.\n* Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.\n* Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
+    ],
+    "evidence": [
+      { "kind": "publisher-download", "url": "https://github.com/Garage-Collective/Dark-And-Under/releases/tag/v2.0.2", "note": "Original publisher version with supported ZIP-container asset; intentionally not the raw-HEX-only v2.0.3." },
+      { "kind": "store-checksum", "url": "https://github.com/Garage-Collective/Dark-And-Under/releases/download/v2.0.2/Dark-And-Under.arduboy", "note": "Independently downloaded 96719 bytes; SHA-256 3f755edb3a5557026aaf6b15b44f4feabddc45645befb2950373f89d34b939cf. No publisher checksum; owner-approved ADR 0012 exception." },
+      { "kind": "license", "url": "https://github.com/Garage-Collective/Dark-And-Under/blob/07be2009b8c455d99e6b39ac3643b90c49e55886/LICENSE", "note": "Whole-project BSD-3-Clause grant; copyright holder is blank in the publisher's text and is not invented here. Original contributor credits retained." },
+      { "kind": "game-data-and-rights", "url": "https://github.com/Garage-Collective/Dark-And-Under/tree/07be2009b8c455d99e6b39ac3643b90c49e55886/Dark-And-Under", "note": "Original game, art and sound in the licensed publisher project, not proprietary game data." },
+      { "kind": "knulli-system-integration", "url": "https://github.com/knulli-cfw/distribution/blob/ab3a6809286b3cff1648fb8c96a0200bc869beb6/package/batocera/emulationstation/batocera-es-system/es_systems.yml", "note": "arduboy supports HEX launch with libretro/arduous." },
+      { "kind": "knulli-runtime", "url": "https://github.com/knulli-cfw/distribution/blob/ab3a6809286b3cff1648fb8c96a0200bc869beb6/package/batocera/emulators/retroarch/libretro/libretro-arduous/libretro-arduous.mk", "note": "Detected firmware core; no private emulator installation." },
+      { "kind": "core-launch-and-save-review", "url": "https://github.com/libretro/arduous/blob/2273b485628790a2ce954941341b5b071c3fb30e/src/libretro/libretro.cpp", "note": "Intel HEX loading, RetroPad mapping and EEPROM/serialization interfaces." },
+      { "kind": "save-and-controller-paths", "url": "https://github.com/knulli-cfw/distribution/blob/ab3a6809286b3cff1648fb8c96a0200bc869beb6/package/batocera/core/batocera-configgen/configgen/generators/libretro/libretroConfig.py", "note": "Shared per-system saves and states stay outside Store ownership." }
+    ]
+  },
+  "release": {
+    "url": "https://github.com/Garage-Collective/Dark-And-Under/releases/download/v2.0.2/Dark-And-Under.arduboy",
+    "sha256": "3f755edb3a5557026aaf6b15b44f4feabddc45645befb2950373f89d34b939cf",
+    "size": 96719,
+    "installed_size": 186692,
+    "format": "zip",
+    "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "dependencies": ["retroarch", "libretro-arduous"]
+  },
+  "install": {
+    "destination": "/userdata/roms/arduboy/DarkAndUnder",
+    "file_mappings": { "Dark-And-Under-Devkit.hex": "support/Dark-And-Under-Devkit.hex.txt" },
+    "launcher": "Dark-And-Under.hex",
+    "warning": "No publisher checksum: Store-pinned bytes trust publisher HTTPS at review time. Uses supported 2.0.2 ZIP, not raw-HEX-only 2.0.3. Requires firmware RetroArch and Arduous. No device gameplay/save-load test supplied. Close before Store operations; saves/settings remain. Licence/credits accompany the catalogue and installed-state record.",
+    "menu": {
+      "gamelist": "/userdata/roms/arduboy/gamelist.xml",
+      "path": "./DarkAndUnder/Dark-And-Under.hex",
+      "name": "Dark & Under",
+      "description": "Garage Collective's free Arduboy dungeon adventure. Code by Simon Holmes; art by Cyril Guichard. Requires firmware Arduous. Experimental and untested on this device."
+    },
+    "network": false,
+    "allowed_write_paths": ["/userdata/roms/arduboy/DarkAndUnder", "/userdata/roms/arduboy/gamelist.xml"]
+  }
+}

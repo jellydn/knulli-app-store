@@ -85,7 +85,16 @@ On 2026-10-30 (Asia/Singapore), the [owner reconfirmed](https://ampcode.com/thre
 | RAOfflineProxy | 2.3.0-alpha1 | Offline casual RetroAchievements; requires Python 3.12 and pygame; [release review](docs/raofflineproxy-2.3.0-alpha1.md) |
 | retroshelf | 0.6.3 | Sync game sessions; requires an account and Wi-Fi; [release review](docs/retroshelf-0.6.3.md) |
 
-The catalog now also includes **Freedoom: Phase 1 + Phase 2 0.13.0**, one experimental package containing two free FPS campaigns. It downloads the original publisher's checksum-pinned ZIP and uses Knulli's firmware RetroArch/PrBoom core; no commercial Doom files or PortMaster install are needed. Phase 1 has a Store-created menu entry. After refreshing game lists, find Phase 2 as `freedoom2.wad` in PrBoom/Freedoom. Saves/settings stay after removal. **Neither game has physical-device test evidence.** See the [release, paths and exclusions review](docs/free-games-review.md).
+The **Games** category includes four experimental packages (five playable games):
+
+| Game | Version | Firmware runtime |
+| --- | --- | --- |
+| Apotris | 4.2.0 GBA | RetroArch + mGBA |
+| Catacombs of the Damned | 1.0 | RetroArch + Arduous |
+| Dark & Under | 2.0.2 | RetroArch + Arduous |
+| Freedoom: Phase 1 + Phase 2 | 0.13.0 | RetroArch + PrBoom |
+
+All downloads are reviewed original-publisher archives, not Nursery or PortMaster assets. Apotris and the two Arduboy games use the owner-approved [missing-publisher-checksum exception](docs/adr/0012-reviewed-game-checksums.md): the Store pins downloaded size/SHA-256 and warns that this trusts publisher HTTPS at review time. They have no physical-device test reports. The owner reports both Freedoom phases work well on TSP with v2026.11.02-f193885, but supplied no firmware/resolution or lifecycle/save results; its exact-matrix badge remains UNTESTED. Freedoom Phase 1 has a Store-created entry; after refreshing game lists, find Phase 2 in PrBoom/Freedoom. Saves/settings stay after removal. Apotris custom audio is preserved, but Repair restores the pinned ROM without running rebuild tools. See the [releases, paths and full exclusions review](docs/free-games-review.md).
 
 Firmware, architecture, ABI, and runtime dependencies still gate installation. Device identity and display scope are advisory. **UNTESTED** means no passed report matches the exact package version and device matrix. See the [evidence and its limits](docs/real-device-tests.md#2026-10-30-current-owner-confirmation). [Picker 0.2.2](https://github.com/jellydn/knulli-random-game-picker/releases/tag/v0.2.2) excludes Tools and Emulators application systems before gamelist parsing, from selection and during Play revalidation. Path-only candidates use boundary-aware application-root checks. Its launcher, settings schema, `state/` preservation and exact-path ES launch contract are unchanged. It still requires glibc ≥2.34, firmware SDL2/image/ttf/gfx, and the loopback EmulationStation API. Its requirements are separate from the Store's.
 
