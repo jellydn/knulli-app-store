@@ -56,6 +56,8 @@ For an older build, custom location, or **text file busy** failure, verify the Z
 
 The **Library** uses a stable package list beside a persistent detail pane. A mint outline marks focus. **All types / Games / Apps** categories and **All states / Ready / Installed** filters stay visible in separate rows. Apps include utilities, themes and integrations; a game picker is still an app. Each category/status view remembers its selection, including after package operations. Technical review status, test evidence and installation state are separate. Long titles and summaries wrap in the detail pane. No setup wizard or custom mapping editor is needed.
 
+Rows and the detail pane show bundled publisher logos or game thumbnails, including before installation and without a network connection. Packages without suitable reviewed artwork use initials tiles, not invented publisher logos. Games show their system (GBA, Arduboy or DOOM) instead of a generic game label. Artwork sources and licences are recorded in [the thumbnail notice](internal/sdlui/assets/thumbnails/NOTICE.txt) and included in device packages' `README.txt`.
+
 | Action | Knulli controller | Desktop keyboard |
 | --- | --- | --- |
 | Browse packages | D-pad up/down | Up/Down |

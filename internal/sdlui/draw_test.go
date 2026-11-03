@@ -132,6 +132,38 @@ func TestRenderRepresentativeStates(t *testing.T) {
 	}
 }
 
+func TestCatalogueArtworkDoesNotRequireInstallation(t *testing.T) {
+	canvas, err := newConsoleCanvas(640)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer canvas.close()
+	for _, test := range []struct {
+		id      string
+		artwork bool
+	}{
+		{"app.romm.grout", true},
+		{"com.akouzoukos.apotris", true},
+		{"io.github.jhhoward.catacombs", true},
+		{"org.retroshelf.knulli", false},
+	} {
+		t.Run(test.id, func(t *testing.T) {
+			pkg, err := manifest.Load("../../catalogue/packages/" + test.id + ".json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			pkg.Install = nil
+			model := &storeui.Model{Items: []appstore.Item{{Package: pkg}}}
+			actual := canvas.draw(model, "", nil)
+			model.Items[0].Package.ID = "unknown.package.id"
+			fallback := canvas.draw(model, "", nil)
+			if differs := !bytes.Equal(actual.Pix, fallback.Pix); differs != test.artwork {
+				t.Fatalf("artwork differs from initials fallback=%v, want %v", differs, test.artwork)
+			}
+		})
+	}
+}
+
 func TestConsoleStatusKeepsContextualControlsVisible(t *testing.T) {
 	canvas, err := newConsoleCanvas(640)
 	if err != nil {

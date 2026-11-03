@@ -47,6 +47,10 @@ install -m 0644 "packaging/$TARGET/README.txt" "$PORTS/knulli-app-store/README.t
 # Keep notices in the already managed README; do not widen self-update paths.
 printf '\nEmbedded DejaVu Sans font notice\n\n' >>"$APP/README.txt"
 cat "internal/sdlui/assets/DejaVuSans-LICENSE.txt" >>"$APP/README.txt"
+for notice in internal/sdlui/assets/thumbnails/*.txt; do
+  printf '\nCatalogue artwork: %s\n\n' "$(basename "$notice")" >>"$APP/README.txt"
+  cat "$notice" >>"$APP/README.txt"
+done
 install -m 0644 "$ICON" "$PORTS/images/Knulli App Store.png"
 
 ARCHIVE="$OUTPUT_DIR/knulli-app-store-$TARGET-experimental-$VERSION.zip"

@@ -35,9 +35,14 @@ var palette = struct{ background, panel, text, muted, accent, warning, error col
 type consoleCanvas struct {
 	width       int
 	body, title font.Face
+	thumbnails  map[string]image.Image
 }
 
 func newConsoleCanvas(width int) (*consoleCanvas, error) {
+	thumbnails, err := loadThumbnails()
+	if err != nil {
+		return nil, err
+	}
 	typeface, err := opentype.Parse(consoleFont)
 	if err != nil {
 		return nil, fmt.Errorf("load console font: %w", err)
@@ -51,7 +56,7 @@ func newConsoleCanvas(width int) (*consoleCanvas, error) {
 		body.Close()
 		return nil, err
 	}
-	return &consoleCanvas{width: width, body: body, title: title}, nil
+	return &consoleCanvas{width: width, body: body, title: title, thumbnails: thumbnails}, nil
 }
 
 func (c *consoleCanvas) close() { _ = c.body.Close(); _ = c.title.Close() }

@@ -4,6 +4,7 @@ package sdlui
 
 import (
 	"image"
+	"path"
 	"strings"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
@@ -12,8 +13,8 @@ import (
 
 func (c *consoleCanvas) browse(frame *image.RGBA, model *storeui.Model) {
 	// Equal-height rows keep neighbours stationary as focus moves. The detail
-	// pane uses catalogue text, not unreviewed cover art or network images.
-	divider := 24 + (c.width-48)*2/5
+	// pane and thumbnails use reviewed, local content without network requests.
+	divider := 24 + (c.width-48)*47/100
 	fill(frame, image.Rect(divider, 120, divider+1, 381), palette.panel)
 	start, end := model.Window(5)
 	for index := start; index < end; index++ {
@@ -26,23 +27,36 @@ func (c *consoleCanvas) browse(frame *image.RGBA, model *storeui.Model) {
 			shade = palette.text
 		}
 		item := model.Items[index]
-		c.text(frame, item.Package.Name, top+2, row.Min.X+12, row.Dx()-24, shade, false)
-		c.text(frame, categoryLabel(item)+" / "+installState(item), top+25, row.Min.X+12, row.Dx()-24, palette.muted, false)
+		c.thumbnail(frame, item, image.Rect(row.Min.X+8, top+4, row.Min.X+48, top+44))
+		c.text(frame, item.Package.Name, top+2, row.Min.X+56, row.Dx()-68, shade, false)
+		c.text(frame, categoryLabel(item)+" / "+installState(item), top+25, row.Min.X+56, row.Dx()-68, palette.muted, false)
 	}
 	item := model.Items[model.Selected]
 	left, right := divider+24, c.width-24
 	c.prose(frame, item.Package.Name, image.Rect(left, 120, right, 183), palette.text, true)
-	c.text(frame, categoryLabel(item)+" / v"+item.Package.Version, 188, left, right-left, palette.accent, false)
+	c.thumbnail(frame, item, image.Rect(right-80, 188, right, 268))
+	c.text(frame, categoryLabel(item)+" / v"+item.Package.Version, 188, left, right-left-96, palette.accent, false)
 	// Test evidence and installation state are independent: an available app
 	// is not necessarily tested on this device.
-	c.text(frame, strings.ToUpper(item.Package.Review.Status), 218, left, right-left, palette.warning, false)
-	c.text(frame, trustLabel(item), 244, left, right-left, palette.warning, false)
+	c.text(frame, strings.ToUpper(item.Package.Review.Status), 218, left, right-left-96, palette.warning, false)
+	c.text(frame, trustLabel(item), 244, left, right-left-96, palette.warning, false)
 	c.text(frame, installState(item), 270, left, right-left, statusColor(item), false)
 	c.prose(frame, item.Package.Summary, image.Rect(left, 306, right, 381), palette.text, false)
 }
 
 func categoryLabel(item appstore.Item) string {
 	if storeui.CategoryGames.Match(item) {
+		// The registered ES system identifies the game format, not the host CPU.
+		if install := item.Package.Install; install != nil && install.Menu != nil {
+			switch path.Base(path.Dir(install.Menu.Gamelist)) {
+			case "gba":
+				return "GBA"
+			case "arduboy":
+				return "Arduboy"
+			case "prboom":
+				return "DOOM"
+			}
+		}
 		return "GAME"
 	}
 	return "APP"

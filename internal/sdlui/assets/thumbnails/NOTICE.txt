@@ -1,0 +1,84 @@
+Knulli App Store catalogue thumbnails
+
+These images identify their respective projects. Their authors retain their
+rights; inclusion does not imply endorsement. They are separate artwork, not
+Store-authored logos. The Store bundles thumbnails for offline browsing and
+does not fetch images, inspect installed files or execute publisher code.
+
+Changes: resize to fit 80 x 80, center on a transparent 80 x 80 canvas and strip
+image metadata with ImageMagick. Aspect ratios are retained; images are not
+cropped or recolored. Modified for the Store on 2026-11-03. Example
+transformation, with the original source paths listed below:
+
+  magick SOURCE -thumbnail 80x80 -background none -gravity center \
+    -extent 80x80 -strip PACKAGE_ID.png
+
+Original sources and licences
+
+app.romm.grout.png
+  Grout v5.4.1.0, scripts/Knulli/logo.png
+  https://github.com/rommapp/grout/blob/v5.4.1.0/scripts/Knulli/logo.png
+  MIT; copyright 2025 Brandon T. Kowalski, Grout Contributors.
+  Full notice: Grout-MIT.txt.
+
+com.akouzoukos.apotris.png
+  Apotris v4.2.0, source/n3ds/icon_48.png. This is the project's icon;
+  the Store package itself remains the GBA release, not a 3DS game.
+  https://gitea.com/akouzoukos/apotris/src/commit/c0b7d1a5ca7475a429666632807d1e471b8d144b/source/n3ds/icon_48.png
+  AGPL-3.0-only, Apotris by akouzoukos. Full licence: AGPL-3.0.txt.
+  Corresponding source, including the unmodified source image:
+  https://gitea.com/akouzoukos/apotris/archive/v4.2.0.tar.gz
+
+io.github.freedoom.freedoom.png
+  Freedoom v0.13.0, graphics/titlepic/titlepic.png
+  https://github.com/freedoom/freedoom/blob/v0.13.0/graphics/titlepic/titlepic.png
+  BSD-3-Clause; copyright 2001-2024 Contributors to the Freedoom project.
+  Full notice: Freedoom-BSD.txt. Contributors:
+  https://github.com/freedoom/freedoom/blob/v0.13.0/CREDITS
+
+io.github.garage-collective.dark-and-under.png
+  Dark & Under v2.0.2 original .arduboy ZIP, screenshot01.png
+  https://github.com/Garage-Collective/Dark-And-Under/releases/download/v2.0.2/Dark-And-Under.arduboy
+  BSD-3-Clause. Code by Simon Holmes; art by Cyril Guichard.
+  Full publisher notice: DarkAndUnder-BSD.txt; its holder field is blank.
+
+io.github.jhhoward.catacombs.png
+  Catacombs of the Damned 1.0 original .arduboy ZIP, screen1.png
+  https://github.com/jhhoward/Arduboy3D/releases/download/1.0/Catacombs.arduboy
+  MIT; copyright 2019 James Howard. Full notice: Catacombs-MIT.txt.
+
+io.github.jellydn.retsend.png
+  RetSend v1.0.0, resources/icon/retsend-mark.png
+  GPL-3.0-only. Full licence: GPL-3.0.txt.
+  Original image and corresponding source:
+  https://github.com/mxmgorin/retsend/blob/v1.0.0/resources/icon/retsend-mark.png
+  https://github.com/mxmgorin/retsend/tree/v1.0.0
+
+io.github.misantronic.raofflineproxy.png
+  RAOfflineProxy v2.3.0-alpha1, docs/public/logo-320.png
+  GPL-3.0-only. Full licence: GPL-3.0.txt.
+  Original image and corresponding source:
+  https://github.com/misantronic/RAOfflineProxy/blob/v2.3.0-alpha1/docs/public/logo-320.png
+  https://github.com/misantronic/RAOfflineProxy/tree/v2.3.0-alpha1
+
+io.github.tomtombombadil.pocketcurator.png
+  PocketCurator v1.1.2, pocketcurator/assets/splash.jpg
+  https://github.com/tomtombombadil/PocketCurator/blob/v1.1.2/pocketcurator/assets/splash.jpg
+  MIT; copyright 2026 tomtombombadil. Full notice: PocketCurator-MIT.txt.
+
+io.github.unitreign.playtime.png
+  PlayTime v1.0.0, icons/playtime.png
+  GPL-3.0-only. Full licence: GPL-3.0.txt.
+  Original image and corresponding source:
+  https://github.com/unitreign/playtime/blob/v1.0.0/icons/playtime.png
+  https://github.com/unitreign/playtime/tree/v1.0.0
+
+Fallbacks
+
+Random Game Picker, Handheld Link Cores, retroshelf, and unknown packages use
+Store-rendered initials, not publisher logos. No unverified image is copied.
+
+Device packages append this notice and all the accompanying licence texts to
+the existing managed README.txt, so self-updates retain the notices without
+adding a new write path. The Store's MIT licence does not replace these
+separately licensed images or imply rights to a project's trademarks.
