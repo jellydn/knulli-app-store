@@ -69,11 +69,11 @@ jobs:
           - `knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-*.zip` — one installable Store ZIP
           - `SHA256SUMS.txt` — checksum for that ZIP; catalogue/signature are embedded
 
-          Cleaner headers show page identity and current type/status filters; actionable controller hints stay in the measured footer. Responsive layout uses runtime output dimensions, not device names. Physical validation of this header cleanup remains outstanding; desktop tests are not hardware validation. See the [2026-11-04 catalogue audit](https://github.com/jellydn/knulli-app-store/blob/main/docs/release-audit-2026-11-04.md) for WebUI 1.2.2, retroshelf 0.6.10, unchanged/blocked entries and security warnings.
+          Responsive Library layouts include offline artwork, game-system labels, current type/status headers, measured footer hints and complete paged reviews. The catalogue contains fourteen experimental packages, including WebUI 1.2.2 and retroshelf 0.6.10. The read-only CPU interval sampler and benchmark protocol support the remaining owner tests; no new handheld CPU, physical-control, audible-audio or Picker gameplay/hotkey result is claimed. Desktop screenshots are labelled fixture renders, not hardware evidence. See the [2026-11-04 catalogue audit](https://github.com/jellydn/knulli-app-store/blob/main/docs/release-audit-2026-11-04.md) for unchanged/blocked entries and security warnings.
 
           These are the exact bytes from the green `check` run. Requires KNULLI, AArch64, glibc and system SDL2/image/ttf; SDL2_gfx is static. Build gates cap required glibc symbols at 2.34. One ZIP is not universal hardware support. See the [installation and legacy migration guide](https://github.com/jellydn/knulli-app-store/blob/main/docs/store-distribution.md). Old device-named clients may need verified manual ZIP replacement; no legacy aliases are published in this release.
           EOF
-          printf '\nCommit: %s · Check run: %s\n' "$(printf '%.7s' "$SHA")" "$RUN_URL" >>notes.md
+          printf '\n[Versioned guide and desktop screenshots](https://github.com/jellydn/knulli-app-store/blob/%s/README.md)\n\nCommit: %s · Check run: %s\n' "$SHA" "$(printf '%.7s' "$SHA")" "$RUN_URL" >>notes.md
           if gh release view "$TAG" >/dev/null 2>&1; then
             expected=$(basename release/*.zip)
             assets=$(gh release view "$TAG" --json assets --jq '.assets[].name')
@@ -135,13 +135,16 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           cat >notes.md <<'EOF'
-          Full release build.
+          Tagged Store release. Packages and device support remain experimental.
 
           - `knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-*.zip` — one installable Store ZIP
           - `SHA256SUMS.txt` — checksum for that ZIP; catalogue/signature are embedded
 
+          Responsive Library layouts include offline artwork, game-system labels, current type/status headers, measured footer hints and complete paged reviews. Fourteen experimental packages include WebUI 1.2.2 and retroshelf 0.6.10; all existing license, runtime-update, network, hook/service cleanup and security warnings remain. The read-only CPU interval sampler supports reproducible owner benchmarks, not a new performance claim. No new physical-control, audible-audio, MagicX or Picker gameplay/hotkey result is supplied. Desktop screenshots are real fixture renders, not handheld evidence.
+
           Built from the tag with the same signed catalogue, AArch64 cross-compile and ABI gates as CI. Requires KNULLI, glibc and system SDL2/image/ttf; SDL2_gfx is static. Required glibc symbols are capped at 2.34. One ZIP is not universal hardware support. See the [installation and legacy migration guide](https://github.com/jellydn/knulli-app-store/blob/main/docs/store-distribution.md). Old device-named clients may need verified manual ZIP replacement; no legacy aliases are published in this release.
           EOF
+          printf '\n[Versioned guide and desktop screenshots](https://github.com/jellydn/knulli-app-store/blob/%s/README.md)\n\n[Catalogue audit and security limits](https://github.com/jellydn/knulli-app-store/blob/%s/docs/release-audit-2026-11-04.md)\n' "$TAG" "$TAG" >>notes.md
           if gh release view "$TAG" >/dev/null 2>&1; then
             expected=$(basename release/*.zip)
             assets=$(gh release view "$TAG" --json assets --jq '.assets[].name')

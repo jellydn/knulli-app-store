@@ -6,12 +6,16 @@ The Store verifies downloads and journals file changes for rollback. It never ru
 
 ## Devices and release
 
-New builds use one **experimental** KNULLI AArch64/glibc/SDL2 distribution, not a ZIP per device. See the [2026-11-04 release audit](docs/release-audit-2026-11-04.md) for package versions, blocked updates and outstanding physical tests. Historical [v2026.10.27](https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.27) assets and hardware reports remain scoped to the artifacts actually tested:
+Current version: **[v2026.11.04](https://github.com/jellydn/knulli-app-store/releases/tag/v2026.11.04)**. Download the [one installable ZIP](https://github.com/jellydn/knulli-app-store/releases/download/v2026.11.04/knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-v2026.11.04.zip) and its [SHA256SUMS.txt](https://github.com/jellydn/knulli-app-store/releases/download/v2026.11.04/SHA256SUMS.txt) from the same release. Packages and device support remain **experimental**, even for a tagged Store release.
+
+This version includes responsive Library layouts, offline artwork and game-system labels, a header showing the current category/status, measured footer hints, complete paged reviews, and fourteen reviewed packages. The [CPU interval sampler and benchmark guide](docs/idle-cpu-benchmark.md) make the remaining performance tests reproducible; no new handheld CPU or battery result is claimed. See the [2026-11-04 catalogue audit](docs/release-audit-2026-11-04.md) for versions, blocked updates and security limits.
+
+One KNULLI AArch64/glibc/SDL2 distribution replaces the old device-named ZIPs. Historical assets and hardware reports remain scoped to the artifacts actually tested:
 
 | Target | Display | Evidence |
 | --- | --- | --- |
-| [TrimUI Smart Pro](docs/trimui-smart-pro.md) | 1280×720 | Owner confirmed all eight current app versions working and tested on 2026-10-30. Historical native development-build lifecycle results remain scoped to their original artifacts. |
-| [MagicX Zero 28](docs/magicx-zero-28.md) | 640×480 | Device diagnostic confirms Knulli, AArch64, display, and SDL controller; full GUI testing remains incomplete. |
+| [TrimUI Smart Pro](docs/trimui-smart-pro.md) | 1280×720 | Owner confirmed eight exact app versions on 2026-10-30, not every version now listed. Current Store physical controls/audio and updated-app checks remain outstanding. |
+| [MagicX Zero 28](docs/magicx-zero-28.md) | 640×480 | Historical diagnostic confirms Knulli, AArch64, display, and SDL controller; full current-build GUI testing remains incomplete. |
 
 **Knulli is the only implemented firmware profile.** Device GUI builds require AArch64, glibc, and system SDL2, SDL2_image, and SDL2_ttf; SDL2_gfx is linked statically. Do not replace firmware libraries.
 
@@ -53,7 +57,7 @@ For an older build, custom location, or **text file busy** failure, verify the Z
 
 ## Controls
 
-The **Library** uses a stable package list beside a persistent detail pane. A mint outline marks focus. **All types / Games / Apps** categories and **All states / Ready / Installed** filters stay visible in separate rows. Apps include utilities, themes and integrations; a game picker is still an app. Each category/status view remembers its selection, including after package operations. Technical review status, test evidence and installation state are separate. Long titles and summaries wrap in the detail pane. No setup wizard or custom mapping editor is needed.
+The **Library** uses a stable package list beside a persistent detail pane where space permits. Compact outputs use one column and a fixed selected-package summary. A mint outline marks focus. The header shows the current category/status intersection, such as **GAMES / INSTALLED**; the measured footer owns the controls. **All types / Games / Apps** categories and **All states / Ready / Installed** filters each retain selection. Apps include utilities, themes and integrations; a game picker is still an app. Technical review status, test evidence and installation state are separate. More and confirmation screens page complete warning/recovery text with a visible line range. No setup wizard or custom mapping editor is needed.
 
 Rows and the detail pane show bundled publisher logos or game thumbnails, including before installation and without a network connection. Packages without suitable reviewed artwork use initials tiles, not invented publisher logos. Games show their system (GBA, Arduboy or DOOM) instead of a generic game label. Artwork sources and licences are recorded in [the thumbnail notice](internal/sdlui/assets/thumbnails/NOTICE.txt) and included in device packages' `README.txt`.
 
@@ -62,6 +66,7 @@ Rows and the detail pane show bundled publisher logos or game thumbnails, includ
 | Browse packages | D-pad up/down | Up/Down |
 | Category: All types, Games, Apps | D-pad left/right | Left/Right |
 | Filter All, Ready, Installed | L1/R1 | Page Up/Page Down |
+| Read previous/next review page | L1/R1 while reviewing | Page Up/Page Down |
 | Review or confirm | A | Enter |
 | Cancel or go back | B | Escape |
 | Open More; export diagnostics inside More | Y | Y |
@@ -71,20 +76,39 @@ The first A press opens confirmation, not installation. **More** contains detail
 
 To test a separately prepared, unpublished build without replacing the production Store, use the [isolated device-test procedure](docs/ui-redesign-device-test.md). Normal release ZIPs are not isolated test packages.
 
+### Current UI screenshots — desktop rendering only
+
+These are real renderer-backbuffer captures from the current UI source used for this release, using Linux software SDL, keyboard input and a disposable KNULLI fixture. They are **not captures from a handheld or the signed ARM64 executable**. Firmware/device/architecture values are fixture data and overrides, not detected hardware evidence. Text and keyboard hints follow actual drawable size; short compact summaries are completed in More.
+
+**1280×720: wide Library with offline artwork and a detail pane.**
+
+![Desktop-rendered Library at 1280×720](docs/assets/screenshots/library-1280x720.png)
+
+**640×480: two-pane boundary, with hints wrapped into two rows.**
+
+![Desktop-rendered Library at 640×480](docs/assets/screenshots/library-640x480.png)
+
+**320×240: compact single-column Library and complete three-row hints.** This is the initial layout target, not a newly supported or tested device.
+
+![Desktop-rendered compact Library at 320×240](docs/assets/screenshots/library-320x240.png)
+
+See [capture commands and limitations](docs/desktop-verification.md#release-screenshots).
+
 ## Catalogue and safety
 
-On 2026-10-30 (Asia/Singapore), the [owner reconfirmed](https://ampcode.com/threads/T-01a184fd-5491-7371-9d0d-5d2a4bbddb02) that the eight app versions then listed work and are tested on TrimUI Smart Pro. This updates the previously confirmed Knulli AArch64 1280×720 matrix, including Picker 0.2.2, Grout 5.4.1.0, retroshelf 0.6.3, RAOfflineProxy 2.3.0-alpha1 and Handheld Link Cores (mGBA Dual) 2026.10.29.1. The reconciled catalogue also includes zitch 0.3.0, which has no device-test evidence. MagicX Zero 28 and other matrices remain untested. Package testing does not establish separate lifecycle results or remove disclosed safety limits. All nine manifest review statuses remain **experimental**:
+On 2026-10-30 (Asia/Singapore), the [owner reconfirmed](https://ampcode.com/threads/T-01a184fd-5491-7371-9d0d-5d2a4bbddb02) eight exact app versions on TrimUI Smart Pro, using the previously confirmed Knulli AArch64 1280×720 matrix. This includes Picker 0.2.2, Grout 5.4.1.0, historical retroshelf 0.6.3, RAOfflineProxy 2.3.0-alpha1 and Handheld Link Cores (mGBA Dual) 2026.10.29.1. It does not verify retroshelf 0.6.10, WebUI 1.2.2, zitch or every later Store build. MagicX Zero 28 and other matrices remain untested. Package testing does not establish separate lifecycle results or remove disclosed safety limits. All **fourteen entries** (ten apps and four game packages) remain **experimental**:
 
 | Package | Current manifest version | Purpose |
 | --- | --- | --- |
 | Grout | 5.4.1.0 | Connect to a RomM 5.4.1+ server; [release review](docs/grout-5.4.1.0.md) |
 | Handheld Link Cores (mGBA Dual) | 2026.10.29.1 | Manual RetroArch core loading only; no system patches; [setup and review](docs/handheld-link-cores.md) |
 | PlayTime | 1.0.0 | Track game play time |
+| Knulli WebUI | 1.2.2 | Private HTTP file/control service; configure credentials offline before first start; [current review](docs/release-audit-2026-11-04.md#webui-122) |
 | Random Game Picker | 0.2.2 | Select from existing EmulationStation games |
 | RetSend | 1.0.0 | Transfer files over local Wi-Fi with LocalSend peers |
 | PocketCurator | 1.1.2 | Manage your ROM collection; requires PortMaster |
 | RAOfflineProxy | 2.3.0-alpha1 | Offline casual RetroAchievements; requires Python 3.12 and pygame; [release review](docs/raofflineproxy-2.3.0-alpha1.md) |
-| retroshelf | 0.6.3 | Sync game sessions; requires an account and Wi-Fi; [release review](docs/retroshelf-0.6.3.md) |
+| retroshelf | 0.6.10 | Sync game sessions; requires an account and Wi-Fi; [current review](docs/release-audit-2026-11-04.md#retroshelf-0610) |
 | zitch | 0.3.0 | Browse and install your itch.io library; requires PortMaster and glibc 2.38+; Knulli game launch untested; [release review](docs/zitch-0.3.0.md) |
 
 The **Games** category includes four experimental packages (five playable games):
@@ -128,7 +152,7 @@ The daily [catalogue update check](https://github.com/jellydn/knulli-app-store/a
 Use **Go 1.27.3** with **Staticcheck 0.8.2** to match CI and local hooks. The analyzer supports the updated Go export format. GUI builds and `make check` also need SDL development files. On Debian or Ubuntu:
 
 ```sh
-sudo apt-get install libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-gfx-dev
+sudo apt-get install libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-gfx-dev zip
 make check             # Format, vet both tag sets, race tests
 make build             # Static host CLI: build/knulli-app
 make catalogue         # Validate manifests and build the index

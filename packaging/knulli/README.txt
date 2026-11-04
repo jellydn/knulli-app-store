@@ -1,5 +1,11 @@
 KNULLI APP STORE - EXPERIMENTAL AARCH64 / GLIBC / SDL2 BUILD
 
+Guide updated for v2026.11.04:
+https://github.com/jellydn/knulli-app-store/releases/tag/v2026.11.04
+This tagged Store release does not promote package status or verify hardware.
+All fourteen catalogue entries remain experimental. WebUI 1.2.2 and retroshelf
+0.6.10 retain their runtime/security warnings and need new-version device tests.
+
 One distribution profile: knulli-aarch64-glibc-sdl2. This is not a universal
 binary. It requires KNULLI, Linux AArch64, the AArch64 glibc loader, and system
 SDL2, SDL2_image and SDL2_ttf. SDL2_gfx is linked statically. The build rejects
@@ -35,8 +41,8 @@ LEGACY DEVICE-NAMED INSTALLATIONS
 The generic ZIP replaces either former TrimUI Smart Pro or MagicX Zero 28
 distribution at the same paths. Once installed, updates use the common profile.
 Old binaries cannot discover the new name by themselves. Verified manual ZIP
-replacement above works without a bridge. All 20 currently visible releases
-already contain both device ZIPs; no automatic bridge destination is verified.
+replacement above works without a bridge. The 2026-11-03 inspection found both
+device ZIPs in all 20 then-visible releases; no automatic bridge was verified.
 Old clients select the first matching asset and skip their current/older tags.
 Do not assume an automatic bridge was published or replace historical assets.
 See the migration guide:
@@ -59,7 +65,8 @@ Confirm also exports diagnostics on the blocked screen.
 
 Layout follows SDL drawable dimensions: two panes where 640x480 logical space
 fits, otherwise a single-column list and fixed summary. Short outputs use
-native text. Measured key chips and complete hint labels wrap without dropping
+native text. The header shows the current category/status; the footer owns the
+controls. Measured key chips and complete hint labels wrap without dropping
 actions. Footer/status height is reserved before body layout, which can show
 fewer list rows. Review screens page complete warnings/recovery text with a visible
 line range. Paging does not change filters/actions or execute an operation.
@@ -99,3 +106,11 @@ Test cold launch, real display, physical controls/repeat/hotplug/Select+Y,
 complete warning/recovery text, ES return and performance on intended hardware.
 Desktop checks do not establish device compatibility. A menu refresh accepted
 by KNULLI is queued, not completed; refresh/restart ES if an entry is missing.
+
+Current desktop-rendered screenshots and reproducible CPU interval commands:
+https://github.com/jellydn/knulli-app-store/blob/v2026.11.04/README.md
+https://github.com/jellydn/knulli-app-store/blob/v2026.11.04/docs/idle-cpu-benchmark.md
+The sampler reads an existing Linux PID without launching or changing the app.
+It needs sh, awk, sleep, getconf and /proc; check firmware tool availability.
+No new handheld CPU, physical-control, audible-audio or Picker gameplay/hotkey
+result is supplied by this release. Those tests remain owner follow-ups.

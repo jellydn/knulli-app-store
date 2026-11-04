@@ -1,8 +1,13 @@
 # Store distribution and legacy migration
 
-Status: approved for the normal green-main experimental release on 2026-11-04.
-Physical footer/device testing remains outstanding. See [ADR 0013](adr/0013-compatibility-profile-distribution.md)
-and the [per-entry release audit](release-audit-2026-11-04.md).
+Current version: [v2026.11.04](https://github.com/jellydn/knulli-app-store/releases/tag/v2026.11.04),
+including the current install/migration guide and desktop screenshots in its
+source documentation. Download the generic ZIP and `SHA256SUMS.txt` from that
+same release. Tagged publication does not promote the experimental packages or
+prove hardware compatibility. Physical footer/device testing remains outstanding.
+See [ADR 0013](adr/0013-compatibility-profile-distribution.md), the
+[per-entry release audit](release-audit-2026-11-04.md) and
+[desktop capture limits](desktop-verification.md#release-screenshots).
 
 ## One installable ZIP
 
@@ -100,7 +105,8 @@ policy exception. Verified manual migration requires neither exception.
 
 ## Physical device-test checklist
 
-Use the same unpublished generic ZIP on each intended compatible device. Record
+Use the same checksum-verified public ZIP on each intended compatible device,
+or record the exact scope of a separately approved unpublished test build. Record
 ZIP SHA-256, version, board, firmware/build, architecture, glibc, SDL libraries,
 renderer/output, controller name/GUID and Ports letter mode. Keep older reports
 scoped to their original bytes; no new hardware pass is implied here.
