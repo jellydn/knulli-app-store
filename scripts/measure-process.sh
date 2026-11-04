@@ -8,13 +8,18 @@ if [ "$#" -lt 1 ] || [ "$#" -gt 4 ]; then
   exit 2
 fi
 pid=$1
-seconds=${2:-60}
-repeats=${3:-3}
-warmup=${4:-5}
+seconds=${2-60}
+repeats=${3-3}
+warmup=${4-5}
 for value in "$pid" "$seconds" "$repeats" "$warmup"; do
   case "$value" in
     ''|*[!0-9]*) echo "arguments must be non-negative integers" >&2; exit 2 ;;
   esac
+  # Stay within portable shell integer ranges before any numeric comparison.
+  if [ "${#value}" -gt 9 ]; then
+    echo "arguments must have at most 9 digits" >&2
+    exit 2
+  fi
 done
 if [ "$pid" -eq 0 ] || [ "$seconds" -eq 0 ] || [ "$repeats" -eq 0 ]; then
   echo "PID, SECONDS and REPEATS must be positive" >&2
@@ -26,18 +31,17 @@ ticks=$(getconf CLK_TCK)
 page_size=$(getconf PAGESIZE)
 
 snapshot() {
-  # comm can contain spaces and parentheses. Fields after its final ')' start
+  # comm can contain spaces, newlines and parentheses. Fields after its final ')' start
   # at field 3 of proc_pid_stat(5), not at field 2 of a whitespace split.
   awk '
-    NR == 1 {
+    FILENAME == ARGV[1] { stat = stat $0 "\n"; next }
+    {
+      uptime = $1
+      $0 = stat
       sub(/^.*\) /, "")
       if (NF < 22 || $1 == "Z" || $1 == "X") exit 1
-      ticks = $12 + $13
-      started = $20
-      rss = $22
-      next
+      printf "%.0f %.0f %.0f %s\n", $12 + $13, $20, $22, uptime
     }
-    NR == 2 { printf "%.0f %.0f %.0f %s\n", ticks, started, rss, $1 }
   ' "/proc/$pid/stat" /proc/uptime
 }
 
