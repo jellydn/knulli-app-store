@@ -13,8 +13,7 @@ import (
 	"golang.org/x/image/font"
 )
 
-func (c *consoleCanvas) header(frame *image.RGBA, model *storeui.Model, controls *storeinput.Session) {
-	c.text(frame, "KNULLI APP STORE", 16, 24, c.width-48, palette.text, true)
+func (c *consoleCanvas) header(frame *image.RGBA, model *storeui.Model) int {
 	context := "Library"
 	switch model.Focus {
 	case storeui.Actions:
@@ -22,48 +21,38 @@ func (c *consoleCanvas) header(frame *image.RGBA, model *storeui.Model, controls
 	case storeui.Health:
 		context = "Package health"
 	case storeui.Confirm:
-		context = "Review before changes"
+		context = "Review"
 	case storeui.ForceConfirm:
-		context = "Recovery / step 2 of 2"
+		context = "Recovery"
 	}
 	if model.Busy {
-		context = "Working / please wait"
+		context = "Working"
 	}
-	if model.Focus != storeui.Browse || model.Busy || (controls != nil && controls.Mode != storeinput.Normal) {
-		fill(frame, image.Rect(24, 84, c.width-24, 85), palette.panel)
-		c.text(frame, context, 56, 24, c.width-48, palette.accent, false)
-		return
+	left, top, stateTop, bottom := 24, 16, 56, 96
+	if c.compact {
+		left, top = 8, 4
+		stateTop = top + c.title.Metrics().Height.Ceil() + 4
+		bottom = stateTop + c.step + 2
 	}
-	fill(frame, image.Rect(24, 109, c.width-24, 110), palette.panel)
-	cell := (c.width - 152) / len(storeui.CategoryOrder)
-	c.text(frame, "←→ Type", 48, 24, 100, palette.muted, false)
-	for index, category := range storeui.CategoryOrder {
-		left := 128 + index*cell
-		shade := palette.muted
-		if category == model.Tabs.Category() {
-			shade = palette.accent
-			fill(frame, image.Rect(left+4, 73, left+cell-4, 76), shade)
-		}
-		c.label(frame, category.Label(), 48, left, cell, shade, false)
+	// Below the target minimum, review text and its page range take priority
+	// over the optional page title. Keep the filter intersection visible.
+	showTitle := !(c.compact && model.Focus != storeui.Browse && c.statusTop()-bottom < 2*c.step)
+	if !showTitle {
+		stateTop = top
+		bottom = stateTop + c.step + 2
 	}
-	statusKeys := "L1/R1"
-	if controls != nil && controls.Source == storeinput.KeyboardSourceName {
-		statusKeys = "PgUp/Dn"
+	status := model.Tab().Label()
+	if model.Tab() == storeui.TabAll {
+		status = "ALL STATES"
 	}
-	c.text(frame, statusKeys, 80, 24, 100, palette.muted, false)
-	for index, tab := range storeui.TabOrder {
-		left := 128 + index*cell
-		shade := palette.muted
-		if tab == model.Tab() {
-			shade = palette.accent
-			fill(frame, image.Rect(left+4, 105, left+cell-4, 108), shade)
-		}
-		label := tab.Label()
-		if tab == storeui.TabAll {
-			label = "ALL STATES"
-		}
-		c.label(frame, label, 80, left, cell, shade, false)
+	if showTitle {
+		c.text(frame, context, top, left, c.width-2*left, palette.text, true)
 	}
+	c.text(frame, model.Tabs.Category().Label()+" / "+status, stateTop, left, c.width-2*left, palette.accent, false)
+	if !c.compact {
+		fill(frame, image.Rect(left, bottom-12, c.width-left, bottom-11), palette.panel)
+	}
+	return bottom
 }
 
 func (c *consoleCanvas) status(frame *image.RGBA, model *storeui.Model) {
@@ -81,7 +70,7 @@ func (c *consoleCanvas) status(frame *image.RGBA, model *storeui.Model) {
 		return
 	}
 	if model.Focus == storeui.Browse && len(model.Items) > 0 {
-		c.text(frame, fmt.Sprintf("%s / %d of %d", model.Tab().Label(), model.Selected+1, len(model.Items)), c.statusTop()+8, 24, c.width-48, palette.muted, false)
+		c.text(frame, fmt.Sprintf("%d of %d packages", model.Selected+1, len(model.Items)), c.statusTop()+8, 24, c.width-48, palette.muted, false)
 	}
 }
 

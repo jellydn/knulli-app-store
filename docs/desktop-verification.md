@@ -68,6 +68,16 @@ toolkit's developer mapping wizard is not part of the Store.
 | More; export diagnostics inside More | Y | Y |
 | Quit | Hold Tab (or F5), then Y | Hold Select, then Y |
 
+The header shows the page name and only the current filter intersection, such
+as `Library` and `GAMES / INSTALLED`. Filter options do not add another focus
+target: left/right still changes type, and L1/R1 still changes status while
+browsing. The footer alone shows these bindings. Empty views retain both filter
+values. Review and busy screens keep the filter context but do not unlock it.
+Review pages omit the generic details subheading; confirmation and recovery
+headings still identify the action and recovery step.
+At 320×240 the full header fits; below-target reviews can omit the optional page
+title to keep a readable warning window and page range.
+
 The footer measures actual key/label glyph bounds and wraps complete groups
 with safe margins and at least eight logical pixels between neighbouring groups.
 It reserves footer/status height before composing the body; no action is dropped

@@ -130,6 +130,30 @@ does not imply a universal binary. Desktop evidence is not hardware evidence;
 the changed build needs new physical display/controller and ES return checks
 before any separately authorized release.
 
+### 2026-11-04 header/filter cleanup (approved)
+
+Device feedback found that header bindings repeated the measured footer. Use
+the same quiet two-line header on compact and standard layouts: page identity
+and the current category/status intersection. Do not repeat bindings, arrows or
+filter alternatives in the header, or add a filter-focus mode. The footer owns
+available controls. A single shared header determines where body content starts;
+standard browsing reclaims the old filter-rail space. Empty views keep the current
+intersection and use the footer for actions rather than repeating instructions.
+
+Painter explored a current-state breadcrumb, labelled chips and full option
+rails, each in compact/wide states. Choose the breadcrumb for low visual weight
+and compact content space. Chips imply another focus target, and rails retain
+the unnecessary header weight. Do not copy the concepts' omitted bindings or
+trust state. Keep both values readable with the longest actual labels. Preserve
+the Game/App and status intersection, selection memory, locked review/busy
+filters, complete warning/recovery paging, measured footer and 320×240 minimum.
+Below-target reviews may omit optional page identity before losing text.
+
+This presentation cleanup does not change package, updater, firmware, ABI or
+controller policy. The owner subsequently authorized committing and pushing to
+the Amp origin, then normal green-main experimental publication after exact-head
+CI passes. No new physical-device pass is claimed.
+
 Stock components run blocking event loops and add Start-to-confirm. Using them
 now would introduce another owner for controls, confirmation and asynchronous
 operation progress. The Store instead uses one loop and disables the toolkit's

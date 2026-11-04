@@ -147,6 +147,87 @@ func TestSDLControlsPreserveConfirmationContract(t *testing.T) {
 	}
 }
 
+func TestFilterHeaderPreservesRawInputAndSelectionMemory(t *testing.T) {
+	for _, policy := range []string{"knulli", "xbox", "keyboard"} {
+		t.Run(policy, func(t *testing.T) {
+			t.Setenv("STORE_CONTROLLER_LAYOUT", policy)
+			model, controls, logger, backend := newRouterHarness(t)
+			mode := InputAuto
+			if policy == "keyboard" {
+				controls, mode = storeinput.NewDesktopSession("", ""), InputKeyboard
+			}
+			for _, spec := range []struct {
+				id, kind string
+				state    appstore.State
+			}{
+				{"first-game", "game", appstore.StateAvailable},
+				{"last-game", "game", appstore.StateAvailable},
+				{"installed-app", "utility", appstore.StateInstalled},
+			} {
+				backend.items = append(backend.items, appstore.Item{Package: manifest.Package{ID: spec.id, Name: spec.id, Type: spec.kind}, Verdict: appstore.Verdict{State: spec.state}, Actions: []appstore.Action{appstore.Install}})
+			}
+			if err := model.Load(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			controller := &controllerState{instanceID: 17}
+			press := func(action storeinput.Action, key sdl.Keycode) {
+				t.Helper()
+				var event sdl.Event = &sdl.ControllerButtonEvent{Type: sdl.CONTROLLERBUTTONDOWN, Which: 17, Button: uint8(controls.Mapping[action])}
+				if mode.IsKeyboard() {
+					event = &sdl.KeyboardEvent{Type: sdl.KEYDOWN, Keysym: sdl.Keysym{Sym: key}}
+				}
+				if handleEvent(context.Background(), model, event, &controller, controls, logger, mode) {
+					t.Fatal("filter input exited")
+				}
+			}
+			press(storeinput.Right, sdl.K_RIGHT)
+			press(storeinput.PageDown, sdl.K_PAGEDOWN)
+			press(storeinput.Down, sdl.K_DOWN)
+			for _, size := range [][2]int{{320, 240}, {320, 200}, {480, 320}, {639, 480}, {640, 480}, {641, 480}, {640, 479}, {640, 481}, {720, 480}, {720, 720}, {480, 640}, {640, 960}, {320, 640}, {1280, 720}, {1920, 1080}, {1920, 1200}, {2560, 1080}, {320, 240}} {
+				w, h := canvasSize(size[0], size[1])
+				canvas, err := newConsoleCanvas(w, h)
+				if err != nil {
+					t.Fatal(err)
+				}
+				canvas.draw(model, "unknown board", controls)
+				if model.Tabs.Category() != storeui.CategoryGames || model.Tab() != storeui.TabReady || len(model.Items) != 2 || model.Items[model.Selected].Package.ID != "last-game" {
+					t.Fatal("render/resize lost intersection or remembered row")
+				}
+				press(storeinput.PageDown, sdl.K_PAGEDOWN)
+				empty := canvas.draw(model, "", controls)
+				if len(model.Items) != 0 || model.Tab() != storeui.TabInstalled || model.Tabs.Category() != storeui.CategoryGames || !renderedText(empty, canvas, "GAMES / INSTALLED", image.Rect(0, 0, w, 96), palette.background, palette.accent) {
+					t.Fatal("empty intersection lost visible filter state")
+				}
+				press(storeinput.Right, sdl.K_RIGHT)
+				if len(model.Items) != 1 || model.Items[0].Package.ID != "installed-app" {
+					t.Fatal("empty view could not change type within status")
+				}
+				press(storeinput.Left, sdl.K_LEFT)
+				press(storeinput.PageUp, sdl.K_PAGEUP)
+				if model.Items[model.Selected].Package.ID != "last-game" {
+					t.Fatal("intersection forgot selection after empty view")
+				}
+				press(storeinput.Diagnostics, sdl.K_y)
+				press(storeinput.Right, sdl.K_RIGHT)
+				canvas.draw(model, "", controls)
+				if model.Focus != storeui.Actions || model.Tab() != storeui.TabReady || model.Tabs.Category() != storeui.CategoryGames {
+					t.Fatal("review accepted filter input")
+				}
+				press(storeinput.Back, sdl.K_ESCAPE)
+				model.Busy = true
+				press(storeinput.Right, sdl.K_RIGHT)
+				press(storeinput.PageDown, sdl.K_PAGEDOWN)
+				canvas.draw(model, "", controls)
+				if model.Tab() != storeui.TabReady || model.Tabs.Category() != storeui.CategoryGames || !model.Busy {
+					t.Fatal("busy rendering/input changed filters")
+				}
+				model.Busy = false
+				canvas.close()
+			}
+		})
+	}
+}
+
 func TestFooterReflowPreservesRawNavigation(t *testing.T) {
 	for _, policy := range []string{"knulli", "xbox", "keyboard"} {
 		t.Run(policy, func(t *testing.T) {

@@ -130,18 +130,17 @@ func (c *consoleCanvas) draw(model *storeui.Model, platformName string, controls
 		return frame
 	}
 	content := frame.SubImage(image.Rect(0, 0, c.width, c.statusTop()-4)).(*image.RGBA)
-	c.header(content, model, controls)
+	top := c.header(content, model)
 	switch {
 	case controls != nil && controls.Mode != storeinput.Normal:
 		c.text(content, "Controller unavailable", 154, 32, c.width-64, palette.warning, true)
 		c.prose(content, "Reconnect a controller to continue. "+platformName, image.Rect(32, 212, c.width-32, 310), palette.muted, false)
 	case len(model.Items) == 0:
 		c.text(content, emptyCatalogueMessage(model.Total()), 164, 32, c.width-64, palette.text, true)
-		c.prose(content, "Change filters to browse other packages. Use Y to export diagnostics if the catalogue is unavailable.", image.Rect(32, 219, c.width-32, 310), palette.muted, false)
 	case model.Focus == storeui.Browse || model.Busy:
-		c.browse(content, model)
+		c.browse(content, model, top)
 	default:
-		c.review(content, model, image.Rect(32, 99, c.width-32, c.statusTop()-4))
+		c.review(content, model, image.Rect(32, top, c.width-32, c.statusTop()-4))
 	}
 	c.status(frame, model)
 	c.footer(frame, model)

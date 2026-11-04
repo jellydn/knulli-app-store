@@ -4,6 +4,7 @@ package sdlui
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"image"
 	"image/color"
@@ -67,6 +68,17 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		"long-title":    {Items: []appstore.Item{longTitle}},
 		"empty":         {},
 	}
+	filtered := &storeui.Model{Items: []appstore.Item{installed}}
+	filtered.Tabs.CycleCategory(2)
+	filtered.Tabs.Cycle(2)
+	states["filtered"] = filtered
+	emptyFiltered := storeui.New(&routerBackend{items: []appstore.Item{item}})
+	if err := emptyFiltered.Load(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	emptyFiltered.Horizontal(1)
+	emptyFiltered.CycleTab(2)
+	states["empty-filtered"] = emptyFiltered
 	notice := &storeui.Model{Items: []appstore.Item{installed}}
 	notice.Toasts.Push("Install completed; game list refresh requested", time.Now())
 	states["notice"] = notice
@@ -222,6 +234,41 @@ func TestConsoleLabelsFitWithoutBreakingUTF8(t *testing.T) {
 	value := fitText(canvas.title, "星のカービィ — A very long title with asymmetric characters", 210)
 	if !utf8.ValidString(value) || font.MeasureString(canvas.title, value).Ceil() > 210 {
 		t.Fatalf("invalid fitted label %q", value)
+	}
+}
+
+func TestHeaderShowsFilterIntersectionWithoutInputHints(t *testing.T) {
+	for _, size := range [][2]int{{320, 240}, {320, 200}, {480, 320}, {639, 480}, {640, 480}, {641, 480}, {640, 479}, {640, 481}, {720, 480}, {720, 720}, {480, 640}, {640, 960}, {320, 640}, {1280, 720}, {1920, 1080}, {1920, 1200}, {2560, 1080}} {
+		t.Run(fmt.Sprintf("%dx%d", size[0], size[1]), func(t *testing.T) {
+			w, h := canvasSize(size[0], size[1])
+			canvas, err := newConsoleCanvas(w, h)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer canvas.close()
+			for category, categoryLabel := range []string{"ALL TYPES", "GAMES", "APPS"} {
+				for status, statusLabel := range []string{"ALL STATES", "READY", "INSTALLED"} {
+					// Empty views must retain both filters too, including the
+					// longest real labels rather than only short Games / Ready.
+					model := &storeui.Model{}
+					model.Tabs.CycleCategory(category)
+					model.Tabs.Cycle(status)
+					pad := canvas.draw(model, "", nil)
+					keyboard := canvas.draw(model, "", storeinput.NewDesktopSession("", ""))
+					bottom := 96
+					if canvas.compact {
+						bottom = 4 + canvas.title.Metrics().Height.Ceil() + 4 + canvas.step + 2
+					}
+					bounds := image.Rect(0, 0, w, bottom)
+					if !renderedText(keyboard, canvas, categoryLabel+" / "+statusLabel, bounds, palette.background, palette.accent) {
+						t.Fatalf("current intersection missing or clipped: %s / %s", categoryLabel, statusLabel)
+					}
+					if !bytes.Equal(pad.Pix[:bottom*pad.Stride], keyboard.Pix[:bottom*keyboard.Stride]) {
+						t.Fatal("header depends on input bindings; instructions belong in footer")
+					}
+				}
+			}
+		})
 	}
 }
 

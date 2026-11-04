@@ -20,16 +20,14 @@ func (c *consoleCanvas) footerTop() int {
 func (c *consoleCanvas) compactScreen(frame *image.RGBA, model *storeui.Model, platformName string, controls *storeinput.Session) {
 	content := frame.SubImage(image.Rect(0, 0, c.width, c.statusTop())).(*image.RGBA)
 	left, width := 8, c.width-16
-	titleHeight := c.title.Metrics().Height.Ceil() + 4
-	c.text(content, "KNULLI APP STORE", 4, left, width, palette.text, true)
-	top := 4 + titleHeight
+	top := c.header(content, model)
 	statusTop := c.statusTop()
 	switch {
 	case controls != nil && controls.Mode != storeinput.Normal:
 		c.text(content, "Controller unavailable", top, left, width, palette.warning, false)
 		c.prose(content, "Reconnect a controller. "+platformName, image.Rect(left, top+c.step, c.width-left, statusTop), palette.muted, false)
 	case len(model.Items) == 0:
-		c.prose(content, emptyCatalogueMessage(model.Total())+". Change filters or export diagnostics.", image.Rect(left, top, c.width-left, statusTop), palette.text, false)
+		c.prose(content, emptyCatalogueMessage(model.Total()), image.Rect(left, top, c.width-left, statusTop), palette.text, false)
 	case model.Busy:
 		c.text(content, model.Items[model.Selected].Package.Name, top, left, width, palette.text, false)
 		for i, line := range wrapReview(c.body, model.Message, width) {
@@ -40,8 +38,6 @@ func (c *consoleCanvas) compactScreen(frame *image.RGBA, model *storeui.Model, p
 	case model.Focus != storeui.Browse:
 		c.review(content, model, image.Rect(left, top, c.width-left, statusTop))
 	default:
-		c.text(content, model.Tabs.Category().Label()+" / "+model.Tab().Label(), top, left, width, palette.accent, false)
-		top += c.step + 2
 		item := model.Items[model.Selected]
 		summaryTop := statusTop - 2*c.step - 4
 		rowHeight := c.step + 2
@@ -107,7 +103,7 @@ func wrapReview(face font.Face, value string, width int) []string {
 
 func (c *consoleCanvas) review(frame *image.RGBA, model *storeui.Model, bounds image.Rectangle) {
 	item := model.Items[model.Selected]
-	heading := "Package details"
+	heading := ""
 	text := item.Package.Name + " / v" + item.Package.Version + "\n" + trustLabel(item) + " / " + installState(item)
 	if item.Package.Install != nil && item.Package.Install.Warning != "" {
 		text += "\n" + item.Package.Install.Warning
@@ -134,7 +130,7 @@ func (c *consoleCanvas) review(frame *image.RGBA, model *storeui.Model, bounds i
 	top := bounds.Min.Y
 	// Below the target minimum, prefer a readable text window and page range
 	// over optional review chrome. Confirmation headings still fit at 320×240.
-	if bounds.Dy() >= 3*c.step+4 {
+	if heading != "" && bounds.Dy() >= 3*c.step+4 {
 		c.text(frame, heading, top, bounds.Min.X, bounds.Dx(), palette.warning, false)
 		top += c.step + 4
 	}

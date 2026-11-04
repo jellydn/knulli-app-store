@@ -110,6 +110,8 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Verb** — The word an action carries in a footer hint, for example `Confirm` for the confirm action. Directional actions share `Navigate` and paging actions share `Page`.
 
+**Header** — The page identity and current category/status intersection, for example `Library` and `GAMES / INSTALLED`. Show the current values, not a second set of controller instructions or focusable filter controls. Keep both values visible even when no package matches. The footer owns the controls; selection memory and filter locking are unchanged. Below the 320×240 target, optional review identity can yield to reachable text while the filter state stays visible.
+
 **Footer hint** — A measured button chip and complete action label, for example `A Manage existing` or `L1/R1 Read`. Whole groups wrap into as many rows as required, with safe margins and a minimum gap; actions are not dropped or shortened to force a fit. Footer and status height are reserved before body layout. The 320×240 target retains selected-package trust/install state and complete reachable reviews. Face labels use the selected ES letters and keyboard runs name their keys. Quit is always Select+Y (Tab/F5+Y on a keyboard), never a lone face button. Status filtering applies only while browsing; Read pages review text.
 
 **Keyboard binding** — A fixed desktop key: arrows browse, Page Up/Page Down filters while browsing and pages text while reviewing, Enter confirms, Escape backs out, Y opens More (Y there exports diagnostics), and held Tab (or F5) plus Y quits. Keyboard input requires no setup or persistence.
