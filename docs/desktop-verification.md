@@ -5,14 +5,15 @@ opens the catalogue immediately: no setup, calibration, or saved assignments.
 The scratch fixture supplies platform files; architecture and resolution are
 explicit overrides, not measurements from a real device.
 
-Release target: v2026.10.27. Hardware reports remain scoped to the artifacts
-actually tested. The earlier audit baseline was v2026.10.25 at `14490119`.
-Picker 0.2.2 is published but UNTESTED on every hardware matrix. Its Tools and
-Emulators exclusions add no hardware gameplay evidence. Launcher, settings schema, `state/`
-preservation, firmware SDL requirements and the local ES API contract remain.
-The historical Picker 0.2.0 Smart Pro report does not verify 0.2.2. The other
-six current package versions retain Smart Pro-only evidence; all seven remain
-experimental. See [device evidence](real-device-tests.md).
+Current release: [v2026.11.04](https://github.com/jellydn/knulli-app-store/releases/tag/v2026.11.04).
+The catalogue has fourteen experimental entries. Hardware reports remain scoped
+to their exact artifacts. The 2026-10-30 owner confirmation covers eight exact
+TSP app versions, including Picker 0.2.2, but not separate physical gameplay,
+audible audio, hotkey return or this Store build. WebUI 1.2.2 and retroshelf
+0.6.10 need new-version device checks. MagicX full GUI validation remains open.
+See [device evidence](real-device-tests.md), the [catalogue audit](release-audit-2026-11-04.md)
+and [CPU benchmark protocol](idle-cpu-benchmark.md). The paragraphs below retain
+historical release-specific validation, not claims about the new binary.
 
 For v2026.10.27, published Picker 0.2.2 bytes passed all six asset digest/size
 checks, ZIP inventory/modes and AArch64/GLIBC 2.34 inspection. The real CLI
@@ -38,6 +39,40 @@ make gui GUI_DEVICE=magicx-zero-28 GUI_RESOLUTION=640x480
 
 `GUI_ROOT` defaults to `build/scratch-root`; `GUI_ARCH` defaults to `aarch64`.
 Never use a mounted SD card or live `/userdata` as a fixture root.
+
+## Release screenshots
+
+The README's `docs/assets/screenshots/library-*.png` images were captured from
+the real current SDL GUI on Linux using the software renderer and keyboard
+input. They use the same GUI source as v2026.11.04; the host executable is not
+the signed ARM64 release binary. No mockup, image generation, compositing,
+cropping or device screenshot was used. Captures show 1280×720, the 640×480
+two-pane boundary, and the 320×240 compact target. Fixture platform values and
+architecture/resolution overrides are not measurements of hardware.
+
+To reproduce without writing to a device:
+
+```sh
+make build-ui catalogue
+scripts/desktop-fixture.sh trimui-smart-pro "$PWD/build/release-capture-root"
+mkdir -p build/release-screens
+for size in 1280x720 640x480 320x240; do
+  SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software \
+    ./build/knulli-app-ui -input keyboard -windowed \
+    -root "$PWD/build/release-capture-root" -arch aarch64 -resolution "$size" \
+    -catalog build/catalog-index.json \
+    -screenshot "$PWD/build/release-screens/library-$size.png"
+done
+```
+
+`-screenshot` reads the renderer backbuffer before Present, including upload
+and viewport composition. These captures verify layout, not normal-mode idle
+CPU, physical readability, input latency, audible restoration or gameplay.
+At compact sizes the fixed summary intentionally shortens its text; More
+retains the complete paged review. Keyboard hint wrapping differs from the
+controller's letter hints. No new device evidence or compatibility is implied.
+
+## Manual run
 
 The equivalent manual run is:
 
