@@ -1,0 +1,126 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "io.github.kubrick89.knulli-webui",
+  "name": "Knulli WebUI",
+  "version": "1.2.2",
+  "type": "utility",
+  "summary": "Manage local ROMs, saves and BIOS files and control Knulli from a web browser.",
+  "repository": "https://github.com/kubrick89/knulli_webui",
+  "review": {
+    "status": "experimental",
+    "notes": [
+      "Release audit 2026-11-04: reviewed original publisher 1.2.2 ZIP, 1107782 bytes, SHA-256 dcfdfe3075176c99fbb2229d869512f2ca11fc543e9ae19c25e6572dae84c161, independently matching GitHub API metadata. The archive has 112 regular files and 1438748 regular-file bytes; removed Windows Zone.Identifier streams account for most inventory changes. No unsafe entries. Source at 557d81db0b07ba338bbc907664751292d8d2b0f3 matches packaged webui.py except the packaged VERSION correction from 1.2.1 to 1.2.2. No native ABI or dependency change; Python 3.7+, Bash and standard utilities remain required. Service bytes and the reviewed patch are unchanged. No separate publisher checksum or application license was found; direct-download upstream-managed experimental warnings remain.",
+      "1.2.2 adds dark theme, an optional first-access credential prompt and salted password hashes. Empty credentials STILL disable authentication; the prompt is not a security gate. Any client with network access can claim initial credentials until configured. Existing plaintext credentials remain supported and config is preserved during update/Repair/removal. HTTP Basic authentication has no TLS, uploads/delete/remote control remain enabled by default, and lexical upload path checks still permit symlink escapes. Configure credentials offline before first start, disable unnecessary writes/control and use a trusted network or encrypted tunnel. First-access setup and theme settings write the private config and a temporary config.json.tmp. Source review does not establish hardware or runtime confinement. See docs/release-audit-2026-11-04.md for fixture lifecycle checks and evidence limits.",
+      "On 2026-11-03 the owner explicitly authorized installation after reviewing the unauthenticated HTTP defaults, writable Tools content, symlinked ROM-root escape, unverified application license and service-removal concerns. This is upstream-managed experimental risk acceptance, not a security fix or device verification. See docs/knulli-webui-1.2.1.md.",
+      "Direct publisher download only; no application-code license or separate publisher checksum was found. Bundled console icons retain their KyleBing CC BY 4.0 attribution. No Store artwork is copied and no license identifier is invented. The independently downloaded 1133508-byte asset matches GitHub SHA-256 f39cf443f314ba8948c2ac9d4b069c81e33519aee491ba25b0fcc97c3cc9c555. GitHub account/API trust is not independent publisher authentication. The Store pins bytes; GitHub does not mark this release immutable.",
+      "The ZIP has 228 unique relative entries, 1423049 uncompressed bytes and no links, unsafe paths or special files. It includes Windows Zone.Identifier files and CPython 3.14 bytecode; the service runs Python source using the existing Python 3 runtime. Source declares Python 3.7+ and standard-library modules; Bash and standard Knulli shell utilities are also needed. Optional capture methods need grim or a configured command, and remote control needs device permissions. No architecture-specific native library is bundled. AArch64 Knulli is the experimental scope, not tested hardware.",
+      "The Store extracts the publisher ZIP into /userdata/system/knulli-webui without running install.sh. A verified equal-length service-header patch locates knulli_webui relative to the private service and moves its PID from /var/run to knulli_webui/service.pid. Tools starts the private service; no shared service registration, automatic startup or shared boot-hook mutation occurs. Stop it manually before all Store operations. Removal is blocked by the private PID or known shared startup references. Legacy independently installed services must be stopped and disabled manually; the Store cannot inspect their /var/run PID.",
+      "config.example.json is mapped to knulli_webui/config.json and preserved, including user credentials. Runtime-created files and logs remain unowned. The Store does not run the upstream uninstaller, which deletes the app directory. Repair restores pinned code and retains configuration; it does not undo runtime edits to ROMs, saves, BIOS, media, gamelists, collections or frontend settings.",
+      "Security warning: defaults expose HTTP on 0.0.0.0:8088 with no authentication, uploads/deletion and remote input enabled. The mutation header is CSRF protection, not authentication. Optional Basic authentication has no TLS. Uploads accept shell files in Tools and follow existing system-directory symlinks; runtime is not confined to Store paths. Use only a trusted private network, never internet port forwarding; set credentials and restrict writes/remote control before starting, or bind loopback and use an encrypted tunnel. Do not upload or distribute content without rights."
+    ],
+    "evidence": [
+      {
+        "kind": "release-integrity",
+        "url": "https://api.github.com/repos/kubrick89/knulli_webui/releases/tags/1.2.2",
+        "note": "Independently downloaded 1107782 bytes match GitHub SHA-256 dcfdfe3075176c99fbb2229d869512f2ca11fc543e9ae19c25e6572dae84c161. GitHub account/API trust only; no publisher checksum or application license found."
+      },
+      {
+        "kind": "filesystem-and-network-review",
+        "url": "https://github.com/kubrick89/knulli_webui/blob/557d81db0b07ba338bbc907664751292d8d2b0f3/knulli_webui/webui.py",
+        "note": "Reviewed auth_enabled, Handler authentication, credential setup, config save/cache invalidation, unchanged lexical upload checks and remote-input defaults. Credential prompt is optional, not enforced authentication. Service and Store patch remain byte-identical."
+      },
+      {
+        "kind": "owner-authorization",
+        "url": "https://ampcode.com/threads/T-01a19f39-efaf-72c8-8855-79981979d3b9",
+        "note": "Owner requested installation after the security admission report: 'It’s not a big problem. Add it and allow to install'. No device test was reported."
+      },
+      {
+        "kind": "release-integrity",
+        "url": "https://api.github.com/repos/kubrick89/knulli_webui/releases/assets/701485636",
+        "note": "Independently downloaded bytes match the API size 1133508 and SHA-256 f39cf443f314ba8948c2ac9d4b069c81e33519aee491ba25b0fcc97c3cc9c555. No separate publisher checksum; direct upstream experimental exception only."
+      },
+      {
+        "kind": "tagged-release",
+        "url": "https://github.com/kubrick89/knulli_webui/releases/tag/1.2.1",
+        "note": "Tag resolves to bc8f18d3fb1bb0d2a05f2dbdaf56ea247b4733fa. The release installer enables and starts a shared service; the Store never executes it."
+      },
+      {
+        "kind": "license-review",
+        "url": "https://github.com/kubrick89/knulli_webui/tree/bc8f18d3fb1bb0d2a05f2dbdaf56ea247b4733fa",
+        "note": "No application-code license found. Console icon notice attributes KyleBing under CC BY 4.0, with cropping/resizing disclosed. This does not license the application."
+      },
+      {
+        "kind": "filesystem-and-network-review",
+        "url": "https://github.com/kubrick89/knulli_webui/blob/bc8f18d3fb1bb0d2a05f2dbdaf56ea247b4733fa/knulli_webui/webui.py",
+        "note": "Inspected defaults, Handler authentication, upload_target/system_dirs, config loading, runtime writes and HTTP startup. Focused temporary-root probes confirmed empty-credential authentication, Tools shell-file upload acceptance and symlinked-system upload escape. Runtime reads device nodes and writes controller events; files are not sandboxed."
+      },
+      {
+        "kind": "service-review",
+        "url": "https://github.com/kubrick89/knulli_webui/blob/bc8f18d3fb1bb0d2a05f2dbdaf56ea247b4733fa/services/knulli_webui",
+        "note": "Store patch changes only APP_DIR and PIDFILE at byte offset 225, verifying source bytes and final hash. Service still writes its log and rotated log under /userdata/system/logs. No shared service is installed or enabled."
+      }
+    ]
+  },
+  "release": {
+    "url": "https://github.com/kubrick89/knulli_webui/releases/download/1.2.2/knulli_webui_1.2.2.zip",
+    "sha256": "dcfdfe3075176c99fbb2229d869512f2ca11fc543e9ae19c25e6572dae84c161",
+    "size": 1107782,
+    "installed_size": 1438748,
+    "format": "zip",
+    "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "dependencies": ["python3"]
+  },
+  "install": {
+    "destination": "/userdata/system/knulli-webui",
+    "file_mappings": {
+      "config.example.json": "knulli_webui/config.json"
+    },
+    "launcher": "services/knulli_webui",
+    "executables": ["services/knulli_webui"],
+    "upstream_managed": true,
+    "menu_command": ["/userdata/system/knulli-webui/services/knulli_webui", "start"],
+    "warning": "Experimental; license unverified; GitHub digest only, no publisher checksum. Starts HTTP on all interfaces at port 8088, NO AUTH by default; upload/delete and remote input enabled. Runtime writes are NOT sandboxed; uploads can follow symlinks and write Tools scripts. Trusted private network only; never expose to internet. Configure knulli_webui/config.json before starting: set credentials (Basic auth has no TLS), disable writes/remote input or use loopback + encrypted tunnel. No autostart. Stop private service before Repair/removal; stop and disable any legacy shared service too. Config is retained.",
+    "preserve": ["knulli_webui/config.json"],
+    "menu": {
+      "gamelist": "/userdata/roms/tools/gamelist.xml",
+      "path": "./Knulli WebUI.sh",
+      "name": "Knulli WebUI",
+      "description": "Start the experimental web service on port 8088. Configure authentication before use; trusted private network only. No autostart."
+    },
+    "network": true,
+    "allowed_write_paths": [
+      "/userdata/system/knulli-webui",
+      "/userdata/roms/tools/Knulli WebUI.sh",
+      "/userdata/roms/tools/gamelist.xml"
+    ],
+    "binary_patches": [
+      {
+        "path": "services/knulli_webui",
+        "offset": 225,
+        "before_hex": "4150505f4449523d222f75736572646174612f73797374656d2f6b6e756c6c692d7765627569220a50494446494c453d222f7661722f72756e2f6b6e756c6c695f77656275692e70696422",
+        "after_hex": "4150505f4449523d22247b30252f2a7d2f2e2e2f6b6e756c6c695f7765627569220a50494446494c453d22244150505f4449522f736572766963652e706964222020202020202020202020",
+        "sha256": "bd922a7631d08a71c6b4d115c89c5b00710490ca407c170f9b37d648e96f66a9"
+      }
+    ],
+    "uninstall_checks": [
+      {
+        "path": "/userdata/system/knulli-webui/knulli_webui/service.pid",
+        "message": "Stop the private service with /userdata/system/knulli-webui/services/knulli_webui stop before retrying. The Store never stops processes."
+      },
+      {
+        "path": "/userdata/system/services/knulli_webui",
+        "message": "Stop and disable the legacy shared knulli_webui service and remove its service file manually before retrying. Its /var/run PID cannot be checked by the Store. Keep your configuration."
+      },
+      {
+        "path": "/userdata/system/custom.sh",
+        "contains": "knulli_webui",
+        "message": "Stop WebUI and remove its manual startup reference from custom.sh before retrying. The Store never edits shared boot hooks."
+      }
+    ]
+  }
+}

@@ -30,15 +30,17 @@ var palette = struct{ background, panel, text, muted, accent, warning, error col
 	accent: color.RGBA{70, 220, 174, 255}, warning: color.RGBA{244, 180, 64, 255}, error: color.RGBA{239, 94, 94, 255},
 }
 
-// One responsive canvas follows the picker's 480-high logical coordinate space:
-// width = max(640, outputWidth * 480 / outputHeight). No per-device layouts.
 type consoleCanvas struct {
-	width       int
-	body, title font.Face
-	thumbnails  map[string]image.Image
+	width, height int
+	compact       bool
+	step          int
+	body, title   font.Face
+	thumbnails    map[string]image.Image
+	groups        []footerGroup
+	footerStart   int
 }
 
-func newConsoleCanvas(width int) (*consoleCanvas, error) {
+func newConsoleCanvas(width, height int) (*consoleCanvas, error) {
 	thumbnails, err := loadThumbnails()
 	if err != nil {
 		return nil, err
@@ -47,16 +49,20 @@ func newConsoleCanvas(width int) (*consoleCanvas, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load console font: %w", err)
 	}
-	body, err := opentype.NewFace(typeface, &opentype.FaceOptions{Size: 18, DPI: 72, Hinting: font.HintingFull})
+	bodySize, titleSize, step := 18.0, 26.0, 23
+	if height < canvasHeight || width < 400 {
+		bodySize, titleSize, step = 14, 18, 18
+	}
+	body, err := opentype.NewFace(typeface, &opentype.FaceOptions{Size: bodySize, DPI: 72, Hinting: font.HintingFull})
 	if err != nil {
 		return nil, err
 	}
-	title, err := opentype.NewFace(typeface, &opentype.FaceOptions{Size: 26, DPI: 72, Hinting: font.HintingFull})
+	title, err := opentype.NewFace(typeface, &opentype.FaceOptions{Size: titleSize, DPI: 72, Hinting: font.HintingFull})
 	if err != nil {
 		body.Close()
 		return nil, err
 	}
-	return &consoleCanvas{width: width, body: body, title: title, thumbnails: thumbnails}, nil
+	return &consoleCanvas{width: width, height: height, compact: width < 640 || height < canvasHeight, step: step, body: body, title: title, thumbnails: thumbnails}, nil
 }
 
 func (c *consoleCanvas) close() { _ = c.body.Close(); _ = c.title.Close() }
@@ -116,25 +122,29 @@ func (c *consoleCanvas) prose(frame *image.RGBA, value string, bounds image.Rect
 }
 
 func (c *consoleCanvas) draw(model *storeui.Model, platformName string, controls *storeinput.Session) *image.RGBA {
-	frame := image.NewRGBA(image.Rect(0, 0, c.width, canvasHeight))
+	c.layoutFooter(model, controls)
+	frame := image.NewRGBA(image.Rect(0, 0, c.width, c.height))
 	fill(frame, frame.Bounds(), palette.background)
-	c.header(frame, model, controls)
+	if c.compact {
+		c.compactScreen(frame, model, platformName, controls)
+		return frame
+	}
+	content := frame.SubImage(image.Rect(0, 0, c.width, c.statusTop()-4)).(*image.RGBA)
+	c.header(content, model, controls)
 	switch {
 	case controls != nil && controls.Mode != storeinput.Normal:
-		c.text(frame, "Controller unavailable", 154, 32, c.width-64, palette.warning, true)
-		c.prose(frame, "Reconnect a controller to continue. "+platformName, image.Rect(32, 212, c.width-32, 310), palette.muted, false)
+		c.text(content, "Controller unavailable", 154, 32, c.width-64, palette.warning, true)
+		c.prose(content, "Reconnect a controller to continue. "+platformName, image.Rect(32, 212, c.width-32, 310), palette.muted, false)
 	case len(model.Items) == 0:
-		c.text(frame, emptyCatalogueMessage(model.Total()), 164, 32, c.width-64, palette.text, true)
-		c.prose(frame, "Change filters to browse other packages. Use Y to export diagnostics if the catalogue is unavailable.", image.Rect(32, 219, c.width-32, 310), palette.muted, false)
+		c.text(content, emptyCatalogueMessage(model.Total()), 164, 32, c.width-64, palette.text, true)
+		c.prose(content, "Change filters to browse other packages. Use Y to export diagnostics if the catalogue is unavailable.", image.Rect(32, 219, c.width-32, 310), palette.muted, false)
 	case model.Focus == storeui.Browse || model.Busy:
-		c.browse(frame, model)
-	case model.Focus == storeui.Confirm || model.Focus == storeui.ForceConfirm:
-		c.confirmation(frame, model)
+		c.browse(content, model)
 	default:
-		c.details(frame, model)
+		c.review(content, model, image.Rect(32, 99, c.width-32, c.statusTop()-4))
 	}
-	c.status(frame, model, controls)
-	c.footer(frame, model, controls)
+	c.status(frame, model)
+	c.footer(frame, model)
 	return frame
 }
 
@@ -145,58 +155,6 @@ func (c *consoleCanvas) text(frame *image.RGBA, value string, y, left, width int
 	}
 	drawer := font.Drawer{Dst: frame, Src: image.NewUniform(shade), Face: face, Dot: fixed.P(left, y+face.Metrics().Ascent.Ceil())}
 	drawer.DrawString(fitText(face, strings.Join(strings.Fields(value), " "), width))
-}
-
-func (c *consoleCanvas) confirmation(frame *image.RGBA, model *storeui.Model) {
-	item := model.Items[model.Selected]
-	action := item.Actions[model.Action]
-	c.text(frame, item.Package.Name, 99, 32, c.width-64, palette.text, true)
-	c.text(frame, "v"+item.Package.Version+" / "+trustLabel(item), 137, 32, c.width-64, palette.muted, false)
-	heading := "Confirm " + actionLabel(action) + "?"
-	notice := ""
-	if item.Package.Install != nil {
-		notice = item.Package.Install.Warning
-	}
-	if action == appstore.ForceReinstall {
-		heading = "Step 1 of 2 / Review recovery"
-		if model.Focus == storeui.ForceConfirm {
-			heading = "Step 2 of 2 / Confirm reinstall"
-		}
-		notice = item.RecoverySummary
-	}
-	c.text(frame, heading, 178, 32, c.width-64, palette.warning, true)
-	c.prose(frame, notice, image.Rect(32, 222, c.width-32, 367), palette.text, false)
-	c.label(frame, "Back cancels / Start never confirms", 386, 24, c.width-48, palette.muted, false)
-}
-
-func (c *consoleCanvas) details(frame *image.RGBA, model *storeui.Model) {
-	item := model.Items[model.Selected]
-	c.text(frame, item.Package.Name, 99, 32, c.width-64, palette.text, true)
-	c.text(frame, trustLabel(item)+" / "+installState(item), 137, 32, c.width-64, statusColor(item), false)
-	message := item.Verdict.Message()
-	if message == "" {
-		message = item.Compatibility
-	}
-	if model.Focus == storeui.Health {
-		message = item.HealthReason + " Repair restores reviewed bytes and modes."
-	}
-	if item.RecoveryReason != "" {
-		message = item.RecoveryReason + " " + item.RecoverySummary
-	}
-	c.prose(frame, message, image.Rect(32, 178, c.width-32, 274), palette.muted, false)
-	if model.Focus == storeui.Health {
-		c.text(frame, "Confirm reviews available recovery actions", 302, 32, c.width-64, palette.warning, false)
-		return
-	}
-	if len(item.Actions) == 0 {
-		c.label(frame, "Read only / review required", 306, 24, c.width-48, palette.warning, false)
-		return
-	}
-	// The model owns selection, including restoration after a cancelled review.
-	fill(frame, image.Rect(32, 286, c.width-32, 330), palette.accent)
-	fill(frame, image.Rect(34, 288, c.width-34, 328), palette.panel)
-	c.label(frame, "‹  "+actionLabel(item.Actions[model.Action])+"  ›", 296, 48, c.width-96, palette.accent, false)
-	c.label(frame, fmt.Sprintf("Action %d of %d / D-pad changes action", model.Action+1, len(item.Actions)), 343, 24, c.width-48, palette.muted, false)
 }
 
 func trustLabel(item appstore.Item) string {

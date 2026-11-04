@@ -285,6 +285,53 @@ func TestWindowFollowsTheSelectionAndStopsAtTheEndOfTheList(t *testing.T) {
 	}
 }
 
+func TestReviewPagingPreservesActionAndClampsAfterResize(t *testing.T) {
+	model := &Model{Items: []appstore.Item{{Actions: []appstore.Action{appstore.Adopt, appstore.ForceReinstall}}}}
+	model.More()
+	model.Horizontal(1)
+	model.Select(context.Background())
+	for _, focus := range []Focus{Confirm, ForceConfirm, Health, Actions} {
+		model.Focus = focus
+		model.ReviewOffset = 0
+		model.ReviewWindow(17, 5)
+		model.CycleTab(1)
+		if start, end := model.ReviewWindow(17, 5); start != 5 || end != 10 {
+			t.Fatalf("focus %v: wrong second text window %d–%d", focus, start, end)
+		}
+		for range 6 {
+			model.CycleTab(1)
+		}
+		if start, end := model.ReviewWindow(17, 5); start != 12 || end != 17 {
+			t.Fatalf("last warning lines unreachable: %d–%d", start, end)
+		}
+		if model.Action != 1 || model.Selected != 0 || model.Focus != focus || model.Tab() != TabAll || model.Busy {
+			t.Fatal("reading changed action, selection, filter or operation")
+		}
+		model.Busy = true
+		model.CycleTab(-1)
+		if model.ReviewOffset != 12 {
+			t.Fatal("busy review accepted paging")
+		}
+		model.Busy = false
+		if start, end := model.ReviewWindow(17, 13); start != 4 || end != 17 {
+			t.Fatalf("resize did not clamp review: %d–%d", start, end)
+		}
+		model.CycleTab(-1)
+		if model.ReviewOffset != 0 {
+			t.Fatal("first warning lines unreachable")
+		}
+	}
+	model.Focus = Confirm
+	model.Select(context.Background())
+	if model.Focus != ForceConfirm || model.Busy {
+		t.Fatal("recovery lost its second confirmation")
+	}
+	model.Back()
+	if model.Focus != Confirm || model.ReviewOffset != 0 {
+		t.Fatal("back did not restore first review")
+	}
+}
+
 func waitForModel(t *testing.T, model *Model) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)

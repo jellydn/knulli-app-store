@@ -5,6 +5,8 @@ package sdlui
 import (
 	"fmt"
 	"image"
+	"image/color"
+	"strings"
 
 	storeinput "github.com/jellydn/knulli-app-store/internal/input"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
@@ -64,7 +66,7 @@ func (c *consoleCanvas) header(frame *image.RGBA, model *storeui.Model, controls
 	}
 }
 
-func (c *consoleCanvas) status(frame *image.RGBA, model *storeui.Model, controls *storeinput.Session) {
+func (c *consoleCanvas) status(frame *image.RGBA, model *storeui.Model) {
 	// Errors persist; notices expire. Neither may cover the controls below.
 	status, shade := model.Message, palette.accent
 	if model.Error != "" {
@@ -74,93 +76,133 @@ func (c *consoleCanvas) status(frame *image.RGBA, model *storeui.Model, controls
 		status = notices[0]
 	}
 	if status != "" {
-		fill(frame, image.Rect(16, 385, c.width-16, 427), palette.panel)
-		c.text(frame, status, 394, 24, c.width-48, shade, false)
+		fill(frame, image.Rect(16, c.statusTop(), c.width-16, c.footerTop()), palette.panel)
+		c.text(frame, status, c.statusTop()+8, 24, c.width-48, shade, false)
 		return
 	}
 	if model.Focus == storeui.Browse && len(model.Items) > 0 {
-		c.text(frame, fmt.Sprintf("%s / %d of %d", model.Tab().Label(), model.Selected+1, len(model.Items)), 397, 24, c.width/2-24, palette.muted, false)
-	}
-	if controls != nil && !model.Busy && model.Focus != storeui.Confirm && model.Focus != storeui.ForceConfirm {
-		c.label(frame, controls.QuitChord()+": Quit", 397, c.width/2, c.width/2-24, palette.muted, false)
+		c.text(frame, fmt.Sprintf("%s / %d of %d", model.Tab().Label(), model.Selected+1, len(model.Items)), c.statusTop()+8, 24, c.width-48, palette.muted, false)
 	}
 }
 
-func (c *consoleCanvas) footer(frame *image.RGBA, model *storeui.Model, controls *storeinput.Session) {
-	fill(frame, image.Rect(0, 427, c.width, 480), palette.panel)
-	if model.Busy {
-		c.label(frame, "Please wait / controls locked", 444, 24, c.width-48, palette.muted, false)
-		return
-	}
-	hints := footerHints(model, controls)
-	// Quit stays above the footer, leaving four short cells for browsing.
-	visible := hints[:0:0]
-	for _, hint := range hints {
-		if hint.Action != storeinput.Exit {
-			visible = append(visible, hint)
-		}
-	}
-	if model.Focus == storeui.Browse && (controls == nil || controls.Mode == storeinput.Normal) {
-		visible = append(visible, storeinput.Hint{Action: storeinput.PageUp, With: storeinput.PageDown, Verb: "Status"})
-	}
-	if len(visible) == 0 {
-		return
-	}
+type footerGroup struct {
+	key, label string
+	bounds     image.Rectangle
+	keyWidth   int
+}
+
+// Measure the same key chips and labels that will be painted. Unlike the
+// toolkit's fixed left/right groups, wrap every whole group instead of dropping
+// actions or letting groups consume each other's space.
+func (c *consoleCanvas) layoutFooter(model *storeui.Model, controls *storeinput.Session) {
 	mapping := footerMapping(controls)
-	buttons, widths := make([]string, len(visible)), make([]int, len(visible))
-	total := 0
-	for i, hint := range visible {
-		button := storeinput.ButtonLabel(mapping[hint.Action])
-		if hint.With != "" {
-			button = "↑↓"
-			if hint.Action == storeinput.PageUp {
-				button = "L1 R1"
-				if controls != nil && controls.Source == storeinput.KeyboardSourceName {
-					button = "PgUp/PgDn"
-				}
-			}
+	confirm, back := storeinput.ButtonLabel(mapping[storeinput.Confirm]), storeinput.ButtonLabel(mapping[storeinput.Back])
+	more, pages, chord := storeinput.ButtonLabel(mapping[storeinput.Diagnostics]), "L1/R1", storeinput.QuitChord(mapping, "")
+	if controls != nil {
+		chord = controls.QuitChord()
+		if controls.Source == storeinput.KeyboardSourceName {
+			confirm, back, pages = "Enter", "Esc", "PgUp/Dn"
 		}
-		if hint.Action == storeinput.Confirm && model.Focus == storeui.Browse && len(model.Items) > 0 {
-			item := model.Items[model.Selected]
-			if len(item.Actions) == 0 {
-				hint.Verb = "Review"
-			} else {
-				hint.Verb = actionLabel(item.Actions[0])
-			}
-			if item.HealthReason != "" {
-				hint.Verb = "Health"
-			}
-		}
-		visible[i], buttons[i] = hint, button
-		widths[i] = font.MeasureString(c.body, button+" "+hint.Verb).Ceil()
-		if len(button) == 1 {
-			widths[i] = 34 + font.MeasureString(c.body, hint.Verb).Ceil()
-		}
-		total += widths[i]
 	}
-	// Measure groups before spacing them: keyboard names and Manage existing
-	// must not be truncated by equal-width footer cells at 640x480.
-	gap := max(0, (c.width-48-total)/(len(visible)+1))
-	left := 24 + gap
-	for i, hint := range visible {
-		button := buttons[i]
-		if len(button) == 1 {
-			shade := palette.text
-			if hint.Action == storeinput.Confirm {
-				shade = palette.accent
-			}
-			for y := -13; y <= 13; y++ {
-				for x := -13; x <= 13; x++ {
-					if distance := x*x + y*y; distance <= 169 && distance >= 132 {
-						frame.Set(left+13+x, 453+y, shade)
-					}
-				}
-			}
-			c.label(frame, button, 442, left, 26, shade, false)
-			c.text(frame, hint.Verb, 442, left+34, widths[i]-34, palette.text, false)
-		} else {
-			c.text(frame, button+" "+hint.Verb, 442, left, widths[i], palette.text, false)
+	chord = strings.ReplaceAll(chord, " ", "")
+	c.groups = nil
+	add := func(key, label string) { c.groups = append(c.groups, footerGroup{key: key, label: label}) }
+	switch {
+	case model.Busy:
+	case controls != nil && controls.Mode != storeinput.Normal:
+		add(confirm, "Diagnostics")
+		add(chord, "Quit")
+	case len(model.Items) == 0:
+		add("←→", "Type")
+		add(pages, "Status")
+		add(more, "Diagnostics")
+		add(chord, "Quit")
+	case model.Focus == storeui.Browse:
+		verb := "Review"
+		item := model.Items[model.Selected]
+		if len(item.Actions) > 0 {
+			verb = actionLabel(item.Actions[0])
 		}
-		left += widths[i] + gap
+		if item.HealthReason != "" {
+			verb = "Health"
+		}
+		add("↑↓", "Browse")
+		add("←→", "Type")
+		add(confirm, verb)
+		add(more, "More")
+		add(pages, "Status")
+		add(chord, "Quit")
+	case model.Focus == storeui.Confirm || model.Focus == storeui.ForceConfirm:
+		add(confirm, "Confirm")
+		add(back, "Back")
+		add(pages, "Read")
+	default:
+		if model.Focus == storeui.Actions && len(model.Items[model.Selected].Actions) > 1 {
+			add("←→", "Action")
+		}
+		add(confirm, "Review")
+		add(back, "Back")
+		add(pages, "Read")
+		add(more, "Diagnostics")
+		add(chord, "Quit")
+	}
+	margin, gap := 8, 8
+	if !c.compact {
+		margin = 16
+	}
+	height := c.body.Metrics().Height.Ceil() + 10
+	x, y := margin, 8
+	for i := range c.groups {
+		group := &c.groups[i]
+		keyInk, keyAdvance := font.BoundString(c.body, group.key)
+		labelInk, labelAdvance := font.BoundString(c.body, group.label)
+		group.keyWidth = max(height-8, max(keyAdvance.Ceil(), keyInk.Max.X.Ceil())-min(0, keyInk.Min.X.Floor())+8)
+		width := group.keyWidth + 12 + max(labelAdvance.Ceil(), labelInk.Max.X.Ceil()) - min(0, labelInk.Min.X.Floor())
+		if x > margin && x+width > c.width-margin {
+			x, y = margin, y+height+4
+		}
+		group.bounds = image.Rect(x, y, x+width, y+height)
+		x += width + gap
+	}
+	c.footerStart = c.height - (y + height + 8)
+	for i := range c.groups {
+		c.groups[i].bounds = c.groups[i].bounds.Add(image.Pt(0, c.footerStart))
+	}
+}
+
+func (c *consoleCanvas) statusTop() int {
+	if c.compact {
+		return c.footerTop() - c.step - 6
+	}
+	return c.footerTop() - 42
+}
+
+func (c *consoleCanvas) footer(frame *image.RGBA, model *storeui.Model) {
+	fill(frame, image.Rect(0, c.footerTop(), c.width, c.height), palette.panel)
+	if model.Busy {
+		left := 8
+		if !c.compact {
+			left = 16
+		}
+		c.text(frame, "Please wait / controls locked", c.footerTop()+8, left, c.width-2*left, palette.muted, false)
+	}
+	for _, group := range c.groups {
+		chip := image.Rect(group.bounds.Min.X, group.bounds.Min.Y+4, group.bounds.Min.X+group.keyWidth, group.bounds.Max.Y-4)
+		roundedHint(frame, chip, palette.background)
+		c.label(frame, group.key, group.bounds.Min.Y+5, chip.Min.X, chip.Dx(), palette.accent, false)
+		c.text(frame, group.label, group.bounds.Min.Y+5, chip.Max.X+6, group.bounds.Max.X-chip.Max.X-6, palette.text, false)
+	}
+}
+
+func roundedHint(frame *image.RGBA, bounds image.Rectangle, shade color.Color) {
+	radius := min(6, bounds.Dy()/2)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		inset := 0
+		if edge := min(y-bounds.Min.Y, bounds.Max.Y-1-y); edge < radius {
+			for inset < radius && (radius-inset)*(radius-inset)+(radius-edge)*(radius-edge) > radius*radius {
+				inset++
+			}
+		}
+		fill(frame, image.Rect(bounds.Min.X+inset, y, bounds.Max.X-inset, y+1), shade)
 	}
 }

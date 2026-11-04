@@ -2,13 +2,19 @@ package sdlui
 
 const canvasHeight = 480
 
-// Same logical-size rule as Random Game Picker 0.2.0. Both device targets use
-// this layout; output aspect ratio, not a device name, determines its width.
-func logicalWidth(width, height int) int {
-	if height <= 0 {
-		return 640
+// Short outputs use native pixels so text is never a downsampled desktop UI.
+// Larger outputs retain the established scale without imposing a 4:3 minimum.
+func canvasSize(width, height int) (int, int) {
+	if width <= 0 || height <= 0 {
+		return 640, canvasHeight
 	}
-	return max(640, width*canvasHeight/height)
+	if height < canvasHeight {
+		return min(width, 960), height
+	}
+	if width*canvasHeight/height < 320 {
+		return 320, height * 320 / width
+	}
+	return min(960, width*canvasHeight/height), canvasHeight
 }
 
 // Kept as the default catalogue page size for semantic keyboard navigation.

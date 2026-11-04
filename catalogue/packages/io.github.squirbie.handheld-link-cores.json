@@ -51,7 +51,6 @@
   },
   "compatibility": {
     "firmware": "knulli",
-    "minimum_version": "",
     "architectures": ["aarch64"],
     "abis": ["linux-aarch64-glibc"],
     "minimum_glibc": "2.35",

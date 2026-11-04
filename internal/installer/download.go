@@ -58,6 +58,10 @@ func download(ctx context.Context, client *http.Client, release manifest.Release
 	if closeErr != nil {
 		return closeErr
 	}
+	// A buffered response can reach EOF successfully after cancellation.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if written != release.Size {
 		return fmt.Errorf("download size is %d, expected %d", written, release.Size)
 	}

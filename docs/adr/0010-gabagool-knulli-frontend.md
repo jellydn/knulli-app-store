@@ -56,6 +56,80 @@ library, chrome, and package review; the input model and installer do not change
 Verify the same layout at 1280×720 and 640×480 with both input sources. Desktop
 fixtures do not establish physical-controller or native-device results.
 
+### 2026-11-03 capability-based presentation revision (approved, unreleased)
+
+This revision replaces the fixed minimum 640×480 canvas and always-present
+detail pane above. Keep standard outputs at a 480-high logical scale, but let
+aspect ratio determine width without a 640 minimum; cap content at 960 logical
+pixels on wide outputs. Below 480 output pixels high, use native pixels rather
+than downsampling. Very tall outputs retain at least 320 logical pixels wide
+and expand logical height instead of squeezing controls. Use 14/18 body/title sizes on short or narrow canvases and
+the existing 18/26 sizes elsewhere. The initial UI target minimum is 320×240;
+320×200, portrait and ultrawide cases are additional stress cases, not physical
+device support claims.
+
+Use two panes only when the canvas is at least 640 wide and 480 high. Otherwise
+use a stable single-column list, a fixed selected-package summary and Y for
+complete details. Derive compact row capacity from available height. Keep
+reviewed offline artwork, contained with its aspect ratio intact; omit
+secondary art on compact screens before reducing essential text. The footer
+revision below supersedes the initial two-row hint budget.
+
+L1/R1 (Page Up/Page Down) still filters status while browsing. On More, Health
+and both confirmation screens it pages the complete measured review text,
+including warnings, compatibility and recovery information. Show the visible
+line range and total. Keep action selection independent from text paging,
+preserve the two-step recovery confirmation, and never execute on a paging key.
+The pure-Go model owns the review offset and clamps it to measured capacity.
+
+The SDL renderer output, not the board name or a resolution override, determines
+the drawable boundary. Rebuild size-dependent canvas/texture resources when
+output changes; preserve the model, worker, input policy and selected action.
+Retain the last valid surface during a transient invalid size. Log drawable
+layout changes separately from detected platform evidence. Do not infer
+rotation from portrait dimensions or rewrite exact device-test evidence on
+resize. Windowed verification permits interactive resizing.
+
+Source review of [Grout at 48b229cc](https://github.com/rommapp/grout/tree/48b229cc04002681335ba66547a267d680c152e3)
+supports measured row capacity, contained artwork, firmware quirks and separate
+architecture builds. Its stock widgets do not control this custom renderer.
+[retroshelf's public Linux repository at 4646af74](https://github.com/retroshelf-org/linux/tree/4646af742d1f89a32158d18f5575ff58c544daa5)
+contains release metadata only. Its linked implementation source still returns
+404; no claim about its internal responsive UI is made. The owner approved
+proceeding without that source. Painter concepts informed structure only;
+actual SDL renders and navigation tests determine acceptance.
+
+### 2026-11-03 measured footer revision (approved, unreleased)
+
+Device testing reported overlapping hints, without an exact failing capture.
+Recheck [Grout's actual footer call site](https://github.com/rommapp/grout/blob/48b229cc04002681335ba66547a267d680c152e3/ui/game_details.go)
+and [gabagool v2.26.6 footer](https://github.com/BrandonKowalski/gabagool/blob/v2.26.6/pkg/gabagool/footer.go).
+Grout supplies contextual button/help pairs. Gabagool measures key and help
+widths, gives long keys wider chips, and groups pills left/right. It does not
+wrap colliding groups; its automatic grouping can omit hints beyond four.
+Adopt measured chips and contextual help, not its item limit, scaling policy,
+blocking input loop or Start confirmation.
+
+Use one footer for compact and standard rendering. Measure actual glyph ink
+and advances, retain an eight-pixel group gap, and wrap whole groups into the
+required rows without hiding or abbreviating actions. Reserve measured footer
+and status bounds before composing/clipping the body. Library row capacity and
+review page capacity use the remaining space. Keep trust/install state at the
+320×240 minimum. Below-target 320×200 stress reviews may omit optional heading
+and action chrome before losing warning text or the page range. All complete
+details remain reachable; controller mapping, filtering, confirmation and quit
+policy stay unchanged. Use actual drawable-derived geometry, including
+1280×720 and all compact/aspect-ratio/resize cases, never a device-name patch.
+
+No architecture/ABI packaging or legacy update-channel migration was included
+in this presentation phase. [ADR 0013](0013-compatibility-profile-distribution.md)
+subsequently authorizes one shared distribution and documents legacy limits.
+Keep firmware/ABI/glibc/SDL requirements, catalogue
+signing, controller letter policy and installer boundaries. Responsive output
+does not imply a universal binary. Desktop evidence is not hardware evidence;
+the changed build needs new physical display/controller and ES return checks
+before any separately authorized release.
+
 Stock components run blocking event loops and add Start-to-confirm. Using them
 now would introduce another owner for controls, confirmation and asynchronous
 operation progress. The Store instead uses one loop and disables the toolkit's
@@ -77,8 +151,9 @@ Keep these ownership boundaries:
 
 These are extension seams, not a generic firmware framework. A future CFW needs
 its own reviewed profile and integration tests; none is implemented or claimed
-here. The only packaged targets remain KNULLI TrimUI Smart Pro and MagicX Zero
-28. Neither an ARM64 build nor a desktop fixture is device compatibility proof.
+here. The initial packaged targets were KNULLI TrimUI Smart Pro and MagicX Zero
+28; ADR 0013 replaces those names with a shared compatibility profile. Neither
+an ARM64 build nor a desktop fixture is device compatibility proof.
 
 Desktop walkthroughs capture the actual renderer backbuffer before presenting,
 not only the source bitmap. Keep headless layout tests, race tests, adversarial

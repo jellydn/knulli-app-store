@@ -390,6 +390,7 @@ func detectDependencies(root string) []string {
 		"libretro-prboom":  {"usr/lib/libretro/prboom_libretro.so"},
 		"libretro-mgba":    {"usr/lib/libretro/mgba_libretro.so"},
 		"libretro-arduous": {"usr/lib/libretro/arduous_libretro.so"},
+		"python3":          {"usr/bin/python3"},
 		"python3.12":       {"usr/bin/python3.12"},
 		"pygame":           {"usr/lib/python3.12/site-packages/pygame/__init__.py", "userdata/roms/pygame/pygame/__init__.py"},
 		"portmaster":       {"opt/system/Tools/PortMaster/control.txt", "opt/tools/PortMaster/control.txt", "userdata/system/.local/share/PortMaster/control.txt", "roms/ports/PortMaster/control.txt"},

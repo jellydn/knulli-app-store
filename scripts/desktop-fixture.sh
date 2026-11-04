@@ -80,6 +80,7 @@ mkdir -p "$ROOT/usr/bin" \
          "$ROOT/usr/lib/libretro" \
          "$ROOT/usr/lib/python3.12/site-packages/pygame" \
          "$ROOT/userdata/system/.local/share/PortMaster"
+: >"$ROOT/usr/bin/python3"
 : >"$ROOT/usr/bin/python3.12"
 : >"$ROOT/usr/bin/retroarch"
 : >"$ROOT/usr/lib/libretro/prboom_libretro.so"

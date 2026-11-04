@@ -5,7 +5,7 @@ name: release
 # - Every green `check` run on main re-publishes that run's verified artifacts
 #   as a dated experimental pre-release (v2026.09.16-6655b2d style). Users
 #   download exactly what green CI built and tested; nothing is rebuilt.
-# - Pushing a v* tag rebuilds both device packages with the same signed
+# - Pushing a v* tag rebuilds the compatibility-profile package with the same signed
 #   catalogue, cross-compile, and ABI-verification steps as CI, then publishes
 #   them as a full release at the tag.
 #
@@ -35,6 +35,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Derive release tag
         id: tag
         env:
@@ -46,19 +49,11 @@ jobs:
         with:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
-          pattern: knulli-app-store-*-experimental
+          name: knulli-app-store-knulli-aarch64-glibc-sdl2-experimental
           path: dist
 
       - name: Collect release files
-        run: |
-          mkdir release
-          find dist -name '*.zip' -exec cp {} release/ \;
-          if [ "$(find release -name '*.zip' | wc -l)" -ne 2 ]; then
-            echo "expected one zip per device target" >&2
-            find dist -maxdepth 2 -print
-            exit 1
-          fi
-          (cd release && sha256sum ./*.zip >SHA256SUMS.txt)
+        run: scripts/collect-release.sh dist release
 
       - name: Publish pre-release
         env:
@@ -69,15 +64,25 @@ jobs:
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}
         run: |
           cat >notes.md <<'EOF'
-          Experimental device build.
+          Experimental KNULLI AArch64/glibc/SDL2 build.
 
-          - `knulli-app-store-trimui-smart-pro-experimental-*.zip` — TrimUI Smart Pro (1280×720)
-          - `knulli-app-store-magicx-zero-28-experimental-*.zip` — MagicX Zero 28 (640×480)
+          - `knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-*.zip` — one installable Store ZIP
+          - `SHA256SUMS.txt` — checksum for that ZIP; catalogue/signature are embedded
 
-          `SHA256SUMS.txt` covers both archives. These are the exact artifacts produced by the green `check` run of the released commit, which also records the GUI walkthrough evidence. Install with the [TrimUI Smart Pro](https://github.com/jellydn/knulli-app-store/blob/main/docs/trimui-smart-pro.md) or [MagicX Zero 28](https://github.com/jellydn/knulli-app-store/blob/main/docs/magicx-zero-28.md) guide.
+          Responsive layout and measured wrapping hints use runtime output dimensions, not device names. Physical footer/device testing remains outstanding; desktop tests are not hardware validation. See the [2026-11-04 catalogue audit](https://github.com/jellydn/knulli-app-store/blob/main/docs/release-audit-2026-11-04.md) for WebUI 1.2.2, retroshelf 0.6.10, unchanged/blocked entries and security warnings.
+
+          These are the exact bytes from the green `check` run. Requires KNULLI, AArch64, glibc and system SDL2/image/ttf; SDL2_gfx is static. Build gates cap required glibc symbols at 2.34. One ZIP is not universal hardware support. See the [installation and legacy migration guide](https://github.com/jellydn/knulli-app-store/blob/main/docs/store-distribution.md). Old device-named clients may need verified manual ZIP replacement; no legacy aliases are published in this release.
           EOF
           printf '\nCommit: %s · Check run: %s\n' "$(printf '%.7s' "$SHA")" "$RUN_URL" >>notes.md
           if gh release view "$TAG" >/dev/null 2>&1; then
+            expected=$(basename release/*.zip)
+            assets=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+            for asset in $assets; do
+              case "$asset" in
+                "$expected"|SHA256SUMS.txt) ;;
+                *) echo "refusing to mix existing release assets: $asset" >&2; exit 1 ;;
+              esac
+            done
             gh release upload "$TAG" release/* --clobber
           else
             gh release create "$TAG" release/* \
@@ -92,9 +97,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     container: golang:1.27.3-bookworm
-    strategy:
-      matrix:
-        target: [trimui-smart-pro, magicx-zero-28]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # The same script the CI path uses, so a tag release cannot be built with
@@ -103,10 +105,10 @@ jobs:
       - name: Build and verify the device artifacts
         env:
           TAG: ${{ github.ref_name }}
-        run: scripts/device-build.sh "${{ matrix.target }}" "$TAG" dist
+        run: scripts/device-build.sh "$TAG" dist
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: knulli-app-store-${{ matrix.target }}-tag
+          name: knulli-app-store-knulli-aarch64-glibc-sdl2-tag
           path: dist/
           if-no-files-found: error
 
@@ -116,22 +118,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Download tagged device artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          pattern: knulli-app-store-*-tag
+          name: knulli-app-store-knulli-aarch64-glibc-sdl2-tag
           path: dist
 
       - name: Collect release files
-        run: |
-          mkdir release
-          find dist -name '*.zip' -exec cp {} release/ \;
-          if [ "$(find release -name '*.zip' | wc -l)" -ne 2 ]; then
-            echo "expected one zip per device target" >&2
-            find dist -maxdepth 2 -print
-            exit 1
-          fi
-          (cd release && sha256sum ./*.zip >SHA256SUMS.txt)
+        run: scripts/collect-release.sh dist release
 
       - name: Publish full release
         env:
@@ -142,12 +137,20 @@ jobs:
           cat >notes.md <<'EOF'
           Full release build.
 
-          - `knulli-app-store-trimui-smart-pro-experimental-*.zip` — TrimUI Smart Pro (1280×720)
-          - `knulli-app-store-magicx-zero-28-experimental-*.zip` — MagicX Zero 28 (640×480)
+          - `knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-*.zip` — one installable Store ZIP
+          - `SHA256SUMS.txt` — checksum for that ZIP; catalogue/signature are embedded
 
-          `SHA256SUMS.txt` covers both archives. Built from the tag with the same verified steps as CI: signed deterministic catalogue, aarch64 cross-compile, and ABI checks. Install with the [TrimUI Smart Pro](https://github.com/jellydn/knulli-app-store/blob/main/docs/trimui-smart-pro.md) or [MagicX Zero 28](https://github.com/jellydn/knulli-app-store/blob/main/docs/magicx-zero-28.md) guide.
+          Built from the tag with the same signed catalogue, AArch64 cross-compile and ABI gates as CI. Requires KNULLI, glibc and system SDL2/image/ttf; SDL2_gfx is static. Required glibc symbols are capped at 2.34. One ZIP is not universal hardware support. See the [installation and legacy migration guide](https://github.com/jellydn/knulli-app-store/blob/main/docs/store-distribution.md). Old device-named clients may need verified manual ZIP replacement; no legacy aliases are published in this release.
           EOF
           if gh release view "$TAG" >/dev/null 2>&1; then
+            expected=$(basename release/*.zip)
+            assets=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+            for asset in $assets; do
+              case "$asset" in
+                "$expected"|SHA256SUMS.txt) ;;
+                *) echo "refusing to mix existing release assets: $asset" >&2; exit 1 ;;
+              esac
+            done
             gh release upload "$TAG" release/* --clobber
           else
             gh release create "$TAG" release/* \

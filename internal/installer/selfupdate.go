@@ -19,6 +19,7 @@ import (
 )
 
 const StoreDirectory = "/userdata/roms/ports/knulli-app-store"
+const StoreBuildTarget = "knulli-aarch64-glibc-sdl2"
 const storeReleaseBase = "https://github.com/jellydn/knulli-app-store/releases/download/"
 
 type StoreUpdate struct {
@@ -29,7 +30,9 @@ type StoreUpdate struct {
 // CheckStoreUpdate includes the project's CI prereleases. GitHub's HTTPS API
 // supplies the digest; an unsigned checksum fetched from another host is not trusted.
 func (m Manager) CheckStoreUpdate(ctx context.Context, target, current string) (*StoreUpdate, error) {
-	if target != "trimui-smart-pro" && target != "magicx-zero-28" {
+	// These legacy targets used the same architecture, ABI and launcher. This
+	// alias applies to updated code, not old binaries that still need a bridge.
+	if target != StoreBuildTarget && target != "trimui-smart-pro" && target != "magicx-zero-28" {
 		return nil, fmt.Errorf("unknown Store build target %q", target)
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/jellydn/knulli-app-store/releases?per_page=20", nil)
@@ -62,7 +65,7 @@ func (m Manager) CheckStoreUpdate(ctx context.Context, target, current string) (
 	if err := json.NewDecoder(io.LimitReader(response.Body, 2<<20)).Decode(&releases); err != nil {
 		return nil, fmt.Errorf("read Store releases: %w", err)
 	}
-	prefix := "knulli-app-store-" + target + "-experimental-"
+	prefix := "knulli-app-store-" + StoreBuildTarget + "-experimental-"
 	for _, release := range releases {
 		if release.Draft {
 			continue

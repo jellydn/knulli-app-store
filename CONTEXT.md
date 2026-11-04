@@ -26,11 +26,13 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Tab** — One view of the catalogue: the whole list, the packages with something to act on, or the packages installed on this device. A tab filters on a package's typed state, never on its rendered state label.
 
-**Library browsing** — Moving through a stable package list with up/down. An outline marks the selected row; its category, title, version, summary, technical status, test evidence and installation state appear in a persistent detail pane. Neighbouring packages stay visible. Y opens More for details and secondary actions. A opens confirmation for the first permitted action; an issue opens its health check first.
+**Library browsing** — Moving through a stable package list with up/down. An outline marks the selected row. Two panes show package metadata where space permits; compact screens use one column with a fixed selected-package summary. Neighbouring rows stay still. Y opens More for the complete title, version, summary, compatibility, warnings and secondary actions. A opens confirmation for the first permitted action; an issue opens its health check first. Layout depends on drawable size, never device identity.
 
 **Category** — All types, Games or Apps, selected with left/right while browsing. Games match the manifest's `game` type; Apps match utilities, themes and integrations, including tools with “game” in their name. A category does not grant installation permission or change technical status.
 
 **Filtering** — Switching All, Ready and Installed status tabs with L1/R1 (Page Up/Page Down on a keyboard), within the selected category. Each category/status combination remembers its selected package. Empty views still permit changing either selector. Selectors are locked during operations and package review screens.
+
+**Review paging** — L1/R1 (Page Up/Page Down) reads the preceding/next measured window of text in More, Health and confirmation screens without changing the category, status tab or selected action. The visible line range and total show when more text exists. All warning, recovery and compatibility text remains reachable, including long unbroken words. A still confirms and B returns; reading text does not execute an operation. Busy screens reject paging.
 
 ## Install lifecycle
 
@@ -90,6 +92,12 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Resolution** — An explicit WIDTHxHEIGHT from a real source. No resolution is ever assumed. Missing resolution or a size outside a manifest's reviewed scope does not block installation.
 
+**Drawable size** — The current SDL renderer output in pixels. It determines layout and can change during a session. It is separate from device identity, CPU/ABI, input mapping and firmware requirements. Resizing preserves selection, review focus and running operations; a transient invalid size retains the last valid surface and never creates device-test evidence. The initial minimum UI target is 320×240, not proof of physical device or binary compatibility.
+
+**Store build profile** — `knulli-aarch64-glibc-sdl2`, the shared Store distribution contract for KNULLI, Linux AArch64, glibc and system SDL2/image/ttf, with SDL2_gfx static. It is not a device name, layout selector or universal compatibility claim. One installable ZIP replaces the former device-named distributions at unchanged paths; its checksum sidecar is separate.
+
+**Legacy bridge** — A separately approved compatibility delivery that an old device-prefix updater can discover and verify before moving to the shared profile. New code accepting legacy metadata does not patch already-installed binaries. Current release inventory and old version/first-asset rules prevent a verified automatic bridge; manual verified seven-file replacement is the supported migration. Local compatibility-copy preparation is not publication or proof of eligibility.
+
 **Untested** — No passed device report matches the exact package version, firmware, architecture, device, and resolution. The UI shows UNTESTED and still offers installation when the package and runtime checks pass; evidence for another device never grants a tested badge.
 
 ## Interface
@@ -102,9 +110,9 @@ Shared vocabulary for Knulli App Store. Use these terms in code, documentation, 
 
 **Verb** — The word an action carries in a footer hint, for example `Confirm` for the confirm action. Directional actions share `Navigate` and paging actions share `Page`.
 
-**Footer hint** — The single line below every screen's panel naming available actions beside their bindings, for example `Confirm (A)  Diagnostics (Y)  Quit (SELECT + Y)`. Face labels use the selected ES letters. Quit is always Select+Y, never a lone face button.
+**Footer hint** — A measured button chip and complete action label, for example `A Manage existing` or `L1/R1 Read`. Whole groups wrap into as many rows as required, with safe margins and a minimum gap; actions are not dropped or shortened to force a fit. Footer and status height are reserved before body layout. The 320×240 target retains selected-package trust/install state and complete reachable reviews. Face labels use the selected ES letters and keyboard runs name their keys. Quit is always Select+Y (Tab/F5+Y on a keyboard), never a lone face button. Status filtering applies only while browsing; Read pages review text.
 
-**Keyboard binding** — A fixed desktop key: arrows browse, Page Up/Page Down filter, Enter confirms, Escape backs out, Y opens More (Y there exports diagnostics), and held Tab (or F5) plus Y quits. Keyboard input requires no setup or persistence.
+**Keyboard binding** — A fixed desktop key: arrows browse, Page Up/Page Down filters while browsing and pages text while reviewing, Enter confirms, Escape backs out, Y opens More (Y there exports diagnostics), and held Tab (or F5) plus Y quits. Keyboard input requires no setup or persistence.
 
 ## Verification
 

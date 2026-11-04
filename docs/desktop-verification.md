@@ -62,15 +62,19 @@ toolkit's developer mapping wizard is not part of the Store.
 | --- | --- | --- |
 | Browse Library rows / action buttons | Arrow keys | D-pad |
 | Filter All / Ready / Installed | Page Up / Page Down | L1 / R1 |
+| Read review text (More, Health, confirmation) | Page Up / Page Down | L1 / R1 |
 | Confirm | Enter | A |
 | Back | Escape | B |
 | More; export diagnostics inside More | Y | Y |
 | Quit | Hold Tab (or F5), then Y | Hold Select, then Y |
 
-The footer shows contextual actions and navigation/filter hints. The Library
-keeps nearby rows visible and expands the selected row. It opens confirmation
+The footer measures actual key/label glyph bounds and wraps complete groups
+with safe margins and at least eight logical pixels between neighbouring groups.
+It reserves footer/status height before composing the body; no action is dropped
+or shortened to force a fixed row count. The Library keeps nearby rows visible, with a separate detail pane where
+space permits and a fixed summary on compact screens. It opens confirmation
 directly for the first allowed action. More keeps
-the full action list and details; Y there exports diagnostics. Empty catalogues
+the full action list and paged details; Y there exports diagnostics. Empty catalogues
 and blocked-controller screens still export directly. Confirmation panels show
 Confirm and Back; a busy operation advertises no unavailable actions. Keyboard
 repeat navigates only, so holding Enter cannot accept multiple confirmations.
@@ -96,14 +100,49 @@ make walkthrough WALK_FLAGS=--install
 ```
 
 Frames and records go under `build/walkthrough/<flow>/`; renderer tests also
-capture representative states at both target sizes under `screens/`. CI
+capture representative states from 320×240 through square, portrait, wide and
+ultrawide outputs under `screens/`, including 639/640/641-wide breakpoint cases. CI
 publishes this generated evidence as `gui-walkthrough`, including partial
 evidence when checks fail. Screenshots are not checked in.
+
+Windowed runs can be resized across the compact/two-pane boundary without
+resetting selection, review focus or an operation. Layout reads the actual SDL
+renderer output, even with a `-resolution` override. The override sets the
+initial verification window and remains platform evidence, not a resize lock.
+Try `make gui GUI_RESOLUTION=320x240` for native 14/18-pixel compact text.
+Review pages show a line range and total; page through to the final warning,
+then use Back to cancel without mutation. Paging does not select another action.
+
+`TestSDLPagingRendersCompleteWarningsWithoutChangingOperation` sends SDL keyboard
+and shoulder-button events through the real adapter. It finds independently
+rasterized final-warning and recovery markers in rendered frames, then reads
+back to the beginning. The 56 cases cover seven compact/boundary sizes and
+Health, More and both recovery confirmation steps. Every paging event must
+preserve the selected package, action, focus, category, status tab and idle
+state. The walkthrough remains visual flow evidence, not an assertion that a
+particular final warning was rendered.
+
+`TestFooterKeepsLongestActionsReadable` checks complete rendered labels and
+compact trust/install state for Manage existing, Force reinstall and Store
+update checks under KNULLI, Xbox and keyboard policies. The representative
+17-size render matrix also checks every hint rectangle for fit and separation.
+`TestFooterReflowPreservesRawNavigation` drives raw SDL key/controller events
+across compact, breakpoint, square, portrait, 1280×720 and ultrawide reflow;
+More/action selection, paging, Back/confirmation and busy locks must not change.
+
+The initial UI minimum is 320×240. 320×200, portrait and ultrawide are stress
+cases, not tested handheld claims. Validate the real firmware renderer,
+controller letters/chord, cold launch and return to ES on physical devices
+before release. Architecture, ABI/glibc, SDL and KNULLI firmware requirements
+are unchanged. [ADR 0013](adr/0013-compatibility-profile-distribution.md) separately
+migrates packaging to one shared profile; old clients need the documented
+verified manual migration, not a presumed automatic update bridge.
 
 | Flow | Covers |
 | --- | --- |
 | `automatic-first-run` | Immediate Library, navigation and filtering |
 | `catalogue-walk` | Direct confirmation, cancel, More, secondary confirmation and quit |
+| `review-text-paging` | Read confirmation to the final page, read back, cancel, page More and return without an operation |
 | `catalogue-tabs` | All, Ready, Installed and stepping out of an empty tab |
 | `upstream-managed-confirmation` | Full warnings for an actionable upstream-managed package |
 | `quit-chord` | Escape does not quit; held Tab plus Y does |

@@ -21,7 +21,7 @@ fi
 # Metadata failure must not prevent access to app repair and diagnostics.
 ./knulli-app register-store-menu >>"$LOG_FILE" 2>&1 || true
 
-# Ports uses direct SDL letters only when its Xbox-layout flag is present.
+# KNULLI Ports uses direct SDL letters only when its Xbox-layout flag is present.
 export STORE_CONTROLLER_LAYOUT=knulli
 if [ -e /var/run/ports_xbox_layout.flag ]; then
   export STORE_CONTROLLER_LAYOUT=xbox

@@ -13,6 +13,7 @@
       "sdl2-image",
       "sdl2-ttf",
       "libc",
+      "libm",
       "libpthread",
       "libresolv"
     ]
@@ -52,10 +53,10 @@
   },
   "name": "retroshelf",
   "release": {
-    "url": "https://github.com/retroshelf-org/linux/releases/download/v0.6.3/retroshelf-knulli-v0.6.3.zip",
-    "sha256": "b0f5d67c8851552b7a74b59cf67e53cb66865ea75b9c3fcaa4c6171cb1398234",
-    "size": 19739401,
-    "installed_size": 42693255,
+    "url": "https://github.com/retroshelf-org/linux/releases/download/v0.6.10/retroshelf-knulli-v0.6.10.zip",
+    "sha256": "bb42d92fe21ab2e56407d391ac3d0f5320962b01f6b80dee020ae4f42c36e4dd",
+    "size": 19976898,
+    "installed_size": 43352008,
     "format": "zip",
     "immutable": true
   },
@@ -63,6 +64,7 @@
   "review": {
     "status": "experimental",
     "notes": [
+      "Release audit 2026-11-04 reviewed v0.6.10: 19976898-byte original publisher ZIP, SHA-256 bb42d92fe21ab2e56407d391ac3d0f5320962b01f6b80dee020ae4f42c36e4dd matches both downloaded publisher checksums.txt and GitHub API digest. Eight regular files, 43352008 bytes; only UI, sync engine and README differ from 0.6.3. Launcher/uninstall wrapper, bundled SDL2_gfx and icon are unchanged. Architecture and package glibc 2.29 requirement remain. Direct-download upstream-managed experimental license warning, shared-hook removal checks and account/history preservation remain mandatory. No source-level engine migration review or physical 0.6.10 test is claimed. See docs/release-audit-2026-11-04.md for fixture lifecycle results and limits.",
       "Requires a retroshelf account and Wi-Fi for linking and syncing. Upstream documents offline session queuing and a game-session hook installed on first launch.",
       "Review on 2026-10-24 verified the version-pinned Knulli v0.5.6 ZIP against the publisher checksums.txt and GitHub asset digest: 19393643 compressed bytes, 41864615 regular-file bytes, SHA-256 bb60de30f256e9f187e755b2cc84b6df2ffb6b5d04a2be63f8421fdbec18c8bb. All eight files and four directories were inspected; no packaged code was executed.",
       "Authorized upstream-managed experimental installation follows the Knulli guide: extract into /userdata/roms/tools/retroshelf, register the launcher, then let the user launch and link. First launch installs session hooks. Runtime writes and upstream updates are not sandboxed or checksum-controlled by the Store.",
@@ -73,6 +75,20 @@
       "The 0.6.3 UI and sync engine are AArch64; the engine is statically linked. The UI requires the existing SDL2/image/ttf, libc, libresolv and libpthread libraries. Bundled SDL2_gfx requires GLIBC_2.29, so the complete package minimum is 2.29. Source and license remain unavailable; opaque binary hook, updater and data-migration behavior cannot be fully audited. See docs/retroshelf-0.6.3.md for evidence and fixture lifecycle limits."
     ],
     "evidence": [
+      {
+        "kind": "release-integrity",
+        "url": "https://api.github.com/repos/retroshelf-org/linux/releases/tags/v0.6.10",
+        "note": "Independently downloaded 19976898 bytes match GitHub SHA-256 bb42d92fe21ab2e56407d391ac3d0f5320962b01f6b80dee020ae4f42c36e4dd and publisher checksums.txt. Eight regular files, 43352008 bytes; no unsafe entries."
+      },
+      {
+        "kind": "publisher-checksum",
+        "url": "https://github.com/retroshelf-org/linux/releases/download/v0.6.10/checksums.txt"
+      },
+      {
+        "kind": "runtime-dependency-review",
+        "url": "https://github.com/retroshelf-org/linux/releases/download/v0.6.10/retroshelf-knulli-v0.6.10.zip",
+        "note": "2026-11-04: AArch64 UI requires GLIBC_2.17 and existing SDL2/image/ttf, pthread, resolv and libc; sync engine static. Bundled SDL2_gfx retains GLIBC_2.29 and needs libm/SDL2/libc. Launcher, uninstall wrapper, gfx and icon match 0.6.3 byte-for-byte. Source/license remain unavailable (linked implementation HTTP 404). Opaque engine data migration, hooks and updater are not fully auditable. No code executed; no new device report."
+      },
       {
         "kind": "real-device-test",
         "url": "https://ampcode.com/threads/T-01a184fd-5491-7371-9d0d-5d2a4bbddb02",
@@ -147,5 +163,5 @@
   "schema": "org.knulli.app-store/package-manifest/v1",
   "summary": "Records Knulli play sessions and syncs them to your retroshelf account.",
   "type": "integration",
-  "version": "0.6.3"
+  "version": "0.6.10"
 }

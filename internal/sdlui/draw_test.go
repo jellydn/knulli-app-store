@@ -4,7 +4,9 @@ package sdlui
 
 import (
 	"bytes"
+	"fmt"
 	"image"
+	"image/color"
 	"os"
 	"path/filepath"
 	"sort"
@@ -19,6 +21,7 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/manifest"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
 	"golang.org/x/image/font"
+	"golang.org/x/image/math/fixed"
 )
 
 func TestRenderRepresentativeStates(t *testing.T) {
@@ -93,8 +96,17 @@ func TestRenderRepresentativeStates(t *testing.T) {
 	for _, size := range []struct {
 		name          string
 		width, height int
-	}{{"640x480", 640, 480}, {"1280x720", 1280, 720}} {
-		canvas, err := newConsoleCanvas(logicalWidth(size.width, size.height))
+	}{
+		{"320x240", 320, 240}, {"320x200", 320, 200}, {"480x320", 480, 320},
+		{"639x480", 639, 480}, {"640x480", 640, 480}, {"641x480", 641, 480},
+		{"640x479", 640, 479}, {"640x481", 640, 481},
+		{"720x480", 720, 480}, {"720x720", 720, 720},
+		{"480x640", 480, 640}, {"640x960", 640, 960}, {"320x640", 320, 640},
+		{"1280x720", 1280, 720}, {"1920x1080", 1920, 1080},
+		{"1920x1200", 1920, 1200}, {"2560x1080", 2560, 1080},
+	} {
+		w, h := canvasSize(size.width, size.height)
+		canvas, err := newConsoleCanvas(w, h)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -102,17 +114,31 @@ func TestRenderRepresentativeStates(t *testing.T) {
 		controls.Connected, controls.Mode = true, storeinput.Normal
 		for mode, session := range map[string]*storeinput.Session{"": controls, "-keyboard": storeinput.NewDesktopSession(t.TempDir(), "")} {
 			for name, model := range states {
-				if model.Busy && fitText(canvas.body, model.Message, canvas.width-48) != model.Message {
+				if model.Busy && !canvas.compact && fitText(canvas.body, model.Message, canvas.width-48) != model.Message {
 					t.Fatalf("%s %s: progress was truncated", size.name, name)
 				}
 				frame := canvas.draw(model, "KNULLI", session)
-				if frame.Bounds() != image.Rect(0, 0, logicalWidth(size.width, size.height), 480) {
+				if frame.Bounds() != image.Rect(0, 0, w, h) {
 					t.Fatal(frame.Bounds())
+				}
+				for i, group := range canvas.groups {
+					if !group.bounds.In(image.Rect(8, canvas.footerTop()+8, w-8, h-8)) {
+						t.Fatalf("%s %s%s: hint outside reserved footer: %v", size.name, name, mode, group.bounds)
+					}
+					for _, other := range canvas.groups[:i] {
+						if group.bounds.Overlaps(other.bounds) || (group.bounds.Min.Y == other.bounds.Min.Y && group.bounds.Min.X-other.bounds.Max.X < 8) {
+							t.Fatalf("%s %s%s: hints overlap or lost their gap: %v / %v", size.name, name, mode, group.bounds, other.bounds)
+						}
+					}
 				}
 				// Long action/key labels must leave the footer's safe margins
 				// intact, including Manage existing on the narrow keyboard view.
-				for y := 427; y < 480; y++ {
-					for x := 0; x < 16; x++ {
+				margin := 8
+				if !canvas.compact && model.Focus == storeui.Browse {
+					margin = 16
+				}
+				for y := canvas.footerTop(); y < h; y++ {
+					for x := 0; x < margin; x++ {
 						if frame.RGBAAt(x, y) != palette.panel || frame.RGBAAt(canvas.width-1-x, y) != palette.panel {
 							t.Fatalf("%s %s%s: footer escaped safe margins", size.name, name, mode)
 						}
@@ -133,7 +159,7 @@ func TestRenderRepresentativeStates(t *testing.T) {
 }
 
 func TestCatalogueArtworkDoesNotRequireInstallation(t *testing.T) {
-	canvas, err := newConsoleCanvas(640)
+	canvas, err := newConsoleCanvas(640, 480)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +191,7 @@ func TestCatalogueArtworkDoesNotRequireInstallation(t *testing.T) {
 }
 
 func TestConsoleStatusKeepsContextualControlsVisible(t *testing.T) {
-	canvas, err := newConsoleCanvas(640)
+	canvas, err := newConsoleCanvas(640, 480)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +214,7 @@ func TestConsoleStatusKeepsContextualControlsVisible(t *testing.T) {
 }
 
 func TestConsoleLabelsFitWithoutBreakingUTF8(t *testing.T) {
-	canvas, err := newConsoleCanvas(640)
+	canvas, err := newConsoleCanvas(640, 480)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,4 +236,74 @@ func TestTrustLabelsRequireExactDeviceEvidence(t *testing.T) {
 	if actionLabel(appstore.Adopt) != "Manage existing" {
 		t.Fatal("adoption vocabulary changed")
 	}
+}
+
+func TestFooterKeepsLongestActionsReadable(t *testing.T) {
+	for _, size := range [][2]int{{320, 240}, {400, 480}, {480, 320}, {639, 480}, {640, 480}, {641, 480}, {720, 720}, {1280, 720}, {2560, 1080}} {
+		for _, policy := range []string{"knulli", "xbox", "keyboard"} {
+			t.Run(fmt.Sprintf("%dx%d/%s", size[0], size[1], policy), func(t *testing.T) {
+				t.Setenv("STORE_CONTROLLER_LAYOUT", policy)
+				w, h := canvasSize(size[0], size[1])
+				canvas, err := newConsoleCanvas(w, h)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer canvas.close()
+				controls := storeinput.NewSession("", "")
+				controls.Connect(storeinput.Identity{Name: "Pad"}, true)
+				if policy == "keyboard" {
+					controls = storeinput.NewDesktopSession("", "")
+				}
+				for _, action := range []appstore.Action{appstore.Adopt, appstore.ForceReinstall, appstore.CheckUpdate} {
+					model := &storeui.Model{Items: []appstore.Item{{Package: manifest.Package{Name: "Long action test"}, Actions: []appstore.Action{action}}}}
+					frame := canvas.draw(model, "KNULLI", controls)
+					for _, label := range []string{actionLabel(action), "Browse", "Type", "Status", "More", "Quit"} {
+						if !renderedText(frame, canvas, label, image.Rect(0, canvas.footerTop(), w, h), palette.panel, palette.text) {
+							t.Fatalf("complete footer label %q is missing or obscured", label)
+						}
+					}
+					if canvas.compact {
+						item := model.Items[0]
+						if !renderedText(frame, canvas, trustLabel(item)+" / "+installState(item), image.Rect(0, 0, w, canvas.statusTop()), palette.background, statusColor(item)) {
+							t.Fatal("footer crowded out selected-package trust/install state")
+						}
+					}
+				}
+			})
+		}
+	}
+}
+
+// Match independently rasterized text, so clipping or a neighbouring hint
+// painting over a label fails even if layout bookkeeping says it fits.
+func renderedText(frame *image.RGBA, canvas *consoleCanvas, value string, bounds image.Rectangle, background, ink color.Color) bool {
+	expected := image.NewRGBA(image.Rect(0, 0, font.MeasureString(canvas.body, value).Ceil(), canvas.body.Metrics().Height.Ceil()))
+	fill(expected, expected.Bounds(), background)
+	drawer := font.Drawer{Dst: expected, Src: image.NewUniform(ink), Face: canvas.body, Dot: fixed.P(0, canvas.body.Metrics().Ascent.Ceil())}
+	drawer.DrawString(value)
+	middle := expected.Bounds().Dy() / 2
+	signature := expected.Pix[middle*expected.Stride : (middle+1)*expected.Stride]
+	for y := bounds.Min.Y; y+expected.Bounds().Dy() <= bounds.Max.Y; y++ {
+		strip := frame.Pix[(y+middle)*frame.Stride : (y+middle+1)*frame.Stride]
+		for offset := 0; offset+expected.Stride <= len(strip); {
+			index := bytes.Index(strip[offset:], signature)
+			if index < 0 {
+				break
+			}
+			left := offset + index
+			offset = left + 4
+			matches := true
+			for row := 0; row < expected.Bounds().Dy(); row++ {
+				start := (y+row)*frame.Stride + left
+				if !bytes.Equal(frame.Pix[start:start+expected.Stride], expected.Pix[row*expected.Stride:(row+1)*expected.Stride]) {
+					matches = false
+					break
+				}
+			}
+			if matches {
+				return true
+			}
+		}
+	}
+	return false
 }

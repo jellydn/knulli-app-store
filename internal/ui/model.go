@@ -23,18 +23,21 @@ type Model struct {
 	// Items is the list the catalogue shows: the packages the active tab
 	// matches. catalogue keeps everything the index listed, so switching tabs
 	// never reloads the index and never reorders what is already known.
-	Items       []appstore.Item
-	catalogue   []appstore.Item
-	Tabs        Tabs
-	Toasts      Toasts
-	Selected    int
-	Action      int
-	Focus       Focus
-	Busy        bool
-	Message     string
-	Error       string
-	events      chan operationEvent
-	confirmFrom Focus
+	Items        []appstore.Item
+	catalogue    []appstore.Item
+	Tabs         Tabs
+	Toasts       Toasts
+	Selected     int
+	Action       int
+	Focus        Focus
+	Busy         bool
+	Message      string
+	Error        string
+	ReviewOffset int
+	reviewLimit  int
+	reviewStep   int
+	events       chan operationEvent
+	confirmFrom  Focus
 }
 
 type operationEvent struct {
@@ -98,7 +101,17 @@ func (m *Model) Move(delta int) {
 	actions := m.current().Actions
 	if m.Focus == Actions && len(actions) > 0 {
 		m.Action = wrap(m.Action+delta, len(actions))
+		m.ReviewOffset = 0
 	}
+}
+
+// ReviewWindow keeps text paging separate from action selection. The renderer
+// supplies measured line capacity; resizing clamps the offset, not the focus.
+func (m *Model) ReviewWindow(lines, rows int) (int, int) {
+	m.reviewStep = max(1, rows)
+	m.reviewLimit = max(0, lines-m.reviewStep)
+	m.ReviewOffset = min(m.ReviewOffset, m.reviewLimit)
+	return m.ReviewOffset, min(lines, m.ReviewOffset+m.reviewStep)
 }
 
 // Window returns the first and last row of the list the catalogue shows for a
@@ -141,9 +154,13 @@ func (m *Model) Horizontal(delta int) {
 	m.Error = ""
 }
 
-// CycleTab keeps filtering separate from browsing individual app cards.
+// CycleTab filters the Library or pages review text without changing its action.
 func (m *Model) CycleTab(delta int) {
-	if m.Busy || m.Focus != Browse {
+	if m.Busy {
+		return
+	}
+	if m.Focus != Browse {
+		m.ReviewOffset = max(0, min(m.reviewLimit, m.ReviewOffset+delta*m.reviewStep))
 		return
 	}
 	// Leaving a tab stores where the reader stopped; entering one prefers that
@@ -203,6 +220,7 @@ func (m *Model) Select(ctx context.Context) {
 	if m.Busy || len(m.Items) == 0 {
 		return
 	}
+	m.ReviewOffset = 0
 	switch m.Focus {
 	case Browse:
 		if m.current().HealthReason != "" {
@@ -258,6 +276,7 @@ func (m *Model) Back() bool {
 	}
 	m.Message = ""
 	m.Error = ""
+	m.ReviewOffset = 0
 	return false
 }
 
@@ -266,6 +285,7 @@ func (m *Model) More() {
 		return
 	}
 	m.Action = 0
+	m.ReviewOffset = 0
 	m.Focus = Actions
 }
 

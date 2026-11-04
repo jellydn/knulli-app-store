@@ -1,6 +1,6 @@
 # MagicX Zero 28 experimental test build
 
-Release target: v2026.10.27.1. Hardware reports remain scoped to the artifacts actually tested. This device target remains experimental. Knulli source confirms the board and display. A real-device diagnostic also confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController name `magicx-input` with a nonzero GUID. Full GUI testing is incomplete. The gabagool-backed Library now uses stable rows and a persistent detail pane. This redesign still needs device tests; Smart Pro evidence does not verify it on MagicX. A shared A133 family alone does not establish application or package compatibility.
+New builds use the shared KNULLI AArch64/glibc/SDL2 ZIP. Historical v2026.10.27.1 and hardware reports remain scoped to the artifacts actually tested. This device remains experimental. Knulli source confirms the board and display. A real-device diagnostic also confirms Knulli Scarab, `aarch64`, 640×480, and SDL GameController name `magicx-input` with a nonzero GUID. Full GUI testing is incomplete. The responsive Library uses two panes where they fit, otherwise one column and a fixed summary. This redesign still needs device tests; Smart Pro evidence does not verify it on MagicX. A shared A133 family alone does not establish application or package compatibility.
 
 ## Confirmed facts
 
@@ -15,14 +15,14 @@ Device builds require system SDL2, SDL2_image, and SDL2_ttf. SDL2_gfx is linked 
 
 ## Install and automatic controls
 
-1. Release target: [v2026.10.27.1](https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.27.1).
-2. Download `knulli-app-store-magicx-zero-28-experimental-v2026.10.27.1.zip` and `SHA256SUMS.txt` into one directory on your computer.
-3. Run `sha256sum --ignore-missing -c SHA256SUMS.txt`. Continue only if your ZIP reports `OK`. The checksum file covers both targets; this command skips the missing target.
+1. Use the [official releases](https://github.com/jellydn/knulli-app-store/releases). Read the release's compatibility and outstanding-test notes.
+2. For new builds, download `knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-VERSION.zip` and `SHA256SUMS.txt` into one directory on your computer.
+3. Run `sha256sum --ignore-missing -c SHA256SUMS.txt`. Continue only if your ZIP reports `OK`. New checksums cover one installable ZIP.
 4. Shut down Knulli and connect its data card to your computer.
 5. Extract the ZIP into `/userdata/roms/ports`. Check for `Knulli App Store.sh`, `knulli-app-store/knulli-app-ui`, and `images/Knulli App Store.png` below that directory.
 6. Safely eject, start Knulli, and refresh game lists or reboot. Open **Knulli App Store** in **Ports**.
 
-For commit-specific testing, download the `knulli-app-store-magicx-zero-28-experimental` artifact from a successful `check` run. Extract the Actions artifact first, then verify its inner ZIP against its `SHA256SUMS.txt`.
+For commit-specific testing after this migration, download the `knulli-app-store-knulli-aarch64-glibc-sdl2-experimental` artifact from a successful `check` run. Extract the Actions artifact first, then verify its inner ZIP against its `SHA256SUMS.txt`. The same ZIP serves compatible devices; it is not universal hardware support. See [distribution and legacy migration](store-distribution.md).
 
 Every launch opens the Library immediately: **up/down** browse (left/right also work), **A** opens confirmation for the selected row's first allowed action, **B** cancels back, and **Y** opens More. More retains all permitted actions and details; Y there exports diagnostics. **L1/R1** filter All, Ready and Installed. **Select+Y** quits. There is no setup, calibration, mapping editor, or saved-assignment override.
 
@@ -42,7 +42,7 @@ Automatic defaults follow Knulli's logical SDL contract, not a device-specific r
 
 At the standard `/userdata/roms/ports/knulli-app-store` location, a build with self-update support shows a **Knulli App Store** entry. Confirm **Check for updates**, then confirm **Update** when offered. Exit and reopen after completion. Checks include official experimental pre-releases and use the packaged target. Asset size and SHA-256 come from GitHub; there is no independent Store update signing key.
 
-For an older build, a custom location, or a **text file busy** failure, verify the target ZIP and shut down Knulli. Extract it into `/userdata/roms/ports`, replacing all Store release files together. Keep the launcher, icon, binaries, catalogue, signature, and packaged guide from the same ZIP. Do not delete installed apps, settings, or `/userdata/system/knulli-app-store`.
+For a legacy device-named build (it cannot discover the generic asset), a custom location, or a **text file busy** failure, verify the generic ZIP and shut down Knulli. Extract it into `/userdata/roms/ports`, replacing all Store release files together. Keep the launcher, icon, binaries, catalogue, signature, and packaged guide from the same ZIP. Do not delete installed apps, settings, or `/userdata/system/knulli-app-store`. No automatic legacy bridge is verified; see the [migration limits](store-distribution.md#automatic-bridge-limit).
 
 The launcher runs recovery before the GUI starts. A failed rollback retains its journal and snapshots for recovery. It cannot recover evidence already deleted by an older build. See [self-update safety and recovery](security-model.md#store-self-update).
 
@@ -68,6 +68,7 @@ Successful Store navigation does not prove any package. No current package has e
 
 1. Record Knulli version, hardware revision, and SDL controller name/GUID. Follow [Recording a device control report](#recording-a-device-control-report).
 2. Confirm the header identifies MagicX Zero 28 and 640×480, with readable responsive content and no clipping.
+   During an app install, check that the status line remains readable through preparation, download, verification, extraction, file installation, and finalization. Brief phases can pass between screen updates. Download percentage measures received bytes against the pinned release size; file-installation percentage measures processed release files, not the whole operation. Other phases have no estimated percentage. Controls stay locked until the operation ends. Confirm success restores controls and shows a notice for three seconds. In a disposable test, cause a download or checksum failure and confirm the error stays visible for review or retry. Reaching 100% in one phase must not report the whole operation as complete.
 3. Confirm the first launch opens the catalogue with no setup.
 4. Check up/down (and left/right) Library browsing, equal-height rows, mint outline, matching detail pane, circled controls, A review/confirm, B cancel, Y More, L1/R1 filtering and Select+Y in both default Knulli and Ports Xbox modes. X has no new feature. First A must not write files. B from direct confirmation must return to the selected row; secondary actions inside More still require confirmation. Multiple committed menu changes must trigger one refresh on exit, not one per operation.
 5. Restart with an old custom mapping file present. Confirm defaults remain active and the file stays unchanged.

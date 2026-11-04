@@ -1,6 +1,6 @@
 # TrimUI Smart Pro experimental test build
 
-Release target: v2026.10.27.1. Hardware reports remain scoped to the artifacts actually tested. Device builds remain experimental. The gabagool-backed Library now uses stable rows and a persistent detail pane. The historical [native Option B report](real-device-tests.md#2026-10-25-option-b-library-and-picker-020) records Picker 0.2.0 Install, Update, Repair, preserved state, injected navigation and ES return on a development build from the v2026.10.25 source. It does not verify this redesign, public ZIP or Picker 0.2.2. Physical controls, audio and idle behavior still need hardware checks. Earlier package reports remain separate evidence.
+New builds use the shared KNULLI AArch64/glibc/SDL2 ZIP. Historical v2026.10.27.1 and hardware reports remain scoped to the artifacts actually tested. Builds remain experimental. The responsive Library uses two panes where they fit, otherwise one column and a fixed summary. The historical [native Option B report](real-device-tests.md#2026-10-25-option-b-library-and-picker-020) records Picker 0.2.0 Install, Update, Repair, preserved state, injected navigation and ES return on a development build from the v2026.10.25 source. It does not verify this redesign, public ZIP or Picker 0.2.2. Physical controls, audio and idle behavior still need hardware checks. Earlier package reports remain separate evidence.
 
 ## Established runtime facts
 
@@ -21,17 +21,17 @@ The sources do not establish a general third-party glibc contract, raw button nu
 
 ## Download and verify
 
-1. Release target: [v2026.10.27.1](https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.27.1).
-2. Download `knulli-app-store-trimui-smart-pro-experimental-v2026.10.27.1.zip` and `SHA256SUMS.txt` into one directory on your computer.
+1. Use the [official releases](https://github.com/jellydn/knulli-app-store/releases). Read the release's compatibility and outstanding-test notes.
+2. For new builds, download `knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-VERSION.zip` and `SHA256SUMS.txt` into one directory on your computer.
 3. Verify the downloaded archive:
 
    ```sh
    sha256sum --ignore-missing -c SHA256SUMS.txt
    ```
 
-   Continue only if your ZIP reports `OK`. The checksum file covers both device ZIPs; `--ignore-missing` skips the other target.
+   Continue only if your ZIP reports `OK`. New checksums cover one installable ZIP.
 
-For commit-specific testing, a successful `check` run also has a `knulli-app-store-trimui-smart-pro-experimental` artifact. Extract the Actions artifact first, then verify its inner ZIP against its `SHA256SUMS.txt`. Do not install a MagicX build on the Smart Pro.
+For commit-specific testing after this migration, a successful `check` run has a `knulli-app-store-knulli-aarch64-glibc-sdl2-experimental` artifact. Extract the Actions artifact first, then verify its inner ZIP against its `SHA256SUMS.txt`. The same ZIP serves compatible devices; it is not universal hardware support. See [distribution and legacy migration](store-distribution.md).
 
 ## Install
 
@@ -47,7 +47,7 @@ The launcher appends diagnostics to `/userdata/system/logs/knulli-app-store.log`
 
 For a build with self-update support at `/userdata/roms/ports/knulli-app-store`, select the **Knulli App Store** entry. Confirm **Check for updates**, then confirm **Update** when offered. Exit and reopen the Store after completion. Checks include official experimental pre-releases. The Store verifies the GitHub asset's exact size and SHA-256; this trusts GitHub and the official publisher account, not an independent update signing key.
 
-Use manual replacement for an older build, a custom location, or a **text file busy** failure:
+Use manual replacement for a legacy device-named build (it cannot discover the generic asset), a custom location, or a **text file busy** failure. No automatic legacy bridge is verified; see the [migration limits](store-distribution.md#automatic-bridge-limit):
 
 1. Verify the new artifact checksum, then shut down Knulli.
 2. Extract the new versioned ZIP into `/userdata/roms/ports`. Replace all Store release files together, including the launcher, icon, binaries, catalogue, signature, and packaged guide.
@@ -105,6 +105,8 @@ Every screen can be checked on a development machine first, with no handheld and
 - Record the exact Knulli release and device hardware revision.
 - Confirm the app appears in Ports and opens at 1280×720 without replacing system libraries.
 - Confirm text, selection, trust state, and package details are readable with no clipping.
+- During an app install, check the status line for preparation, download, verification, extraction, file installation, and finalization. Brief phases can pass between screen updates. Download percentage measures received bytes against the pinned release size; file-installation percentage measures processed release files, not the whole operation. Other phases have no estimated percentage. Controls stay locked until the operation ends.
+- Confirm a successful install restores controls and shows a notice for three seconds. In a disposable test, cause a download or checksum failure and confirm the error stays visible for review or retry. Reaching 100% in one phase must not report the whole operation as complete.
 - Confirm D-pad navigation, select, back, and exit with Knulli's default Ports layout.
 - Confirm circled face labels and contextual footer actions match the active mapping, with Select+Y above the footer. Record the log if no controller appears.
 - Confirm up/down (and left/right) browse equal-height Library rows with a mint outline and matching detail pane; L1/R1 filter All, Ready and Installed, including leaving an empty filter. A must open confirmation without writing files; B must return to the selected row. Y must open More, where secondary actions still require confirmation. Check that completion notices do not cover action buttons. Multiple committed menu changes must trigger one refresh on exit, not one per operation.

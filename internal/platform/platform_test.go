@@ -35,12 +35,19 @@ func TestDetectReadsKnulliDeviceAndFramebuffer(t *testing.T) {
 
 func TestDetectUpstreamAppPrerequisites(t *testing.T) {
 	root := t.TempDir()
-	for _, dependency := range []string{"python3.12", "pygame", "portmaster", "sdl2-gfx", "libm", "retroarch", "libretro-prboom", "libretro-mgba", "libretro-arduous"} {
+	for _, dependency := range []string{"python3", "python3.12", "pygame", "portmaster", "sdl2-gfx", "libm", "retroarch", "libretro-prboom", "libretro-mgba", "libretro-arduous"} {
 		if includes(Resolve(root).Dependencies, dependency) {
 			t.Fatalf("missing dependency reported present: %s", dependency)
 		}
 	}
 	writePlatformFile(t, root, "usr/bin/python3.11", "")
+	if includes(Resolve(root).Dependencies, "python3") {
+		t.Fatal("versioned Python alone satisfies the missing python3 command")
+	}
+	writePlatformFile(t, root, "usr/bin/python3", "")
+	if !includes(Resolve(root).Dependencies, "python3") {
+		t.Fatal("generic Python 3 incorrectly requires CPython 3.12")
+	}
 	if includes(Resolve(root).Dependencies, "python3.12") {
 		t.Fatal("Python 3.11 satisfies a CPython 3.12 extension")
 	}
@@ -61,7 +68,7 @@ func TestDetectUpstreamAppPrerequisites(t *testing.T) {
 	}
 	writePlatformFile(t, root, "usr/lib/libretro/mgba_libretro.so", "")
 	writePlatformFile(t, root, "usr/lib/libretro/arduous_libretro.so", "")
-	for _, dependency := range []string{"python3.12", "pygame", "portmaster", "sdl2-gfx", "libm", "retroarch", "libretro-prboom", "libretro-mgba", "libretro-arduous"} {
+	for _, dependency := range []string{"python3", "python3.12", "pygame", "portmaster", "sdl2-gfx", "libm", "retroarch", "libretro-prboom", "libretro-mgba", "libretro-arduous"} {
 		if !includes(Resolve(root).Dependencies, dependency) {
 			t.Fatalf("installed prerequisite not detected: %s", dependency)
 		}

@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-if [ "$#" -ne 6 ]; then
-  echo "usage: $0 CLI UI CATALOG OUTPUT_DIR VERSION TARGET" >&2
+if [ "$#" -ne 5 ]; then
+  echo "usage: $0 CLI UI CATALOG OUTPUT_DIR VERSION" >&2
   exit 2
 fi
 
@@ -11,17 +11,12 @@ UI=$2
 CATALOG=$3
 OUTPUT_DIR=$(realpath -m "$4")
 VERSION=$(printf '%s' "$5" | tr -cd 'A-Za-z0-9._-')
-TARGET=$6
+TARGET=knulli-aarch64-glibc-sdl2
 
 if [ -z "$VERSION" ]; then
   echo "version must contain a portable filename character" >&2
   exit 2
 fi
-
-case "$TARGET" in
-  trimui-smart-pro|magicx-zero-28) ;;
-  *) echo "unsupported package target: $TARGET" >&2; exit 2 ;;
-esac
 
 ICON="docs/assets/cover.png"
 SIG=$CATALOG.sig
@@ -42,8 +37,8 @@ install -m 0755 "$CLI" "$APP/knulli-app"
 install -m 0755 "$UI" "$APP/knulli-app-ui"
 install -m 0644 "$CATALOG" "$APP/catalog-index.json"
 install -m 0644 "$SIG" "$APP/catalog-index.json.sig"
-install -m 0755 "packaging/$TARGET/Knulli App Store.sh" "$PORTS/Knulli App Store.sh"
-install -m 0644 "packaging/$TARGET/README.txt" "$PORTS/knulli-app-store/README.txt"
+install -m 0755 "packaging/knulli/Knulli App Store.sh" "$PORTS/Knulli App Store.sh"
+install -m 0644 "packaging/knulli/README.txt" "$PORTS/knulli-app-store/README.txt"
 # Keep notices in the already managed README; do not widen self-update paths.
 printf '\nEmbedded DejaVu Sans font notice\n\n' >>"$APP/README.txt"
 cat "internal/sdlui/assets/DejaVuSans-LICENSE.txt" >>"$APP/README.txt"

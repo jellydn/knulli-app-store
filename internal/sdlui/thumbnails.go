@@ -43,7 +43,14 @@ func loadThumbnails() (map[string]image.Image, error) {
 func (c *consoleCanvas) thumbnail(frame *image.RGBA, item appstore.Item, bounds image.Rectangle) {
 	fill(frame, bounds, palette.panel)
 	if thumbnail := c.thumbnails[item.Package.ID]; thumbnail != nil {
-		draw.CatmullRom.Scale(frame, bounds, thumbnail, thumbnail.Bounds(), imagedraw.Over, nil)
+		width, height := thumbnail.Bounds().Dx(), thumbnail.Bounds().Dy()
+		fittedWidth, fittedHeight := bounds.Dx(), bounds.Dx()*height/width
+		if fittedHeight > bounds.Dy() {
+			fittedHeight, fittedWidth = bounds.Dy(), bounds.Dy()*width/height
+		}
+		left := bounds.Min.X + (bounds.Dx()-fittedWidth)/2
+		top := bounds.Min.Y + (bounds.Dy()-fittedHeight)/2
+		draw.CatmullRom.Scale(frame, image.Rect(left, top, left+fittedWidth, top+fittedHeight), thumbnail, thumbnail.Bounds(), imagedraw.Over, nil)
 		return
 	}
 	// Initials are a fallback, not a claim to be the publisher's logo.

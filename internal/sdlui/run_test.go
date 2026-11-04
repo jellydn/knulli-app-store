@@ -3,11 +3,16 @@
 package sdlui
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"image"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"unsafe"
 
 	"github.com/jellydn/knulli-app-store/internal/appstore"
 	"github.com/jellydn/knulli-app-store/internal/diagnostics"
@@ -16,6 +21,8 @@ import (
 	"github.com/jellydn/knulli-app-store/internal/platform"
 	storeui "github.com/jellydn/knulli-app-store/internal/ui"
 	"github.com/veandco/go-sdl2/sdl"
+	"golang.org/x/image/font"
+	"golang.org/x/image/math/fixed"
 )
 
 func TestRunRejectsToolkitMappingWizard(t *testing.T) {
@@ -137,6 +144,265 @@ func TestSDLControlsPreserveConfirmationContract(t *testing.T) {
 				t.Fatal("held Select+Y did not quit")
 			}
 		})
+	}
+}
+
+func TestFooterReflowPreservesRawNavigation(t *testing.T) {
+	for _, policy := range []string{"knulli", "xbox", "keyboard"} {
+		t.Run(policy, func(t *testing.T) {
+			t.Setenv("STORE_CONTROLLER_LAYOUT", policy)
+			model, controls, logger, _ := newRouterHarness(t)
+			mode := InputAuto
+			if policy == "keyboard" {
+				controls, mode = storeinput.NewDesktopSession("", ""), InputKeyboard
+			}
+			item := appstore.Item{Package: manifest.Package{ID: "org.example.hints", Name: "Hint test", Install: &manifest.Install{Warning: strings.Repeat("Read before changing files. ", 80)}}, Actions: []appstore.Action{appstore.Adopt, appstore.ForceReinstall}}
+			model.Items = []appstore.Item{item, item}
+			controller := &controllerState{instanceID: 17}
+			press := func(action storeinput.Action, key sdl.Keycode) {
+				t.Helper()
+				var event sdl.Event = &sdl.ControllerButtonEvent{Type: sdl.CONTROLLERBUTTONDOWN, Which: 17, Button: uint8(controls.Mapping[action])}
+				if mode.IsKeyboard() {
+					event = &sdl.KeyboardEvent{Type: sdl.KEYDOWN, Keysym: sdl.Keysym{Sym: key}}
+				}
+				if handleEvent(context.Background(), model, event, &controller, controls, logger, mode) {
+					t.Fatal("footer navigation requested exit")
+				}
+			}
+			for _, size := range [][2]int{{320, 240}, {639, 480}, {640, 480}, {641, 480}, {480, 640}, {720, 720}, {1280, 720}, {2560, 1080}, {320, 240}} {
+				w, h := canvasSize(size[0], size[1])
+				canvas, err := newConsoleCanvas(w, h)
+				if err != nil {
+					t.Fatal(err)
+				}
+				model.Selected = 0
+				canvas.draw(model, "unknown board", controls)
+				press(storeinput.Down, sdl.K_DOWN)
+				press(storeinput.Diagnostics, sdl.K_y)
+				press(storeinput.Right, sdl.K_RIGHT)
+				canvas.draw(model, "unknown board", controls)
+				if model.Selected != 1 || model.Action != 1 || model.Focus != storeui.Actions || model.Busy {
+					t.Fatal("reflow changed selection/action or More navigation")
+				}
+				press(storeinput.PageDown, sdl.K_PAGEDOWN)
+				canvas.draw(model, "unknown board", controls)
+				if model.ReviewOffset == 0 || model.Tab() != storeui.TabAll || model.Tabs.Category() != storeui.CategoryAll || model.Action != 1 || model.Busy {
+					t.Fatal("reading changed filters/action or failed to page")
+				}
+				press(storeinput.Back, sdl.K_ESCAPE)
+				press(storeinput.Confirm, sdl.K_RETURN)
+				if model.Focus != storeui.Confirm || model.Busy {
+					t.Fatal("confirm did not open review without executing")
+				}
+				canvas.draw(model, "unknown board", controls)
+				press(storeinput.Back, sdl.K_ESCAPE)
+				model.Busy = true
+				canvas.draw(model, "unknown board", controls)
+				press(storeinput.Down, sdl.K_DOWN)
+				press(storeinput.PageDown, sdl.K_PAGEDOWN)
+				if !model.Busy || model.Selected != 1 || len(canvas.groups) != 0 {
+					t.Fatal("busy footer promised or accepted a control")
+				}
+				model.Busy = false
+				canvas.close()
+			}
+		})
+	}
+}
+
+func TestSDLPagingRendersCompleteWarningsWithoutChangingOperation(t *testing.T) {
+	const first = "REVIEW-START-5D8E"
+	const warningEnd = "WARNING-END-7F3A"
+	const recoveryEnd = "RECOVERY-END-9B2C"
+	for _, size := range [][2]int{{320, 200}, {320, 240}, {480, 320}, {639, 480}, {640, 480}, {480, 640}, {720, 720}} {
+		for _, input := range []InputMode{InputKeyboard, InputAuto} {
+			for _, focus := range []storeui.Focus{storeui.Health, storeui.Actions, storeui.Confirm, storeui.ForceConfirm} {
+				t.Run(fmt.Sprintf("%dx%d/%s/focus-%d", size[0], size[1], input, focus), func(t *testing.T) {
+					w, h := canvasSize(size[0], size[1])
+					canvas, err := newConsoleCanvas(w, h)
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer canvas.close()
+					model, controls, logger, _ := newRouterHarness(t)
+					if input.IsKeyboard() {
+						controls = storeinput.NewDesktopSession(t.TempDir(), "")
+					}
+					item := appstore.Item{
+						Package: manifest.Package{ID: "org.example.review", Name: first, Version: "1", Type: "game", Install: &manifest.Install{
+							Warning: strings.Repeat("Read before replacing existing files. ", 45) + "\n" + warningEnd,
+						}},
+						Actions:         []appstore.Action{appstore.Adopt, appstore.ForceReinstall},
+						RecoverySummary: strings.Repeat("Preserve user data and retain the backup for manual restore. ", 37) + "\n" + recoveryEnd,
+					}
+					model.Items = []appstore.Item{{Package: manifest.Package{ID: "org.example.other"}}, item}
+					model.Selected, model.Action, model.Focus = 1, 1, focus
+					model.Tabs.Cycle(1)
+					model.Tabs.CycleCategory(1)
+					controller := &controllerState{instanceID: 17}
+					page := func(down bool) {
+						var event sdl.Event
+						if input.IsKeyboard() {
+							key := sdl.Keycode(sdl.K_PAGEUP)
+							if down {
+								key = sdl.K_PAGEDOWN
+							}
+							event = &sdl.KeyboardEvent{Type: sdl.KEYDOWN, Keysym: sdl.Keysym{Sym: key}}
+						} else {
+							button := sdl.CONTROLLER_BUTTON_LEFTSHOULDER
+							if down {
+								button = sdl.CONTROLLER_BUTTON_RIGHTSHOULDER
+							}
+							event = &sdl.ControllerButtonEvent{Type: sdl.CONTROLLERBUTTONDOWN, Which: 17, Button: uint8(button)}
+						}
+						if handleEvent(context.Background(), model, event, &controller, controls, logger, input) {
+							t.Fatal("paging requested exit")
+						}
+						if model.Selected != 1 || model.Action != 1 || model.Focus != focus || model.Tab() != storeui.TabReady || model.Tabs.Category() != storeui.CategoryGames || model.Busy {
+							t.Fatal("paging changed selection, action, focus, filter or busy state")
+						}
+					}
+					// Match independently rasterized glyphs in the content, not an
+					// offset or the wrapping helper's own account of visible text.
+					visible := func(frame *image.RGBA, marker string) bool {
+						expected := image.NewRGBA(image.Rect(0, 0, font.MeasureString(canvas.body, marker).Ceil(), canvas.body.Metrics().Height.Ceil()))
+						fill(expected, expected.Bounds(), palette.background)
+						drawer := font.Drawer{Dst: expected, Src: image.NewUniform(palette.text), Face: canvas.body, Dot: fixed.P(0, canvas.body.Metrics().Ascent.Ceil())}
+						drawer.DrawString(marker)
+						middle := expected.Bounds().Dy() / 2
+						signature := expected.Pix[middle*expected.Stride : (middle+1)*expected.Stride]
+						for y := 0; y+expected.Bounds().Dy() < canvas.footerTop(); y++ {
+							strip := frame.Pix[(y+middle)*frame.Stride : (y+middle+1)*frame.Stride]
+							for offset := 0; offset+expected.Stride <= len(strip); {
+								index := bytes.Index(strip[offset:], signature)
+								if index < 0 {
+									break
+								}
+								left := offset + index
+								offset = left + 4
+								matches := true
+								for row := 0; row < expected.Bounds().Dy(); row++ {
+									start := (y+row)*frame.Stride + left
+									if !bytes.Equal(frame.Pix[start:start+expected.Stride], expected.Pix[row*expected.Stride:(row+1)*expected.Stride]) {
+										matches = false
+										break
+									}
+								}
+								if matches {
+									return true
+								}
+							}
+						}
+						return false
+					}
+					frame := canvas.draw(model, "", controls)
+					if !visible(frame, first) || visible(frame, warningEnd) || visible(frame, recoveryEnd) {
+						t.Fatal("fixture must start with the warning ends offscreen")
+					}
+					seenWarning, seenRecovery := false, false
+					for range 128 {
+						before := model.ReviewOffset
+						page(true)
+						frame = canvas.draw(model, "", controls)
+						seenWarning = seenWarning || visible(frame, warningEnd)
+						seenRecovery = seenRecovery || visible(frame, recoveryEnd)
+						if model.ReviewOffset == before {
+							break
+						}
+					}
+					if !seenWarning || !seenRecovery {
+						t.Fatalf("final text unreachable: warning=%v recovery=%v", seenWarning, seenRecovery)
+					}
+					for range 128 {
+						page(false)
+						frame = canvas.draw(model, "", controls)
+						if visible(frame, first) {
+							break
+						}
+					}
+					if !visible(frame, first) {
+						t.Fatal("cannot read back to the first warning")
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestOutputResizeRendersWithoutResettingReviewOrBusyState(t *testing.T) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	t.Setenv("SDL_VIDEODRIVER", "dummy")
+	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
+		t.Fatal(err)
+	}
+	defer sdl.Quit()
+	window, err := sdl.CreateWindow("Resize test", 0, 0, 640, 480, sdl.WINDOW_HIDDEN|sdl.WINDOW_RESIZABLE)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer window.Destroy()
+	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_SOFTWARE)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer renderer.Destroy()
+	var surface outputSurface
+	defer surface.close()
+	model, controls, logger, _ := newRouterHarness(t)
+	model.Items = []appstore.Item{{}, {Package: manifest.Package{Name: "Asymmetric review", Summary: "Keep this selected", Install: &manifest.Install{Warning: strings.Repeat("Read every warning. ", 40) + "FINAL WARNING"}}, Actions: []appstore.Action{appstore.Adopt, appstore.ForceReinstall}}}
+	model.Selected, model.Action, model.Focus = 1, 1, storeui.Confirm
+	for _, size := range [][2]int{{320, 240}, {720, 720}, {1280, 720}, {639, 480}, {640, 480}, {641, 480}, {480, 640}, {320, 240}} {
+		window.SetSize(int32(size[0]), int32(size[1]))
+		w, h, err := renderer.GetOutputSize()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if changed, err := surface.resize(renderer, int(w), int(h)); err != nil || !changed {
+			t.Fatalf("resize: %v %v", changed, err)
+		}
+		frame := surface.canvas.draw(model, "Unknown device", controls)
+		handleEvent(context.Background(), model, &sdl.KeyboardEvent{Type: sdl.KEYDOWN, Keysym: sdl.Keysym{Sym: sdl.K_PAGEDOWN}}, new(*controllerState), controls, logger, InputKeyboard)
+		if model.Selected != 1 || model.Action != 1 || model.Focus != storeui.Confirm || model.Busy || model.ReviewOffset == 0 {
+			t.Fatal("resize/paging reset review or executed operation")
+		}
+		if err := surface.texture.Update(nil, unsafe.Pointer(&frame.Pix[0]), frame.Stride); err != nil {
+			t.Fatal(err)
+		}
+		renderer.SetDrawColor(palette.background.R, palette.background.G, palette.background.B, 255)
+		renderer.Clear()
+		if err := renderer.Copy(surface.texture, nil, &surface.destination); err != nil {
+			t.Fatal(err)
+		}
+		capture := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
+		if err := renderer.ReadPixels(nil, sdl.PIXELFORMAT_ABGR8888, unsafe.Pointer(&capture.Pix[0]), capture.Stride); err != nil {
+			t.Fatal(err)
+		}
+		if capture.RGBAAt(int(w)/2, int(h)-1) != palette.panel {
+			t.Fatal("renderer did not fill output height")
+		}
+		if directory := os.Getenv("KNULLI_UI_SCREENSHOT_DIR"); directory != "" {
+			if err := os.MkdirAll(directory, 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := savePNG(filepath.Join(directory, fmt.Sprintf("resize-%dx%d.png", w, h)), capture); err != nil {
+				t.Fatal(err)
+			}
+		}
+		before := surface.canvas
+		for _, invalid := range [][2]int{{0, 0}, {319, 240}, {8000, 480}, {320, 1000}} {
+			if changed, err := surface.resize(renderer, invalid[0], invalid[1]); err != nil || changed || surface.canvas != before {
+				t.Fatal("invalid output replaced valid surface")
+			}
+		}
+	}
+	model.Busy, model.Message = true, "Installing files: 66% (2/3)"
+	if _, err := surface.resize(renderer, 640, 480); err != nil {
+		t.Fatal(err)
+	}
+	surface.canvas.draw(model, "", controls)
+	if !model.Busy || model.Message != "Installing files: 66% (2/3)" || model.Selected != 1 {
+		t.Fatal("resize reset operation state")
 	}
 }
 

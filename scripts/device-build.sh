@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds the signed, ABI-verified device artifacts for one target.
+# Builds the signed, ABI-verified KNULLI AArch64/glibc/SDL2 distribution.
 #
 # CI and a tagged release both call this script, so the cross-compile, the ABI
 # gate, and the catalogue signature have exactly one home. They used to be
@@ -10,8 +10,7 @@
 # toolchain and the arm64 SDL headers are installed here when they are missing,
 # so the caller does not restate a dependency list that can drift.
 #
-# usage: device-build.sh TARGET VERSION OUTPUT_DIR
-#   TARGET      trimui-smart-pro or magicx-zero-28
+# usage: device-build.sh VERSION OUTPUT_DIR
 #   VERSION     version stamped into the archive name
 #   OUTPUT_DIR  directory for the archive, SHA256SUMS.txt, and the catalogue
 #
@@ -19,24 +18,19 @@
 # log without a hidden stdout contract.
 set -eu
 
-if [ "$#" -ne 3 ]; then
-  echo "usage: $0 TARGET VERSION OUTPUT_DIR" >&2
+if [ "$#" -ne 2 ]; then
+  echo "usage: $0 VERSION OUTPUT_DIR" >&2
   exit 2
 fi
 
-TARGET=$1
-VERSION=$(printf '%s' "$2" | tr -cd 'A-Za-z0-9._-')
-OUTPUT_DIR=$3
+TARGET=knulli-aarch64-glibc-sdl2
+VERSION=$(printf '%s' "$1" | tr -cd 'A-Za-z0-9._-')
+OUTPUT_DIR=$2
 
 if [ -z "$VERSION" ]; then
   echo "version must contain a portable filename character" >&2
   exit 2
 fi
-
-case "$TARGET" in
-  trimui-smart-pro|magicx-zero-28) ;;
-  *) echo "unsupported device target: $TARGET" >&2; exit 2 ;;
-esac
 
 # Host packaging tools can be missing even when the cross-toolchain is ready.
 if ! command -v zip >/dev/null 2>&1 || ! command -v file >/dev/null 2>&1 || ! command -v readelf >/dev/null 2>&1; then
@@ -99,4 +93,4 @@ if [ -z "$maximum_glibc" ] || [ "$(printf '%s\n' 2.34 "$maximum_glibc" | sort -V
 fi
 echo "maximum required glibc: $maximum_glibc" >&2
 
-scripts/package-device.sh "$WORK/knulli-app" "$WORK/knulli-app-ui" "$CATALOG" "$OUTPUT_DIR" "$VERSION" "$TARGET" >&2
+scripts/package-device.sh "$WORK/knulli-app" "$WORK/knulli-app-ui" "$CATALOG" "$OUTPUT_DIR" "$VERSION" >&2

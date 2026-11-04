@@ -20,19 +20,21 @@ import (
 
 func TestCheckStoreUpdatePinsOfficialTargetAsset(t *testing.T) {
 	for _, test := range []struct{ name, target, current, url, digest, want string }{
-		{"new prerelease", "magicx-zero-28", "old", storeReleaseBase + "v2/knulli-app-store-magicx-zero-28-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "v2"},
-		{"current build", "magicx-zero-28", "new", storeReleaseBase + "v2/knulli-app-store-magicx-zero-28-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "current"},
-		{"current tag", "magicx-zero-28", "v2", storeReleaseBase + "v2/knulli-app-store-magicx-zero-28-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "current"},
-		{"older numbered release", "magicx-zero-28", "v3", storeReleaseBase + "v2/knulli-app-store-magicx-zero-28-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "current"},
-		{"newer numbered release", "magicx-zero-28", "v1", storeReleaseBase + "v2/knulli-app-store-magicx-zero-28-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "v2"},
-		{"equivalent numbered release", "magicx-zero-28", "2.0", storeReleaseBase + "v2/knulli-app-store-magicx-zero-28-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "current"},
+		{"new prerelease", "knulli-aarch64-glibc-sdl2", "old", storeReleaseBase + "v2/knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "v2"},
+		{"legacy MagicX metadata", "magicx-zero-28", "old", storeReleaseBase + "v2/knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "v2"},
+		{"legacy TrimUI metadata", "trimui-smart-pro", "old", storeReleaseBase + "v2/knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "v2"},
+		{"current build", "magicx-zero-28", "new", storeReleaseBase + "v2/knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "current"},
+		{"current tag", "magicx-zero-28", "v2", storeReleaseBase + "v2/knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "current"},
+		{"older numbered release", "magicx-zero-28", "v3", storeReleaseBase + "v2/knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "current"},
+		{"newer numbered release", "magicx-zero-28", "v1", storeReleaseBase + "v2/knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "v2"},
+		{"equivalent numbered release", "magicx-zero-28", "2.0", storeReleaseBase + "v2/knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "current"},
 		{"foreign asset", "magicx-zero-28", "old", "https://example.org/new.zip", "sha256:" + strings.Repeat("a", 64), "error"},
-		{"missing digest", "magicx-zero-28", "old", storeReleaseBase + "v2/knulli-app-store-magicx-zero-28-experimental-new.zip", "", "error"},
-		{"no target asset", "trimui-smart-pro", "old", storeReleaseBase + "v2/knulli-app-store-magicx-zero-28-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "error"},
+		{"missing digest", "magicx-zero-28", "old", storeReleaseBase + "v2/knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-new.zip", "", "error"},
+		{"unsupported ABI", "knulli-armhf-musl-sdl2", "old", storeReleaseBase + "v2/knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-new.zip", "sha256:" + strings.Repeat("a", 64), "error"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				fmt.Fprintf(w, `[{"tag_name":"v2","prerelease":true,"assets":[{"name":"knulli-app-store-magicx-zero-28-experimental-new.zip","browser_download_url":%q,"digest":%q,"size":123}]}]`, test.url, test.digest)
+				fmt.Fprintf(w, `[{"tag_name":"v2","prerelease":true,"assets":[{"name":"knulli-app-store-magicx-zero-28-experimental-new.zip","browser_download_url":"https://example.org/legacy.zip"},{"name":"knulli-app-store-knulli-armhf-musl-sdl2-experimental-new.zip","browser_download_url":"https://example.org/wrong-abi.zip"},{"name":"knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-new.zip","browser_download_url":%q,"digest":%q,"size":123}]}]`, test.url, test.digest)
 			}))
 			defer server.Close()
 			update, err := (Manager{Client: rewriteClient(t, server)}).CheckStoreUpdate(context.Background(), test.target, test.current)

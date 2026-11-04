@@ -156,6 +156,12 @@ walk catalogue-walk keyboard \
   "right,left,enter,esc,y,enter,esc,esc,tab,y" \
   "catalogue,actions,confirm"
 
+# Review paging must never switch filters or accept an operation. The frames
+# retain the line range, including the final page and the return to browsing.
+walk review-text-paging keyboard \
+  "enter,pgdown,pgdown,pgdown,pgdown,pgdown,pgdown,pgdown,pgdown,pgdown,pgdown,pgdown,pgdown,pgup,esc,y,pgdown,esc" \
+  "catalogue,confirm,actions"
+
 # Status is independent of category: R1 walks through Ready and Installed,
 # and L1 walks back. Nothing is installed in a fresh fixture,
 # so the installed tab is empty and the same key steps out of it. The record's
@@ -174,7 +180,7 @@ walk catalogue-categories keyboard \
 # The former PocketCurator candidate now opens an upstream-managed install
 # confirmation. Never confirm a download in this offline flow.
 walk upstream-managed-confirmation keyboard \
-  "right,right,down,down,down,enter" \
+  "right,right,down,down,down,down,enter" \
   "catalogue,confirm" \
   "io.github.tomtombombadil.pocketcurator"
 

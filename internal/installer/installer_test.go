@@ -32,13 +32,13 @@ import (
 
 func TestApplyReportsMeasuredProgressBeforeDownloadFinishes(t *testing.T) {
 	asset := zipBytes(t, map[string]string{"launch.sh": "launcher", "data": strings.Repeat("x", 90_000), "config.ini": "defaults"})
-	for _, mode := range []string{"known-size", "chunked", "cancelled", "truncated"} {
+	for _, mode := range []string{"known-size", "chunked", "cancelled", "cancelled-at-completion", "truncated"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			releaseDownload := make(chan struct{})
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if mode == "known-size" {
+				if mode == "known-size" || mode == "cancelled-at-completion" {
 					w.Header().Set("Content-Length", strconv.Itoa(len(asset)))
 				}
 				_, _ = w.Write(asset[:len(asset)/3])
@@ -66,14 +66,20 @@ func TestApplyReportsMeasuredProgressBeforeDownloadFinishes(t *testing.T) {
 					}
 					close(releaseDownload)
 				}
+				if mode == "cancelled-at-completion" && message == "Downloading: 100%" {
+					cancel()
+				}
 			}}.WithPlatform(testPlatform())
 			_, err := manager.Apply(ctx, OpInstall, pkg)
 			if !released {
 				t.Fatalf("no measured progress while download was waiting: %v, %v", messages, err)
 			}
-			if mode == "cancelled" || mode == "truncated" {
+			if mode == "cancelled" || mode == "cancelled-at-completion" || mode == "truncated" {
 				if err == nil {
 					t.Fatal("incomplete download succeeded")
+				}
+				if mode != "truncated" && !errors.Is(err, context.Canceled) {
+					t.Fatalf("expected download cancellation, got %v", err)
 				}
 				if strings.Contains(strings.Join(messages, "\n"), "Extracting") {
 					t.Fatalf("incomplete download advanced to extraction: %v", messages)
@@ -101,6 +107,64 @@ func TestApplyReportsMeasuredProgressBeforeDownloadFinishes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestZitchPrivateLauncherAndLifecycleKeepAccountsAndGames(t *testing.T) {
+	pkg, err := manifest.Load("../../catalogue/packages/io.github.itchio.zitch.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Exercise directory selection without running PortMaster, butler or games.
+	header := "#!/bin/bash\ndirectory=wrong\nunset SCRIPT_DIR\n"
+	before := "GAMEDIR=\"/$directory/ports/zitch\""
+	after := "GAMEDIR=\"$(dirname \"$0\")/zitch\"  "
+	footer := "\ntest -f \"$GAMEDIR/zitch.aarch64\" || exit 1\nprintf '%s' \"$GAMEDIR\"\n"
+	asset := zipBytes(t, map[string]string{
+		"itch.io.sh":           header + before + footer,
+		"zitch/zitch.aarch64":  "frontend, never executed",
+		"zitch/butler":         "butler, never executed",
+		"zitch/love":           "love, never executed",
+		"zitch/screenshot.png": "menu image",
+		"zitch/home/settings":  "defaults",
+	})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg.Release = testPackage(pkg.Release.URL, asset, pkg.Version).Release
+	pkg.Install.BinaryPatches[0].Offset = int64(len(header))
+	digest := sha256.Sum256([]byte(header + after + footer))
+	pkg.Install.BinaryPatches[0].SHA256 = hex.EncodeToString(digest[:])
+	root := filepath.Join(t.TempDir(), "root with spaces")
+	if err := os.Mkdir(root, 0755); err != nil {
+		t.Fatal(err)
+	}
+	detected := testPlatform()
+	detected.GLIBCVersion = "2.38"
+	detected.Dependencies = append(detected.Dependencies, "portmaster", "libresolv", "libpthread")
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(detected)
+	for _, operation := range []Op{OpInstall, OpRepair} {
+		if _, err := manager.Apply(context.Background(), operation, pkg); err != nil {
+			t.Fatal(err)
+		}
+		launcher := filepath.Join(root, "userdata/roms/ports/Zitch/itch.io.sh")
+		output, err := exec.Command("bash", launcher).CombinedOutput()
+		want := filepath.Join(root, "userdata/roms/ports/Zitch/zitch")
+		if err != nil || string(output) != want {
+			t.Fatalf("launcher: got %q, want %q, err %v", output, want, err)
+		}
+		assertContains(t, root, "userdata/roms/ports/gamelist.xml", "./Zitch/zitch/screenshot.png")
+		if operation == OpRepair {
+			assertRootFile(t, root, "userdata/roms/ports/Zitch/zitch/home/settings", "my account")
+			assertRootFile(t, root, "userdata/roms/ports/Zitch/zitch/home/game/save", "my save")
+		}
+		writeRootFile(t, root, "userdata/roms/ports/Zitch/zitch/home/settings", "my account")
+		writeRootFile(t, root, "userdata/roms/ports/Zitch/zitch/home/game/save", "my save")
+	}
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	assertMissing(t, root, "userdata/roms/ports/Zitch/itch.io.sh")
+	assertRootFile(t, root, "userdata/roms/ports/Zitch/zitch/home/settings", "my account")
+	assertRootFile(t, root, "userdata/roms/ports/Zitch/zitch/home/game/save", "my save")
 }
 
 func TestFreedoomLifecycleKeepsSavesAndOtherInstallations(t *testing.T) {
@@ -314,6 +378,70 @@ func TestUpstreamManagedInstallRepairAndGuardedRemoval(t *testing.T) {
 	assertRootFile(t, root, "userdata/system/demo/session.db", "session history")
 	assertRootFile(t, root, "userdata/system/scripts/other.sh", "unrelated hook")
 	assertMissing(t, root, "userdata/system/demo/launch.sh")
+}
+
+func TestKnulliWebUILifecyclePreservesConfigAndRequiresServiceCleanup(t *testing.T) {
+	pkg, err := manifest.Load("../../catalogue/packages/io.github.kubrick89.knulli-webui.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	asset := zipBytes(t, map[string]string{
+		"services/knulli_webui": "reviewed service",
+		"config.example.json":   "defaults",
+		"knulli_webui/webui.py": "reviewed source",
+	})
+	pkg.Release = testPackage(pkg.Release.URL, asset, pkg.Version).Release
+	pkg.Install.BinaryPatches = nil // Synthetic inventory, not the publisher's service bytes.
+	server := serveAsset(t, asset)
+	defer server.Close()
+	root := t.TempDir()
+	info := testPlatform()
+	info.Dependencies = append(info.Dependencies, "python3")
+	manager := Manager{Root: root, Client: rewriteClient(t, server), DeferGameListRefresh: true}.WithPlatform(info)
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+		t.Fatal(err)
+	}
+	const app = "userdata/system/knulli-webui/"
+	assertRootFile(t, root, app+"knulli_webui/config.json", "defaults")
+	assertMissing(t, root, "userdata/system/services/knulli_webui")
+	assertContains(t, root, "userdata/roms/tools/Knulli WebUI.sh", "start")
+	writeRootFile(t, root, app+"knulli_webui/config.json", "private credentials")
+	writeRootFile(t, root, app+"knulli_webui/webui.py", "damaged")
+	if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, app+"knulli_webui/webui.py", "reviewed source")
+	assertRootFile(t, root, app+"knulli_webui/config.json", "private credentials")
+	for _, active := range []struct{ path, body string }{
+		{app + "knulli_webui/service.pid", "1234"},
+		{"userdata/system/services/knulli_webui", "legacy service"},
+		{"userdata/system/custom.sh", "/userdata/system/knulli-webui/services/knulli_webui start"},
+	} {
+		writeRootFile(t, root, active.path, active.body)
+		if _, err := manager.Uninstall(context.Background(), pkg.ID); err == nil {
+			t.Fatalf("removal accepted uncleared service state: %s", active.path)
+		}
+		assertRootFile(t, root, app+"services/knulli_webui", "reviewed service")
+		assertRootFile(t, root, app+"knulli_webui/config.json", "private credentials")
+		if err := os.Remove(filepath.Join(root, active.path)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeRootFile(t, root, "userdata/saves/example.srm", "saved game")
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, app+"knulli_webui/config.json", "private credentials")
+	assertRootFile(t, root, "userdata/saves/example.srm", "saved game")
+	assertMissing(t, root, app+"services/knulli_webui")
+	assertMissing(t, root, "userdata/roms/tools/Knulli WebUI.sh")
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err == nil {
+		t.Fatal("reinstall ignored retained external configuration")
+	}
+	if _, err := manager.Apply(context.Background(), OpAdopt, pkg); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, app+"knulli_webui/config.json", "private credentials")
 }
 
 func TestRAOfflineProxyRemovalRequiresRestoredRetroArchCustomConfig(t *testing.T) {

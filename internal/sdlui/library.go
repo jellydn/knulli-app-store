@@ -14,9 +14,10 @@ import (
 func (c *consoleCanvas) browse(frame *image.RGBA, model *storeui.Model) {
 	// Equal-height rows keep neighbours stationary as focus moves. The detail
 	// pane and thumbnails use reviewed, local content without network requests.
+	bottom := c.statusTop() - 4
 	divider := 24 + (c.width-48)*47/100
-	fill(frame, image.Rect(divider, 120, divider+1, 381), palette.panel)
-	start, end := model.Window(5)
+	fill(frame, image.Rect(divider, 120, divider+1, bottom), palette.panel)
+	start, end := model.Window(max(1, (bottom-120)/52))
 	for index := start; index < end; index++ {
 		top := 120 + (index-start)*52
 		row := image.Rect(24, top, divider-16, top+48)
@@ -41,7 +42,7 @@ func (c *consoleCanvas) browse(frame *image.RGBA, model *storeui.Model) {
 	c.text(frame, strings.ToUpper(item.Package.Review.Status), 218, left, right-left-96, palette.warning, false)
 	c.text(frame, trustLabel(item), 244, left, right-left-96, palette.warning, false)
 	c.text(frame, installState(item), 270, left, right-left, statusColor(item), false)
-	c.prose(frame, item.Package.Summary, image.Rect(left, 306, right, 381), palette.text, false)
+	c.prose(frame, item.Package.Summary, image.Rect(left, 306, right, bottom), palette.text, false)
 }
 
 func categoryLabel(item appstore.Item) string {

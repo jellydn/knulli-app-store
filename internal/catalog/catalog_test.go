@@ -17,8 +17,8 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first.Packages) != 12 || len(second.Packages) != 12 {
-		t.Fatalf("expected twelve packages, got %d and %d", len(first.Packages), len(second.Packages))
+	if len(first.Packages) != 14 || len(second.Packages) != 14 {
+		t.Fatalf("expected fourteen packages, got %d and %d", len(first.Packages), len(second.Packages))
 	}
 	// RetSend now uses upstream releases, but its recorded approval remains
 	// the maintainer's decision rather than community or device verification.
@@ -28,9 +28,11 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 		"com.akouzoukos.apotris":                     "",
 		"io.github.freedoom.freedoom":                "",
 		"io.github.garage-collective.dark-and-under": "",
+		"io.github.itchio.zitch":                     "",
 		"io.github.jhhoward.catacombs":               "",
 		"io.github.jellydn.random-game-picker":       "maintainer",
 		"io.github.jellydn.retsend":                  "maintainer",
+		"io.github.kubrick89.knulli-webui":           "",
 		"io.github.misantronic.raofflineproxy":       "community",
 		"io.github.squirbie.handheld-link-cores":     "maintainer",
 		"io.github.tomtombombadil.pocketcurator":     "community",
@@ -68,8 +70,8 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 			}
 		}
 	}
-	if experimental != 12 || verified != 0 {
-		t.Fatalf("expected twelve experimental packages and no current device-verified release, got %d and %d", experimental, verified)
+	if experimental != 14 || verified != 0 {
+		t.Fatalf("expected fourteen experimental packages and no current device-verified release, got %d and %d", experimental, verified)
 	}
 }
 

@@ -6,7 +6,7 @@ The Store verifies downloads and journals file changes for rollback. It never ru
 
 ## Devices and release
 
-Release target: [v2026.10.27](https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.27). Includes Picker 0.2.2, which excludes Tools and Emulators applications. Hardware reports remain scoped to the artifacts actually tested. Device targets remain **experimental**:
+New builds use one **experimental** KNULLI AArch64/glibc/SDL2 distribution, not a ZIP per device. See the [2026-11-04 release audit](docs/release-audit-2026-11-04.md) for package versions, blocked updates and outstanding physical tests. Historical [v2026.10.27](https://github.com/jellydn/knulli-app-store/releases/tag/v2026.10.27) assets and hardware reports remain scoped to the artifacts actually tested:
 
 | Target | Display | Evidence |
 | --- | --- | --- |
@@ -15,17 +15,16 @@ Release target: [v2026.10.27](https://github.com/jellydn/knulli-app-store/releas
 
 **Knulli is the only implemented firmware profile.** Device GUI builds require AArch64, glibc, and system SDL2, SDL2_image, and SDL2_ttf; SDL2_gfx is linked statically. Do not replace firmware libraries.
 
-Download examples for v2026.10.27:
+New-build asset names:
 
-- `knulli-app-store-trimui-smart-pro-experimental-v2026.10.27.zip`
-- `knulli-app-store-magicx-zero-28-experimental-v2026.10.27.zip`
-- `SHA256SUMS.txt`
+- `knulli-app-store-knulli-aarch64-glibc-sdl2-experimental-VERSION.zip`
+- `SHA256SUMS.txt` (separate checksum file, not another device distribution)
 
-Successful `main` builds also publish dated experimental pre-releases. A release version alone does not establish hardware evidence.
+The build gates required glibc symbols at 2.34; SDL2_gfx is static. One ZIP does not mean all hardware is compatible. Successful `main` workflows publish dated experimental pre-releases. Physical footer/device testing remains outstanding; publication is not a hardware-tested badge. See [distribution, security and legacy migration](docs/store-distribution.md).
 
 ## Install and use
 
-1. Download the target ZIP and checksum file into one directory on your computer:
+1. Download the compatibility-profile ZIP and checksum file into one directory on your computer:
 
    ```sh
    sha256sum --ignore-missing -c SHA256SUMS.txt
@@ -48,7 +47,7 @@ The GUI requests one menu refresh on exit if package operations changed the game
 
 ### Update the Store
 
-At the standard `/userdata/roms/ports/knulli-app-store` location, a build with self-update support offers a **Knulli App Store** entry. Confirm **Check for updates**, then **Update**; exit and reopen afterward. Checks include official experimental pre-releases and use the packaged target. Asset size and SHA-256 come from GitHub, not an independent update signing key.
+At the standard `/userdata/roms/ports/knulli-app-store` location, a build with self-update support offers a **Knulli App Store** entry. Confirm **Check for updates**, then **Update**; exit and reopen afterward. New builds select the common compatibility profile, including official experimental pre-releases. Asset size and SHA-256 come from GitHub, not an independent update signing key. Old device-named binaries cannot discover the new asset; use the [verified manual migration](docs/store-distribution.md#legacy-migration).
 
 For an older build, custom location, or **text file busy** failure, verify the ZIP and shut down Knulli before extracting it. Replace launcher, icon, binaries, catalogue, signature, and packaged guide together. Do not delete installed apps, settings, or `/userdata/system/knulli-app-store`. See [self-update safety and recovery](docs/security-model.md#store-self-update).
 
@@ -74,7 +73,7 @@ To test a separately prepared, unpublished build without replacing the productio
 
 ## Catalogue and safety
 
-On 2026-10-30 (Asia/Singapore), the [owner reconfirmed](https://ampcode.com/threads/T-01a184fd-5491-7371-9d0d-5d2a4bbddb02) that all eight current app versions below work and are tested on TrimUI Smart Pro. This updates the previously confirmed Knulli AArch64 1280×720 matrix, including Picker 0.2.2, Grout 5.4.1.0, retroshelf 0.6.3, RAOfflineProxy 2.3.0-alpha1 and Handheld Link Cores (mGBA Dual) 2026.10.29.1. MagicX Zero 28 and other matrices remain untested. Package testing does not establish separate lifecycle results or remove disclosed safety limits. All eight manifest review statuses remain **experimental**:
+On 2026-10-30 (Asia/Singapore), the [owner reconfirmed](https://ampcode.com/threads/T-01a184fd-5491-7371-9d0d-5d2a4bbddb02) that the eight app versions then listed work and are tested on TrimUI Smart Pro. This updates the previously confirmed Knulli AArch64 1280×720 matrix, including Picker 0.2.2, Grout 5.4.1.0, retroshelf 0.6.3, RAOfflineProxy 2.3.0-alpha1 and Handheld Link Cores (mGBA Dual) 2026.10.29.1. The reconciled catalogue also includes zitch 0.3.0, which has no device-test evidence. MagicX Zero 28 and other matrices remain untested. Package testing does not establish separate lifecycle results or remove disclosed safety limits. All nine manifest review statuses remain **experimental**:
 
 | Package | Current manifest version | Purpose |
 | --- | --- | --- |
@@ -86,6 +85,7 @@ On 2026-10-30 (Asia/Singapore), the [owner reconfirmed](https://ampcode.com/thre
 | PocketCurator | 1.1.2 | Manage your ROM collection; requires PortMaster |
 | RAOfflineProxy | 2.3.0-alpha1 | Offline casual RetroAchievements; requires Python 3.12 and pygame; [release review](docs/raofflineproxy-2.3.0-alpha1.md) |
 | retroshelf | 0.6.3 | Sync game sessions; requires an account and Wi-Fi; [release review](docs/retroshelf-0.6.3.md) |
+| zitch | 0.3.0 | Browse and install your itch.io library; requires PortMaster and glibc 2.38+; Knulli game launch untested; [release review](docs/zitch-0.3.0.md) |
 
 The **Games** category includes four experimental packages (five playable games):
 
@@ -110,12 +110,14 @@ PortMaster remains an external provider: the Store does not import its catalog, 
 
 ### Upstream-managed apps
 
-**PocketCurator, RAOfflineProxy, and retroshelf** are actionable experimental packages, not read-only candidates. The Store verifies pinned installation bytes, but does not control later setup, runtime writes, downloads, or self-updates. Repair restores pinned code and keeps declared data.
+**PocketCurator, RAOfflineProxy, retroshelf, zitch, and Knulli WebUI** are actionable experimental packages, not read-only candidates. The Store verifies pinned installation bytes, but does not control later setup, runtime writes, downloads, or self-updates. Repair restores pinned code and keeps declared data.
 
 - PocketCurator can permanently delete ROMs: back up first. For an older launcher-path failure, update the Store to v2026.10.24.4 or later, close PocketCurator, then use **More → Repair**. See the [native launch investigation](docs/real-device-tests.md#2026-10-24-pocketcurator-ssh-investigation).
 - RAOfflineProxy lacks an independent publisher checksum; its pinned hash was checked against GitHub's asset digest. This trusts GitHub and the publisher's account.
 - retroshelf's license is unverified; the Store downloads directly from its publisher without redistribution.
+- zitch uses private `Ports/Zitch` with a verified launcher-path patch and bundled menu artwork. Its launcher disables frontend self-updates, but downloaded games execute outside Store checks. Knulli game launch is untested; ROM/core launch is muOS-only. Close zitch and its games before Store operations. Removal keeps account data and games under `Zitch/zitch/home`; it does not sign you out or erase credentials.
 - RAOfflineProxy and retroshelf require manual hook/service cleanup before removal. Read the Store's cleanup messages and the [RAOfflineProxy](catalogue/packages/io.github.misantronic.raofflineproxy.json) / [retroshelf](catalogue/packages/org.retroshelf.knulli.json) manifest warnings. Declared read-only checks block removal; the Store never runs cleanup scripts.
+- Knulli WebUI starts a private HTTP service from Tools, without autostart. Defaults have no authentication and enable file writes and remote input. Configure it before starting, use only a trusted private network, and stop it before Store operations. Removal keeps configuration and credentials. See the [WebUI setup and security review](docs/knulli-webui-1.2.1.md).
 
 See [package manifests](catalogue/packages/), [package contribution guidance](docs/how-to-add-a-package.md), [RetSend review](docs/retsend-upstream-1.0.0.md), and the [security model](docs/security-model.md) for preserved paths and boundaries.
 

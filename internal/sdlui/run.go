@@ -77,6 +77,7 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 		},
 	}
 	frameworkOptions.WindowOptions.FullscreenDesktop = !options.Windowed
+	frameworkOptions.WindowOptions.Resizable = options.Windowed
 	// Do not load a firmware-specific raw joystick map or a saved assignment.
 	// KNULLI's SDL GameController mapping is resolved by internal/input once.
 	gaba.SetInputMappingBytes([]byte(`{}`))
@@ -104,19 +105,8 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 	logResolutionCandidates(options.Diagnostics, platform.AssessResolutions(allCandidates), options.Platform)
 	backend.SetPlatform(options.Platform)
 	platformHeader := platform.DisplayHeader(options.Platform, 0, 0)
-	outputWidth, outputHeight := selectedOutputSize(options.Platform.Resolution)
-	canvas, err := newConsoleCanvas(logicalWidth(outputWidth, outputHeight))
-	if err != nil {
-		return err
-	}
-	defer canvas.close()
-	destination := outputRectangle(outputWidth, outputHeight)
-	sdlDestination := sdl.Rect{X: int32(destination.Min.X), Y: int32(destination.Min.Y), W: int32(destination.Dx()), H: int32(destination.Dy())}
-	texture, err := renderer.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STREAMING, int32(canvas.width), canvasHeight)
-	if err != nil {
-		return fmt.Errorf("create card texture: %w", err)
-	}
-	defer texture.Destroy()
+	var surface outputSurface
+	defer surface.close()
 
 	model := storeui.New(backend)
 	if err := model.Load(ctx); err != nil {
@@ -171,6 +161,21 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 				return nil
 			}
 		}
+		width, height, err := renderer.GetOutputSize()
+		if err != nil {
+			return fmt.Errorf("read renderer output: %w", err)
+		}
+		changed, err := surface.resize(renderer, int(width), int(height))
+		if err != nil {
+			return err
+		}
+		if changed {
+			dirty = true
+			options.Diagnostics.Event("display_layout", "output", fmt.Sprintf("%dx%d", width, height), "canvas", fmt.Sprintf("%dx%d", surface.canvas.width, surface.canvas.height), "compact", fmt.Sprint(surface.canvas.compact))
+		}
+		if surface.canvas == nil {
+			continue
+		}
 		if !options.Input.IsKeyboard() {
 			if repeatHeldDirection(ctx, model, controls, controller, options.Diagnostics, &repeat) {
 				dirty = true
@@ -188,13 +193,13 @@ func Run(ctx context.Context, backend appstore.Backend, options Options) error {
 			continue
 		}
 		dirty = false
-		frame := canvas.draw(model, platformHeader, controls)
-		if err := texture.Update(nil, unsafe.Pointer(&frame.Pix[0]), frame.Stride); err != nil {
+		frame := surface.canvas.draw(model, platformHeader, controls)
+		if err := surface.texture.Update(nil, unsafe.Pointer(&frame.Pix[0]), frame.Stride); err != nil {
 			return fmt.Errorf("upload card frame: %w", err)
 		}
 		renderer.SetDrawColor(palette.background.R, palette.background.G, palette.background.B, 255)
 		renderer.Clear()
-		if err := renderer.Copy(texture, nil, &sdlDestination); err != nil {
+		if err := renderer.Copy(surface.texture, nil, &surface.destination); err != nil {
 			return fmt.Errorf("render card frame: %w", err)
 		}
 		// Capture the actual renderer before Present invalidates its backbuffer,
@@ -500,16 +505,55 @@ func selectedOutputSize(resolution string) (int, int) {
 }
 
 func outputRectangle(width, height int) image.Rectangle {
-	scaleWidth := width
-	logical := logicalWidth(width, height)
-	scaleHeight := scaleWidth * canvasHeight / logical
-	if scaleHeight > height {
-		scaleHeight = height
-		scaleWidth = scaleHeight * logical / canvasHeight
-	}
+	logicalW, logicalH := canvasSize(width, height)
+	scaleHeight := height
+	scaleWidth := scaleHeight * logicalW / logicalH
 	x := (width - scaleWidth) / 2
 	y := (height - scaleHeight) / 2
 	return image.Rect(x, y, x+scaleWidth, y+scaleHeight)
+}
+
+// outputSurface owns only size-dependent presentation resources. Replacing it
+// cannot reload the backend or reset an in-flight operation or review focus.
+type outputSurface struct {
+	canvas        *consoleCanvas
+	texture       *sdl.Texture
+	destination   sdl.Rect
+	width, height int
+}
+
+func (s *outputSurface) close() {
+	if s.texture != nil {
+		s.texture.Destroy()
+	}
+	if s.canvas != nil {
+		s.canvas.close()
+	}
+}
+
+func (s *outputSurface) resize(renderer *sdl.Renderer, width, height int) (bool, error) {
+	if width == s.width && height == s.height {
+		return false, nil
+	}
+	if !platform.AssessResolutions([]platform.ResolutionCandidate{{Width: width, Height: height}})[0].Valid {
+		return false, nil
+	}
+	w, h := canvasSize(width, height)
+	canvas, err := newConsoleCanvas(w, h)
+	if err != nil {
+		return false, err
+	}
+	texture, err := renderer.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STREAMING, int32(w), int32(h))
+	if err != nil {
+		canvas.close()
+		return false, fmt.Errorf("create display texture: %w", err)
+	}
+	s.close()
+	s.canvas, s.texture = canvas, texture
+	s.width, s.height = width, height
+	destination := outputRectangle(width, height)
+	s.destination = sdl.Rect{X: int32(destination.Min.X), Y: int32(destination.Min.Y), W: int32(destination.Dx()), H: int32(destination.Dy())}
+	return true, nil
 }
 
 func renderOutput(frame *image.RGBA, width, height int) *image.RGBA {

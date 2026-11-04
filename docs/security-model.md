@@ -20,7 +20,7 @@ For upstream-managed experimental packages only, a missing publisher checksum ma
 
 ## Store self-update
 
-The Store card checks `api.github.com/repos/jellydn/knulli-app-store/releases` only after confirmation. It includes CI pre-releases and selects the asset for the packaged build target. A separate Update confirmation uses the pinned official release URL, byte size, and SHA-256 returned by GitHub. Missing digests, download mismatches, unsafe archive paths, unexpected file inventories, symlinks, and insufficient space reject the update.
+The Store card checks `api.github.com/repos/jellydn/knulli-app-store/releases` only after confirmation. It includes CI pre-releases and selects the shared `knulli-aarch64-glibc-sdl2` profile, not a device-name asset. Rebuilt code accepts former device target metadata as aliases, but already-installed old binaries need [verified manual migration](store-distribution.md#legacy-migration). A separate Update confirmation uses the pinned official release URL, byte size, and SHA-256 returned by GitHub. Missing digests, download mismatches, unsafe archive paths, unexpected file inventories, symlinks, and insufficient space reject the update.
 
 Only the two Store binaries, catalogue/signature pair, README, launcher, and icon under `/userdata/roms/ports` can change. The updater shares the manager lock and journal/rollback implementation. The launcher runs `knulli-app recover` before starting the UI: recovery can restore a key-bearing binary and its matching catalogue before either is loaded. The service also recovers before catalogue verification. Atomic file replacement keeps the current Linux process running; the user must exit and reopen to load the new version. No package state or settings are removed.
 

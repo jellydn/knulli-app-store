@@ -85,9 +85,6 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     container: golang:1.27.3-bookworm
-    strategy:
-      matrix:
-        target: [trimui-smart-pro, magicx-zero-28]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # One step owns the dependency install, the signed catalogue, the
@@ -96,10 +93,10 @@ jobs:
       - name: Build and verify the device artifacts
         run: |
           VERSION=$(printf '%.7s' "$GITHUB_SHA")
-          scripts/device-build.sh "${{ matrix.target }}" "$VERSION" dist
+          scripts/device-build.sh "$VERSION" dist
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: knulli-app-store-${{ matrix.target }}-experimental
+          name: knulli-app-store-knulli-aarch64-glibc-sdl2-experimental
           path: dist/
           if-no-files-found: error
           retention-days: 30
