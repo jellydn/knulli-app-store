@@ -197,6 +197,8 @@ Normal runs poll at 30 Hz but redraw only after input, window/controller events,
 held navigation repeats, operation events or notice expiry. Screenshot and
 scripted walkthrough runs still render complete frames on each step. They do
 not measure quiet interactive CPU use.
+Use the [CPU interval benchmark](idle-cpu-benchmark.md) for raw counter samples,
+matched before/after runs and the outstanding handheld evidence checklist.
 
 Renderer and router tests cover automatic controls in both letter modes,
 ignored legacy mappings, disconnect/hotplug, footers, lifecycle confirmations,
