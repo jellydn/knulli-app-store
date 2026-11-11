@@ -53,9 +53,9 @@
   },
   "name": "retroshelf",
   "release": {
-    "url": "https://github.com/retroshelf-org/linux/releases/download/v0.6.10/retroshelf-knulli-v0.6.10.zip",
-    "sha256": "bb42d92fe21ab2e56407d391ac3d0f5320962b01f6b80dee020ae4f42c36e4dd",
-    "size": 19976898,
+    "url": "https://github.com/retroshelf-org/linux/releases/download/v0.6.11/retroshelf-knulli-v0.6.11.zip",
+    "sha256": "202e762d99dcdfe204517b4fa19abd74fc9649c65d2274012b352069857a6476",
+    "size": 19975854,
     "installed_size": 43352008,
     "format": "zip",
     "immutable": true
@@ -72,7 +72,8 @@
       "The Store links directly to the publisher's release; it does not mirror or redistribute the ZIP. License remains unverified and is disclosed before installation. This exception is limited to upstream-managed experimental packages; no license identifier or device-test result is invented.",
       "Before Store removal, close the app and run /userdata/roms/tools/retroshelf/bin/retroshelf-uninstall.sh --keep-data to remove its hooks while preserving the linked device and sync history. A read-only check of /userdata/system/scripts refuses removal while any hook still references retroshelf. The Store never runs that script or removes shared hooks or runtime-created data.",
       "Manual 0.6.3 review on 2026-10-29 independently matched the ZIP to publisher checksums.txt and inspected all eight regular files: 19739401 compressed bytes, 42693255 installed bytes. The launcher and uninstall wrapper are byte-identical to 0.5.6; they still relocate through /tmp, apply upstream-staged updates, repair game-session hooks and delegate removal to the sync engine. These runtime actions remain explicitly upstream-managed. No upstream code or scripts were executed.",
-      "The 0.6.3 UI and sync engine are AArch64; the engine is statically linked. The UI requires the existing SDL2/image/ttf, libc, libresolv and libpthread libraries. Bundled SDL2_gfx requires GLIBC_2.29, so the complete package minimum is 2.29. Source and license remain unavailable; opaque binary hook, updater and data-migration behavior cannot be fully audited. See docs/retroshelf-0.6.3.md for evidence and fixture lifecycle limits."
+      "The 0.6.3 UI and sync engine are AArch64; the engine is statically linked. The UI requires the existing SDL2/image/ttf, libc, libresolv and libpthread libraries. Bundled SDL2_gfx requires GLIBC_2.29, so the complete package minimum is 2.29. Source and license remain unavailable; opaque binary hook, updater and data-migration behavior cannot be fully audited. See docs/retroshelf-0.6.3.md for evidence and fixture lifecycle limits.",
+      "Automated release proposal: downloaded size/SHA-256 and bounded archive inspection passed. Earlier runtime, dependency, path and device evidence is historical; review this version before merging. No upstream code was executed."
     ],
     "evidence": [
       {
@@ -157,11 +158,25 @@
         "kind": "runtime-dependency-review",
         "url": "https://github.com/retroshelf-org/linux/releases/download/v0.6.3/retroshelf-knulli-v0.6.3.zip",
         "note": "Manual 2026-10-29 review: AArch64 UI GLIBC_2.17, static AArch64 sync engine, bundled SDL2_gfx GLIBC_2.29. Launcher/uninstall wrapper match 0.5.6 exactly. Existing /userdata/system/scripts cleanup check is retained. Store lifecycle fixtures do not execute the app, hooks, updater or data migrations; upstream runtime remains unsandboxed and source/license unavailable."
+      },
+      {
+        "kind": "release-asset",
+        "url": "https://github.com/retroshelf-org/linux/releases/download/v0.6.11/retroshelf-knulli-v0.6.11.zip",
+        "note": "Automated proposal verified downloaded bytes against GitHub API SHA-256: 202e762d99dcdfe204517b4fa19abd74fc9649c65d2274012b352069857a6476"
+      },
+      {
+        "kind": "release-api",
+        "url": "https://api.github.com/repos/retroshelf-org/linux/releases/tags/v0.6.11",
+        "note": "Asset size and digest used for this proposal; downloaded bytes were independently hashed. GitHub account and API trust, not independent publisher authentication."
+      },
+      {
+        "kind": "publisher-checksum",
+        "url": "https://github.com/retroshelf-org/linux/releases/download/v0.6.11/checksums.txt"
       }
     ]
   },
   "schema": "org.knulli.app-store/package-manifest/v1",
   "summary": "Records Knulli play sessions and syncs them to your retroshelf account.",
   "type": "integration",
-  "version": "0.6.10"
+  "version": "0.6.11"
 }
