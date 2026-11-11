@@ -11,6 +11,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Avoid runner Ubuntu mirror/DNS failures; match the release build base.
+    container: golang:1.27.3-bookworm
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
@@ -19,7 +22,7 @@ jobs:
           go-version: "1.27.3"
           cache: true
       - name: Install SDL2 development files
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-gfx-dev
+        run: apt-get update -qq && apt-get install -y -qq libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-gfx-dev pkg-config zip pipx python3-venv
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
       - name: Check dependency lock files
@@ -29,6 +32,7 @@ jobs:
       - name: Check repository hooks
         run: |
           pipx install prek==0.5.5
+          export PATH="$HOME/.local/bin:$PATH"
           prek run --all-files --hook-stage pre-commit
       - name: Static checks
         run: |
@@ -55,6 +59,7 @@ jobs:
 
   gui-walkthrough:
     runs-on: ubuntu-latest
+    container: golang:1.27.3-bookworm
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -63,7 +68,7 @@ jobs:
           go-version: "1.27.3"
           cache: true
       - name: Install SDL2 development files
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-gfx-dev
+        run: apt-get update -qq && apt-get install -y -qq libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-gfx-dev pkg-config zip
       # The keyboard drives the real binary against a scratch root, so no device
       # and no display are needed. CI walks the offline flows, records opening,
       # post-key, and operation-completion frames, and renders every screen.
