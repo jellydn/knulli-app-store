@@ -12,7 +12,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     # Avoid runner Ubuntu mirror/DNS failures; match the release build base.
-    container: golang:1.27.3-bookworm
+    container: golang:1.27.4-bookworm
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -59,7 +59,7 @@ jobs:
 
   gui-walkthrough:
     runs-on: ubuntu-latest
-    container: golang:1.27.3-bookworm
+    container: golang:1.27.4-bookworm
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -89,7 +89,7 @@ jobs:
   device-artifact:
     needs: test
     runs-on: ubuntu-latest
-    container: golang:1.27.3-bookworm
+    container: golang:1.27.4-bookworm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # One step owns the dependency install, the signed catalogue, the
