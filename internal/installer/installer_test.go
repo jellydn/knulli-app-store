@@ -1263,6 +1263,7 @@ func TestRandomPickerLifecyclePreservesStateAndOtherPorts(t *testing.T) {
 	defer server.Close()
 	goAsset := zipBytesWithModes(t, map[string]zipFixture{
 		"RandomGamePicker.sh":   {body: "Go launcher", mode: 0755},
+		"Play Random Game.sh":   {body: "direct launcher", mode: 0755},
 		"random-game-picker":    {body: "Go binary", mode: 0755},
 		"assets/DejaVuSans.ttf": {body: "font", mode: 0644},
 		"licenses/font.txt":     {body: "font notice", mode: 0644},
@@ -1283,6 +1284,10 @@ func TestRandomPickerLifecyclePreservesStateAndOtherPorts(t *testing.T) {
 	legacyCompatibility.Dependencies = []string{"sdl2", "sdl2-image", "sdl2-ttf", "libc"}
 	pkg.Compatibility = &legacyCompatibility
 	pkg.Version = "0.1.1"
+	legacyInstall := *pkg.Install
+	pkg.Install = &legacyInstall
+	pkg.Install.Executables = []string{"RandomGamePicker.sh", "random-game-picker"}
+	pkg.Install.AdditionalMenus = nil
 	digest := sha256.Sum256(asset)
 	pkg.Release.SHA256 = hex.EncodeToString(digest[:])
 	pkg.Release.Size = int64(len(asset))
@@ -1334,6 +1339,8 @@ func TestRandomPickerLifecyclePreservesStateAndOtherPorts(t *testing.T) {
 				t.Fatal(err)
 			}
 			assertRootFile(t, root, base+"random-game-picker", "Go binary")
+			assertRootFile(t, root, base+"Play Random Game.sh", "direct launcher")
+			assertContains(t, root, menu, "./RandomGamePicker/Play Random Game.sh")
 			assertRootFile(t, root, base+"assets/DejaVuSans.ttf", "font")
 			writeRootFile(t, root, base+"state/ui.log", "Go UI session")
 			if _, err := manager.Apply(context.Background(), OpRepair, updated); err != nil {
@@ -1344,7 +1351,9 @@ func TestRandomPickerLifecyclePreservesStateAndOtherPorts(t *testing.T) {
 			}
 			assertMissing(t, root, base+"random-game-picker")
 			assertMissing(t, root, base+"RandomGamePicker.sh")
+			assertMissing(t, root, base+"Play Random Game.sh")
 			assertNotContains(t, root, menu, "./RandomGamePicker/RandomGamePicker.sh")
+			assertNotContains(t, root, menu, "./RandomGamePicker/Play Random Game.sh")
 			assertContains(t, root, menu, "./Other/Other.sh")
 			assertRootFile(t, root, "userdata/roms/ports/Other/Other.sh", "other port")
 			assertRootFile(t, root, base+"state/settings.json", `{"favorites":true}`)
@@ -2185,6 +2194,178 @@ func testPackage(url string, asset []byte, version string) manifest.Package {
 			Menu:              &manifest.Menu{Gamelist: "/userdata/roms/tools/gamelist.xml", Path: "./demo/launch.sh", Name: "Demo", Description: "Fixture utility."},
 		},
 	}
+}
+
+func TestAdditionalMenuLifecyclePreservesSavedState(t *testing.T) {
+	for _, update := range []bool{false, true} {
+		t.Run(fmt.Sprint("update=", update), func(t *testing.T) {
+			root := t.TempDir()
+			asset := zipBytes(t, map[string]string{"launch.sh": "settings launcher", "Play Random Game.sh": "direct launcher"})
+			server := serveAsset(t, asset)
+			defer server.Close()
+			pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+			pkg.Install.Preserve = []string{"state"}
+			manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+			if update {
+				if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+					t.Fatal(err)
+				}
+				// Model the installed-state format written by the old Store.
+				stateHost := filepath.Join(root, strings.TrimPrefix(statePath(pkg.ID), "/"))
+				data, err := os.ReadFile(stateHost)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var legacy map[string]json.RawMessage
+				if err := json.Unmarshal(data, &legacy); err != nil {
+					t.Fatal(err)
+				}
+				delete(legacy, "menu_ownership")
+				data, err = json.Marshal(legacy)
+				if err != nil {
+					t.Fatal(err)
+				}
+				writeRootFile(t, root, strings.TrimPrefix(statePath(pkg.ID), "/"), string(data))
+			}
+			saveSettings := func() {
+				writeRootFile(t, root, "userdata/roms/tools/demo/state/settings.json", `{"system":"snes","favorites":true,"yolo":true}`)
+				writeRootFile(t, root, "userdata/roms/tools/demo/state/nested/history", "preserve me")
+			}
+			if update {
+				saveSettings()
+			}
+			pkg.Install.AdditionalMenus = []manifest.Menu{{Gamelist: "/userdata/roms/tools/gamelist.xml", Path: "./demo/Play Random Game.sh", Name: "Play Random Game"}}
+			pkg.Version = "2.0.0"
+			pkg.Install.Executables = []string{"launch.sh", "Play Random Game.sh"}
+			op := OpInstall
+			if update {
+				op = OpUpdate
+			}
+			if _, err := manager.Apply(context.Background(), op, pkg); err != nil {
+				t.Fatal(err)
+			}
+			if !update {
+				saveSettings()
+			}
+			menuPath := filepath.Join(root, "userdata/roms/tools/gamelist.xml")
+			assertMenus := func(want int) {
+				t.Helper()
+				data, err := os.ReadFile(menuPath)
+				if err != nil || strings.Count(string(data), "<game>") != want {
+					t.Fatalf("want %d menu entries, got %s (%v)", want, data, err)
+				}
+			}
+			assertMenus(2)
+			writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList></gameList>")
+			writeRootFile(t, root, "userdata/roms/tools/demo/Play Random Game.sh", "damaged")
+			if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
+				t.Fatal(err)
+			}
+			assertMenus(2)
+			assertRootFile(t, root, "userdata/roms/tools/demo/Play Random Game.sh", "direct launcher")
+			extra := pkg.Install.AdditionalMenus
+			pkg.Install.AdditionalMenus = nil
+			pkg.Version = "3.0.0"
+			if _, err := manager.Apply(context.Background(), OpUpdate, pkg); err != nil {
+				t.Fatal(err)
+			}
+			assertMenus(1)
+			pkg.Install.AdditionalMenus = extra
+			pkg.Version = "4.0.0"
+			if _, err := manager.Apply(context.Background(), OpUpdate, pkg); err != nil {
+				t.Fatal(err)
+			}
+			assertMenus(2)
+			if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+				t.Fatal(err)
+			}
+			assertMenus(0)
+			assertRootFile(t, root, "userdata/roms/tools/demo/state/settings.json", `{"system":"snes","favorites":true,"yolo":true}`)
+			assertRootFile(t, root, "userdata/roms/tools/demo/state/nested/history", "preserve me")
+		})
+	}
+}
+
+func TestAdditionalMenusKeepSharedAndUserEditedEntries(t *testing.T) {
+	for _, edit := range []string{"shared", "name", "history"} {
+		t.Run(edit, func(t *testing.T) {
+			shared := edit == "shared"
+			root := t.TempDir()
+			asset := zipBytes(t, map[string]string{"launch.sh": "settings", "play.sh": "direct"})
+			server := serveAsset(t, asset)
+			defer server.Close()
+			pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+			pkg.Install.AdditionalMenus = []manifest.Menu{{Gamelist: pkg.Install.Menu.Gamelist, Path: "./demo/play.sh", Name: "Play"}}
+			entry := "<game><path>./demo/play.sh</path><name>Play</name><playcount>7</playcount></game>"
+			if shared {
+				writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", "<gameList>"+entry+"</gameList>")
+			}
+			manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+			if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+				t.Fatal(err)
+			}
+			menuHost := filepath.Join(root, "userdata/roms/tools/gamelist.xml")
+			if !shared {
+				data, err := os.ReadFile(menuHost)
+				if err != nil {
+					t.Fatal(err)
+				}
+				name := "Play"
+				if edit == "name" {
+					name = "My choice"
+				}
+				writeRootFile(t, root, "userdata/roms/tools/gamelist.xml", strings.Replace(string(data), "<name>Play</name>", "<name>"+name+"</name><playcount>7</playcount>", 1))
+			}
+			if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(menuHost)
+			if err != nil || strings.Count(string(data), "<game>") != 1 || !strings.Contains(string(data), "./demo/play.sh") || !strings.Contains(string(data), "<playcount>7</playcount>") {
+				t.Fatalf("shared/modified entry was lost: %s (%v)", data, err)
+			}
+			if edit == "name" && !strings.Contains(string(data), "My choice") {
+				t.Fatal("user's menu name was overwritten")
+			}
+		})
+	}
+}
+
+func TestAdditionalMenuFailureRollsBackTheWholeUpdate(t *testing.T) {
+	root := t.TempDir()
+	asset := zipBytes(t, map[string]string{"launch.sh": "settings", "play.sh": "direct"})
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg := testPackage("https://github.com/example/demo/releases/download/v1/demo.zip", asset, "1.0.0")
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(testPlatform())
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+		t.Fatal(err)
+	}
+	stateHost := filepath.Join(root, strings.TrimPrefix(statePath(pkg.ID), "/"))
+	beforeState, err := os.ReadFile(stateHost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	menuHost := filepath.Join(root, "userdata/roms/tools/gamelist.xml")
+	beforeMenu, err := os.ReadFile(menuHost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeRootFile(t, root, "userdata/roms/tools/demo/play.sh", "pre-update bytes")
+	writeRootFile(t, root, "userdata/roms/tools/broken.xml", "not XML")
+	pkg.Version = "2.0.0"
+	pkg.Install.Menu.Name = "Updated settings"
+	pkg.Install.AllowedWritePaths = append(pkg.Install.AllowedWritePaths, "/userdata/roms/tools/broken.xml")
+	pkg.Install.AdditionalMenus = []manifest.Menu{{Gamelist: "/userdata/roms/tools/broken.xml", Path: "./demo/play.sh", Name: "Play"}}
+	if _, err := manager.Apply(context.Background(), OpUpdate, pkg); err == nil {
+		t.Fatal("malformed second gamelist did not fail the update")
+	}
+	assertRootFile(t, root, "userdata/roms/tools/demo/play.sh", "pre-update bytes")
+	assertRootFile(t, root, "userdata/roms/tools/gamelist.xml", string(beforeMenu))
+	assertRootFile(t, root, strings.TrimPrefix(statePath(pkg.ID), "/"), string(beforeState))
+	assertRootFile(t, root, "userdata/roms/tools/broken.xml", "not XML")
 }
 
 func testPlatform() platform.Info {

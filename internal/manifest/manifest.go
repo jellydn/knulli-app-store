@@ -113,6 +113,7 @@ type Install struct {
 	Executables       []string          `json:"executables,omitempty"`
 	Warning           string            `json:"warning,omitempty"`
 	Menu              *Menu             `json:"menu,omitempty"`
+	AdditionalMenus   []Menu            `json:"additional_menus,omitempty"`
 	Preserve          []string          `json:"preserve,omitempty"`
 	Network           bool              `json:"network"`
 	AllowedWritePaths []string          `json:"allowed_write_paths"`
@@ -142,6 +143,15 @@ type Menu struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	Image       string `json:"image,omitempty"`
+}
+
+// MenuEntries keeps the original primary entry first for legacy installed state.
+func (i Install) MenuEntries() []Menu {
+	entries := make([]Menu, 0, 1+len(i.AdditionalMenus))
+	if i.Menu != nil {
+		entries = append(entries, *i.Menu)
+	}
+	return append(entries, i.AdditionalMenus...)
 }
 
 // MenuLauncherPath is the optional Store-generated launcher, not an archive file.
@@ -406,25 +416,37 @@ func (p Package) validateInstallation() []string {
 	if len(p.Install.MenuCommand) > 0 && p.Install.Menu == nil {
 		problems = append(problems, "menu command requires menu metadata")
 	}
-	if p.Install.Menu != nil {
-		if !safeAbsolute(p.Install.Menu.Gamelist) || !coveredBy(p.Install.Menu.Gamelist, p.Install.AllowedWritePaths) {
+	seenMenus := make(map[string]bool)
+	for _, menu := range p.Install.MenuEntries() {
+		if !safeAbsolute(menu.Gamelist) || !coveredBy(menu.Gamelist, p.Install.AllowedWritePaths) {
 			problems = append(problems, "menu gamelist must be an allowed absolute path")
 		}
-		if p.Install.Menu.Path == "" || p.Install.Menu.Name == "" {
+		if menu.Path == "" || menu.Name == "" {
 			problems = append(problems, "menu path and name are required")
 		}
-		if p.Install.Menu.Image != "" && !safeRelative(strings.TrimPrefix(p.Install.Menu.Image, "./")) {
+		if menu.Image != "" && !safeRelative(strings.TrimPrefix(menu.Image, "./")) {
 			problems = append(problems, "menu image must be a safe relative path")
 		}
-		if len(p.Install.MenuCommand) > 0 {
-			launcher := p.Install.MenuLauncherPath()
-			if !safeRelative(strings.TrimPrefix(p.Install.Menu.Path, "./")) || !coveredBy(launcher, p.Install.AllowedWritePaths) || under(launcher, p.Install.Destination) || p.Install.MenuCommand[0] != path.Join(p.Install.Destination, p.Install.Launcher) {
-				problems = append(problems, "menu command must invoke the package launcher from a separate allowed menu path")
-			}
-			for _, argument := range p.Install.MenuCommand {
-				if strings.ContainsRune(argument, '\x00') {
-					problems = append(problems, "menu command arguments must not contain NUL")
-				}
+		key := menu.Gamelist + "\x00" + path.Clean(menu.Path)
+		if seenMenus[key] {
+			problems = append(problems, "menu launch paths must be unique within a gamelist")
+		}
+		seenMenus[key] = true
+	}
+	for _, menu := range p.Install.AdditionalMenus {
+		launcher := path.Join(path.Dir(menu.Gamelist), menu.Path)
+		if !safeRelative(strings.TrimPrefix(menu.Path, "./")) || !under(launcher, p.Install.Destination) || launcher == p.Install.Destination {
+			problems = append(problems, "additional menu paths must refer to files below the package destination")
+		}
+	}
+	if p.Install.Menu != nil && len(p.Install.MenuCommand) > 0 {
+		launcher := p.Install.MenuLauncherPath()
+		if !safeRelative(strings.TrimPrefix(p.Install.Menu.Path, "./")) || !coveredBy(launcher, p.Install.AllowedWritePaths) || under(launcher, p.Install.Destination) || p.Install.MenuCommand[0] != path.Join(p.Install.Destination, p.Install.Launcher) {
+			problems = append(problems, "menu command must invoke the package launcher from a separate allowed menu path")
+		}
+		for _, argument := range p.Install.MenuCommand {
+			if strings.ContainsRune(argument, '\x00') {
+				problems = append(problems, "menu command arguments must not contain NUL")
 			}
 		}
 	}

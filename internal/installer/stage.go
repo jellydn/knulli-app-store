@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -209,6 +210,13 @@ func (m Manager) stage(ctx context.Context, operation string, pkg manifest.Packa
 	}
 	if !containsArchiveFile(files, pkg.Install.Launcher) {
 		return nil, fmt.Errorf("release archive does not contain launcher %s", pkg.Install.Launcher)
+	}
+	for _, menu := range pkg.Install.AdditionalMenus {
+		launcher := path.Join(path.Dir(menu.Gamelist), menu.Path)
+		relative := strings.TrimPrefix(launcher, pkg.Install.Destination+"/")
+		if !containsArchiveFile(files, relative) {
+			return nil, fmt.Errorf("release archive does not contain additional menu launcher %s", relative)
+		}
 	}
 	staged.guard = guard
 	staged.old = old

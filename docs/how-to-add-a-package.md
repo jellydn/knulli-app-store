@@ -37,6 +37,23 @@ Package code runs with access to user files. A complete review protects ROMs, sa
 
 A `candidate` can retain validated `release` metadata without `compatibility` or `install`. This lets later review reuse pinned bytes without exposing any lifecycle action. To promote it, add the reviewed runtime and installation definitions and an experimental warning. Do not treat the candidate's checksum as proof that its runtime is safe.
 
+## Additional menu entries
+
+Keep `install.menu` for the primary entry. An optional `install.additional_menus`
+array uses the same fields for other launch files inside the verified package.
+Each gamelist must be an allowed write path; each extra launch path must be
+unique in that gamelist, stay below the package destination, and exist in the
+staged release. Declare shell scripts and binaries in `install.executables`.
+Extra entries do not generate scripts or run commands.
+
+The Store records ownership for each entry. Update removes only unchanged
+retired entries; Repair can recreate missing entries without claiming existing
+paths. Uninstall removes only unchanged owned entries. Shared entries, user
+metadata, play history and preserved data stay. All entry edits and package
+files share one transaction, so a failure rolls them back together. Legacy
+single-entry installed state is read without a reset. Old Store binaries reject
+this added v1 field; ship the matching Store binary and signed catalogue together.
+
 ## Free games and homebrew
 
 [ADR 0011](adr/0011-reviewed-free-games.md) permits `type: game` for native free games, legally redistributable homebrew ROMs, and game data used by a Knulli-supplied engine. A game always requires a verified license, even as a candidate or upstream-managed package. Establish rights to all bundled graphics, music, text and levels, not just engine code; retain notices and attribution. Exclude commercial files, games requiring them, unclear rights, and permission limited to another distributor. Free download and spruce's `requires_files: false` are not permission.

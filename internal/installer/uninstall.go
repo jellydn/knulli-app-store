@@ -81,14 +81,9 @@ func (m Manager) uninstall(ctx context.Context, id string, outcome *OperationOut
 			return err
 		}
 	}
-	gameListChanged := false
-	if state.MenuOwned && state.Manifest.Install.Menu != nil {
-		menu := *state.Manifest.Install.Menu
-		changed, _, err := gamelist.Apply(tx, guard, gamelist.Derive(true, &menu, nil))
-		if err != nil {
-			return err
-		}
-		gameListChanged = changed
+	gameListChanged, _, err := gamelist.Reconcile(tx, guard, state.ownedMenus(), nil)
+	if err != nil {
+		return err
 	}
 	for _, backup := range state.Originals {
 		if err := tx.Remove(backup); err != nil {

@@ -15,11 +15,29 @@ import (
 const managerPath = manifest.ManagerStatePath
 
 type Installed struct {
-	Schema    string            `json:"schema"`
-	Manifest  manifest.Package  `json:"manifest"`
-	Files     []InstalledFile   `json:"files"`
-	Originals map[string]string `json:"originals,omitempty"`
-	MenuOwned bool              `json:"menu_owned,omitempty"`
+	Schema        string            `json:"schema"`
+	Manifest      manifest.Package  `json:"manifest"`
+	Files         []InstalledFile   `json:"files"`
+	Originals     map[string]string `json:"originals,omitempty"`
+	MenuOwned     bool              `json:"menu_owned,omitempty"`
+	MenuOwnership []bool            `json:"menu_ownership,omitempty"`
+}
+
+func (s *Installed) ownedMenus() []manifest.Menu {
+	if s == nil {
+		return nil
+	}
+	var result []manifest.Menu
+	for i, menu := range s.Manifest.Install.MenuEntries() {
+		owned := i < len(s.MenuOwnership) && s.MenuOwnership[i]
+		if s.MenuOwnership == nil {
+			owned = i == 0 && s.Manifest.Install.Menu != nil && s.MenuOwned
+		}
+		if owned {
+			result = append(result, menu)
+		}
+	}
+	return result
 }
 
 type InstalledFile struct {
@@ -56,6 +74,9 @@ func loadState(guard *safefs.Guard, id string) (*Installed, error) {
 	state.Manifest = migrateLegacyManifest(state.Manifest)
 	if err := state.Manifest.Validate(); err != nil || !state.Manifest.Installable() {
 		return nil, fmt.Errorf("installed state contains an invalid manifest")
+	}
+	if state.MenuOwnership != nil && len(state.MenuOwnership) != len(state.Manifest.Install.MenuEntries()) {
+		return nil, fmt.Errorf("installed state contains invalid menu ownership")
 	}
 	return &state, nil
 }

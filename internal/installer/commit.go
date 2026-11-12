@@ -52,16 +52,12 @@ func (m Manager) commit(ctx context.Context, operation string, pkg manifest.Pack
 		return err
 	}
 	m.event("backup_complete", "package", pkg.ID, "originals", fmt.Sprint(len(state.Originals)))
-	var previous *manifest.Menu
-	if old != nil && old.MenuOwned && old.Manifest.Install.Menu != nil {
-		owned := *old.Manifest.Install.Menu
-		previous = &owned
-	}
-	menuChanged, menuOwned, err := gamelist.Apply(tx, guard, gamelist.Derive(previous != nil, previous, pkg.Install.Menu))
+	menuChanged, ownership, err := gamelist.Reconcile(tx, guard, old.ownedMenus(), pkg.Install.MenuEntries())
 	if err != nil {
 		return err
 	}
-	state.MenuOwned = menuOwned
+	state.MenuOwnership = ownership
+	state.MenuOwned = pkg.Install.Menu != nil && ownership[0]
 	gameListChanged := menuChanged
 	stateData, err := encodeState(state)
 	if err != nil {

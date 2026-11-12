@@ -58,6 +58,40 @@ func Derive(oldOwned bool, oldMenu, menu *manifest.Menu) Plan {
 	return plan
 }
 
+// Reconcile applies a set of entries in the caller's transaction. Only exact
+// entries in previous are owned; a shared or modified entry never becomes owned.
+func Reconcile(tx *safefs.Transaction, guard *safefs.Guard, previous, desired []manifest.Menu) (changed bool, ownership []bool, err error) {
+	for _, old := range previous {
+		retained := false
+		for _, menu := range desired {
+			retained = retained || sameEntry(old, menu)
+		}
+		if !retained {
+			removed, _, err := Apply(tx, guard, Derive(true, &old, nil))
+			if err != nil {
+				return changed, nil, err
+			}
+			changed = changed || removed
+		}
+	}
+	for _, menu := range desired {
+		var old *manifest.Menu
+		for _, candidate := range previous {
+			if sameEntry(candidate, menu) {
+				old = &candidate
+				break
+			}
+		}
+		edited, owned, err := Apply(tx, guard, Derive(old != nil, old, &menu))
+		if err != nil {
+			return changed, nil, err
+		}
+		changed = changed || edited
+		ownership = append(ownership, owned)
+	}
+	return changed, ownership, nil
+}
+
 // ownedEntry returns the entry this installer owns, or nil.
 func ownedEntry(owned bool, menu *manifest.Menu) *manifest.Menu {
 	if !owned || menu == nil {
@@ -108,7 +142,13 @@ func applyStep(tx *safefs.Transaction, guard *safefs.Guard, step Step) (bool, er
 		if step.Previous == nil {
 			return false, fmt.Errorf("replace menu step requires previous entry")
 		}
-		return replaceEntry(tx, guard, *step.Previous, step.Menu)
+		changed, err := replaceEntry(tx, guard, *step.Previous, step.Menu)
+		if changed || err != nil {
+			return changed, err
+		}
+		// Repair may recreate a deleted entry, but addEntry never claims or
+		// replaces an existing path whose metadata the user changed.
+		return addEntry(tx, guard, step.Menu)
 	case StepRemove:
 		return removeEntry(tx, guard, step.Menu)
 	}

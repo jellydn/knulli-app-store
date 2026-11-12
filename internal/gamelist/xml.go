@@ -192,7 +192,19 @@ func menuNode(menu manifest.Menu) *xmlNode {
 }
 
 func menuNodeMatches(node *xmlNode, menu manifest.Menu) bool {
-	return node.Name.Local == "game" && childValue(node, "path") == menu.Path && childValue(node, "name") == menu.Name && childValue(node, "desc") == menu.Description && childValue(node, "image") == menu.Image
+	// Added history, custom fields or attributes make this a modified entry,
+	// even when its reviewed name, description and launch path are unchanged.
+	expected := menuNode(menu)
+	if node.Name != expected.Name || node.Text != "" || len(node.Attrs) != 0 || len(node.Children) != len(expected.Children) {
+		return false
+	}
+	for i, field := range node.Children {
+		want := expected.Children[i]
+		if field.Name != want.Name || field.Text != want.Text || len(field.Attrs) != 0 || len(field.Children) != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func encodeGamelist(root *xmlNode) ([]byte, error) {

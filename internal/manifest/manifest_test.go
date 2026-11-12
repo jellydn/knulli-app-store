@@ -741,6 +741,35 @@ func broadExperimentalPackage() Package {
 	return pkg
 }
 
+func TestAdditionalMenusMustStayWithinPackagePolicy(t *testing.T) {
+	for _, invalid := range []string{"", "gamelist", "escape", "absolute", "duplicate", "image", "name"} {
+		t.Run(invalid, func(t *testing.T) {
+			pkg := validPackage()
+			pkg.Install.AllowedWritePaths = append(pkg.Install.AllowedWritePaths, "/userdata/roms/tools/gamelist.xml")
+			pkg.Install.Menu = &Menu{Gamelist: "/userdata/roms/tools/gamelist.xml", Path: "./demo/launch.sh", Name: "Settings"}
+			extra := Menu{Gamelist: pkg.Install.Menu.Gamelist, Path: "./demo/play.sh", Name: "Play"}
+			switch invalid {
+			case "gamelist":
+				extra.Gamelist = "/userdata/elsewhere/gamelist.xml"
+			case "escape":
+				extra.Path = "../other/play.sh"
+			case "absolute":
+				extra.Path = "/userdata/roms/tools/demo/play.sh"
+			case "duplicate":
+				extra.Path = "demo/launch.sh"
+			case "image":
+				extra.Image = "../image.png"
+			case "name":
+				extra.Name = ""
+			}
+			pkg.Install.AdditionalMenus = []Menu{extra}
+			if err := pkg.Validate(); (err == nil) != (invalid == "") {
+				t.Fatalf("validation for %q: %v", invalid, err)
+			}
+		})
+	}
+}
+
 func validPackage() Package {
 	return Package{
 		Schema:     SchemaV1,

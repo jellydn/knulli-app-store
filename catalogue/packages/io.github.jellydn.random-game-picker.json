@@ -2,20 +2,20 @@
   "schema": "org.knulli.app-store/package-manifest/v1",
   "id": "io.github.jellydn.random-game-picker",
   "name": "Random Game Picker",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "utility",
-  "summary": "Pick an existing ES game with saved filters and optional YOLO launch.",
+  "summary": "Settings app plus a direct Play Random Game shortcut using saved filters.",
   "repository": "https://github.com/jellydn/knulli-random-game-picker",
   "license": "MIT",
   "review": {
     "status": "experimental",
     "approval": {"provenance": "maintainer"},
     "notes": [
-      "Stable 0.3.0 adds optional persistent YOLO mode, off by default. Settings toggles the yolo boolean; a clean exit or launch saves it atomically. When enabled, one pick starts fresh revalidation and one launch without preview, cancel or reroll. Saved-on runs open Settings so it can be disabled. When off, normal preview, Play, reroll and back remain unchanged. Empty pools, stale games and failed saves still block launch. Host/race and SDL fixtures cover both target sizes; 0.3.0 remains UNTESTED on hardware. The owner's 0.2.2 and 0.2.0 reports remain historical exact-version evidence. Store review status remains experimental.",
+      "Stable 0.4.0 adds Play Random Game.sh and --play-random: read existing state/settings.json, select once with saved system/favorites filters, revalidate and submit one ES launch without SDL initialization or picker UI. Missing/malformed settings, unavailable saved systems, empty pools, stale or ambiguous games, failed saves and ES failures block safely; no fallback or launch retry is added. The original Random Game Picker app retains settings, optional saved YOLO and normal preview/Play/reroll/back behavior. The direct shortcut works independently of YOLO and preserves its saved value. Host/race and SDL fixtures cover both target sizes; 0.4.0 remains UNTESTED on hardware. The owner's 0.2.2 and 0.2.0 reports remain historical exact-version evidence. Store review status remains experimental.",
       "The version-specific URL, exact size and SHA-256 pin the reviewed bytes. GitHub reports immutable=false: this is not a server-enforced immutable release. The Store rejects replacement bytes; release.immutable declares the pinned-content contract, not a GitHub repository setting.",
       "The picker reads effective ES system configuration, gamelists and the live ES catalogue; no game ROM directory or emulator command is hardcoded. Tools and Emulators are identified by exact system IDs; only path-only candidates use the confirmed /userdata/roms/tools and /userdata/roms/emulators roots. Ports, collections, missing/hidden games and ambiguous launch paths remain excluded. Application systems still contribute to launch-path ambiguity checks.",
       "The only network use is bounded HTTP to 127.0.0.1:1234. Play closes SDL, sends one exact raw-path POST to ES and exits. HTTP acceptance does not confirm play; there is no retry or nested configgen fallback.",
-      "The Store owns only its package directory and one Ports menu entry. Preserve the entire state directory: settings.json, atomic settings.json.tmp, replaced-per-run last-run.log and ui.log. The system string and favorites boolean are unchanged; an absent yolo boolean defaults off, so old settings need no migration. Published-byte fresh Install, 0.2.2-to-0.3.0 Update, damaged-file Repair and Uninstall fixtures at both target sizes preserve nested state and the saved YOLO setting. A nonstandard configured Ports root needs manual installation in that root instead.",
+      "The Store manages its package directory and two independent Ports menu entries: Random Game Picker and Play Random Game. Preserve the entire state directory: settings.json, atomic settings.json.tmp, replaced-per-run last-run.log and ui.log. The system string and favorites boolean are unchanged; an absent yolo boolean defaults off, so old settings need no migration. Published-byte fresh Install, legacy 0.3.0-to-0.4.0 Update, damaged-file/deleted-menu Repair and Uninstall fixtures at both target sizes preserve nested state and the saved YOLO setting. Shared or user-edited entries remain unowned. A nonstandard configured Ports root needs manual installation in that root instead. Use the matching new Store binary and signed catalogue; old Store binaries reject additional_menus.",
       "Includes the TSP-tested A/B and X/Y correction: default KNULLI SDL bindings translate back to ES labels. The launcher honors the Ports Xbox-layout flag, which keeps the identity mapping. Both launcher and binary must update together; this report does not verify every external controller or MagicX.",
       "Published AArch64 ELF inspection establishes a glibc 2.34 minimum. Firmware SDL2, SDL2_image, SDL2_ttf and SDL2_gfx are required; no firmware library is bundled or replaced. Go/module/font license notices replace the old C++ runtime notices; no libstdc++ runtime dependency remains."
     ],
@@ -52,32 +52,32 @@
       },
       {
         "kind": "release-asset",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.3.0/random-game-picker-0.3.0-knulli-aarch64.zip",
-        "note": "Downloaded stable ZIP: 3,275,766 compressed bytes, 7,874,357 regular-file bytes across 20 files; SHA-256 e0695b91bf018ace4a0bf12fea88893520a0ec0d67afc0210d7ade23d943284f. Publisher artifact.json and SHA256SUMS.txt agree. Flat layout; no archive links, state or bundled libraries. All six published files match GitHub sizes and digests. GitHub does not enforce immutability for this release."
+        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.4.0/random-game-picker-0.4.0-knulli-aarch64.zip",
+        "note": "Downloaded stable ZIP: 3,279,887 compressed bytes, 7,877,205 regular-file bytes across 21 files; SHA-256 8a91b69cc89f2d3acd8300f3294384db78c1ef47757c671e2eba2a968cbe392b. Publisher artifact.json and SHA256SUMS.txt agree. Flat layout; no archive links, state or bundled libraries. All six anonymous public downloads match GitHub sizes and digests. GitHub does not enforce immutability for this release."
       },
       {
         "kind": "publisher-checksum",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.3.0/SHA256SUMS.txt"
+        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.4.0/SHA256SUMS.txt"
       },
       {
         "kind": "license",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/blob/4d12ddab6fda57dca92a5dbba6a9a5696355d9a7/LICENSE",
+        "url": "https://github.com/jellydn/knulli-random-game-picker/blob/9e3a91cb6f6e99e3c150ff0d0f0b925e2c1d055f/LICENSE",
         "note": "MIT project license. ZIP includes THIRD_PARTY.md, Go toolchain and module LICENSE/COPYING files, and the DejaVu font notice. SDL libraries remain firmware dependencies. Historical C++ notices in THIRD_PARTY.md describe 0.1.1, not the Go executable."
       },
       {
         "kind": "runtime-dependency-review",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.3.0/abi.txt",
+        "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.4.0/abi.txt",
         "note": "ELF64 AArch64, interpreter /lib/ld-linux-aarch64.so.1; highest GLIBC symbol 2.34. NEEDED: libSDL2_image-2.0.so.0, libSDL2-2.0.so.0, libSDL2_ttf-2.0.so.0, libSDL2_gfx-1.0.so.0 and libc.so.6. No libstdc++ runtime dependency."
       },
       {
         "kind": "filesystem-and-network-review",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/blob/4d12ddab6fda57dca92a5dbba6a9a5696355d9a7/docs/go-rewrite.md",
+        "url": "https://github.com/jellydn/knulli-random-game-picker/blob/9e3a91cb6f6e99e3c150ff0d0f0b925e2c1d055f/docs/go-rewrite.md",
         "note": "Launcher sets package-local state and reads /var/run/ports_xbox_layout.flag without writing it. Settings/atomic temporary file, last-run.log and ui.log stay under state. ES config, ROMs, art and saves are read-only to the picker; the launched emulator can make its normal writes. Only bounded loopback ES requests are used."
       },
       {
         "kind": "desktop-test",
-        "url": "https://github.com/jellydn/knulli-random-game-picker/actions/runs/43047747127",
-        "note": "Passed gated 0.3.0 release workflow publishes the ARM64 ZIP, artifact.json, SHA256SUMS.txt, abi.txt, archive-inventory.txt and build-info.txt without rebuilding after device checks. Release bytes and metadata were independently downloaded and checked. Host/race and SDL fixtures at both sizes cover YOLO toggle/save/reopen, one-pick launch, stale/save-failure blocks, disabling back to normal preview/reroll/cancel/Play, demo isolation and existing exclusion/controller regressions. No physical-device pass is claimed."
+        "url": "https://github.com/jellydn/knulli-random-game-picker/actions/runs/43131032710",
+        "note": "Passed gated 0.4.0 release workflow builds in Debian 12 and publishes the ARM64 ZIP, artifact.json, SHA256SUMS.txt, abi.txt, archive-inventory.txt and build-info.txt without rebuilding after device checks. Release bytes and metadata were independently downloaded and checked. Host/race includes 44 real-binary headless cases; SDL fixtures at both sizes cover UI-save/direct-launch/UI, YOLO on/off persistence and recovery, normal preview/reroll/cancel/Play, demo isolation and existing exclusion/controller regressions. No physical-device pass is claimed."
       },
       {
         "kind": "device-test",
@@ -87,10 +87,10 @@
     ]
   },
   "release": {
-    "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.3.0/random-game-picker-0.3.0-knulli-aarch64.zip",
-    "sha256": "e0695b91bf018ace4a0bf12fea88893520a0ec0d67afc0210d7ade23d943284f",
-    "size": 3275766,
-    "installed_size": 7874357,
+    "url": "https://github.com/jellydn/knulli-random-game-picker/releases/download/v0.4.0/random-game-picker-0.4.0-knulli-aarch64.zip",
+    "sha256": "8a91b69cc89f2d3acd8300f3294384db78c1ef47757c671e2eba2a968cbe392b",
+    "size": 3279887,
+    "installed_size": 7877205,
     "format": "zip",
     "immutable": true
   },
@@ -107,14 +107,22 @@
     "destination": "/userdata/roms/ports/RandomGamePicker",
     "strip_components": 0,
     "launcher": "RandomGamePicker.sh",
-    "executables": ["RandomGamePicker.sh", "random-game-picker"],
-    "warning": "Experimental Go 0.3.0; UNTESTED on hardware. YOLO is off by default; when enabled, one pick launches without preview, cancel or reroll. Saved-on runs open Settings so it can be disabled. Tools and Emulators remain excluded. Requires glibc 2.34+, firmware SDL2/image/ttf/gfx and local ES API. Launch is submitted once; inspect state/last-run.log and state/ui.log before retrying. Standard Ports location only. Settings/logs stay after uninstall.",
+    "executables": ["RandomGamePicker.sh", "Play Random Game.sh", "random-game-picker"],
+    "warning": "Experimental Go 0.4.0; UNTESTED on hardware. Play Random Game reads saved settings and submits one launch without picker UI. Open Random Game Picker first to configure/save filters; it retains optional YOLO and normal controls. Missing/invalid settings, unavailable systems, stale games and failed saves block the shortcut. Tools and Emulators remain excluded. Requires glibc 2.34+, firmware SDL2/image/ttf/gfx and local ES API. No launch retry; inspect state/last-run.log and state/ui.log before retrying. Standard Ports location only. Settings/logs stay after uninstall.",
     "menu": {
       "gamelist": "/userdata/roms/ports/gamelist.xml",
       "path": "./RandomGamePicker/RandomGamePicker.sh",
       "name": "Random Game Picker",
       "description": "Random selection from your existing ES games, with filters and scraped art."
     },
+    "additional_menus": [
+      {
+        "gamelist": "/userdata/roms/ports/gamelist.xml",
+        "path": "./RandomGamePicker/Play Random Game.sh",
+        "name": "Play Random Game",
+        "description": "Launch one random existing ES game using saved Random Game Picker settings, without opening the picker UI."
+      }
+    ],
     "preserve": ["state"],
     "network": true,
     "allowed_write_paths": [
