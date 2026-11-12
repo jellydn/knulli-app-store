@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           # Match .agents/setup and the analyzer-compatible local hooks.
-          go-version: "1.27.3"
+          go-version: "1.27.4"
           cache: true
       - name: Install SDL2 development files
         run: apt-get update -qq && apt-get install -y -qq libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-gfx-dev pkg-config zip pipx python3-venv
@@ -73,7 +73,7 @@ jobs:
           git status --porcelain
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: "1.27.3"
+          go-version: "1.27.4"
           cache: true
       - name: Install SDL2 development files
         run: apt-get update -qq && apt-get install -y -qq libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-gfx-dev pkg-config zip
