@@ -180,7 +180,7 @@ walk catalogue-categories keyboard \
 # The former PocketCurator candidate now opens an upstream-managed install
 # confirmation. Never confirm a download in this offline flow.
 walk upstream-managed-confirmation keyboard \
-  "right,right,down,down,down,down,enter" \
+  "right,right,down,down,down,down,down,enter" \
   "catalogue,confirm" \
   "io.github.tomtombombadil.pocketcurator"
 
