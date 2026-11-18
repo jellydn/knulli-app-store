@@ -17,8 +17,8 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first.Packages) != 14 || len(second.Packages) != 14 {
-		t.Fatalf("expected fourteen packages, got %d and %d", len(first.Packages), len(second.Packages))
+	if len(first.Packages) != 15 || len(second.Packages) != 15 {
+		t.Fatalf("expected fifteen packages, got %d and %d", len(first.Packages), len(second.Packages))
 	}
 	// RetSend now uses upstream releases, but its recorded approval remains
 	// the maintainer's decision rather than community or device verification.
@@ -26,6 +26,7 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 	provenance := map[string]string{
 		"app.romm.grout":                             "community",
 		"com.akouzoukos.apotris":                     "",
+		"io.github.etrnliam.grainbrick":              "",
 		"io.github.freedoom.freedoom":                "",
 		"io.github.garage-collective.dark-and-under": "",
 		"io.github.itchio.zitch":                     "",
@@ -69,9 +70,14 @@ func TestRepositoryCatalogueBuildsDeterministically(t *testing.T) {
 				t.Fatal("retroshelf must be upstream-managed and experimental without an invented license")
 			}
 		}
+		if pkg := first.Packages[index].Package; pkg.ID == "io.github.etrnliam.grainbrick" {
+			if !pkg.Experimental() || pkg.Install == nil || !pkg.Install.UpstreamManaged || pkg.License != "" {
+				t.Fatal("grainbrick must be upstream-managed and experimental without an invented license")
+			}
+		}
 	}
-	if experimental != 14 || verified != 0 {
-		t.Fatalf("expected fourteen experimental packages and no current device-verified release, got %d and %d", experimental, verified)
+	if experimental != 15 || verified != 0 {
+		t.Fatalf("expected fifteen experimental packages and no current device-verified release, got %d and %d", experimental, verified)
 	}
 }
 
