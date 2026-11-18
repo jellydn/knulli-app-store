@@ -150,17 +150,22 @@ exec python3 "$APPDIR/main.py" > "$APPDIR/grainbrick.log" 2>&1
 	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
 		t.Fatal(err)
 	}
+	assertContains(t, root, base+"GrainBrick BETA 2.0.sh", `APPDIR="${0%/*}/grainbrick-beta2"`)
 	bin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(bin, "python3"), []byte("#!/bin/sh\nprintf '%s\\n' \"$PWD\" \"$1\" \"$PYTHONPATH\"\n"), 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(bin, "python3"), []byte("#!/bin/sh\nexit 99\n"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	command := exec.Command("sh", filepath.Join(root, base, "GrainBrick BETA 2.0.sh"))
+	if err := os.WriteFile(filepath.Join(bin, "python3.12"), []byte("#!/bin/sh\nprintf '%s\\n' \"$PWD\" \"$1\" \"$PYTHONPATH\"\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	command := exec.CommandContext(t.Context(), "sh", filepath.Join(root, base, "GrainBrick BETA 2.0.sh"))
 	command.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"), "PYTHONPATH=")
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("launcher failed: %s, %v", output, err)
 	}
 	appdir := filepath.Join(root, base, "grainbrick-beta2")
-	assertRootFile(t, root, base+"grainbrick-beta2/grainbrick.log", appdir+"\n"+appdir+"/main.py\n"+appdir+"/_vendor:"+appdir+"\n")
+	wantLog := appdir + "\n" + appdir + "/main.py\n" + appdir + "/_vendor:" + appdir + "\n"
+	assertRootFile(t, root, base+"grainbrick-beta2/grainbrick.log", wantLog)
 	assertContains(t, root, "userdata/roms/ports/gamelist.xml", "./GrainBrick/GrainBrick BETA 2.0.sh")
 	for file := range files {
 		if file != "GrainBrick BETA 2.0.sh" && file != "grainbrick-beta2/main.py" {
@@ -173,6 +178,7 @@ exec python3 "$APPDIR/main.py" > "$APPDIR/grainbrick.log" 2>&1
 		t.Fatal(err)
 	}
 	assertRootFile(t, root, base+"grainbrick-beta2/main.py", files["grainbrick-beta2/main.py"])
+	assertRootFile(t, root, base+"grainbrick-beta2/grainbrick.log", wantLog)
 	status, err := manager.Status(pkg.ID)
 	if err != nil || !status.Healthy {
 		t.Fatalf("repaired app is not healthy: %#v, %v", status, err)
@@ -188,6 +194,7 @@ exec python3 "$APPDIR/main.py" > "$APPDIR/grainbrick.log" 2>&1
 		}
 	}
 	assertRootFile(t, root, base+"grainbrick-beta2/recordings/session.wav", "my recording")
+	assertRootFile(t, root, base+"grainbrick-beta2/grainbrick.log", wantLog)
 	assertRootFile(t, root, "userdata/roms/ports/grainbrick-beta2/main.py", "manual installation")
 	data, err := os.ReadFile(filepath.Join(root, "userdata/roms/ports/gamelist.xml"))
 	if err != nil || bytes.Contains(data, []byte("./GrainBrick/GrainBrick BETA 2.0.sh")) {
