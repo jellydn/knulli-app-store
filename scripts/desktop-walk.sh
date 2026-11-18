@@ -132,6 +132,15 @@ walk() {
     FAILURES=$((FAILURES + 1))
   fi
 
+  if [ "$name" = upstream-managed-confirmation ] && ! awk -F '\t' '
+    $2 == "confirm" && $4 == "io.github.tomtombombadil.pocketcurator" && $6 == "install" { matches++ }
+    END { exit(matches != 1) }
+  ' "$out/walk.tsv"; then
+    echo "FAIL $name: expected one PocketCurator install confirmation" >&2
+    result="wrong confirmation"
+    FAILURES=$((FAILURES + 1))
+  fi
+
   if [ "$frames" -eq 0 ]; then
     echo "FAIL $name: the walkthrough captured no frame" >&2
     result="no frames"
