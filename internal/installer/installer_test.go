@@ -109,6 +109,92 @@ func TestApplyReportsMeasuredProgressBeforeDownloadFinishes(t *testing.T) {
 	}
 }
 
+func TestGrainBrickLifecycleKeepsUserSoundData(t *testing.T) {
+	pkg, err := manifest.Load("../../catalogue/packages/io.github.etrnliam.grainbrick.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Exact Beta 2.0 launcher; a stub interpreter checks relocation without running the app.
+	launcher := `#!/bin/sh
+# GrainBrick BETA 2.0, isolated from earlier installs
+APPDIR="/userdata/roms/ports/grainbrick-beta2"
+if [ ! -f "$APPDIR/main.py" ]; then
+  echo "GrainBrick BETA 2.0 not installed: $APPDIR/main.py" >&2
+  exit 1
+fi
+cd "$APPDIR" || exit 1
+export PYTHONPATH="$APPDIR/_vendor:$APPDIR${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 "$APPDIR/main.py" > "$APPDIR/grainbrick.log" 2>&1
+`
+	files := map[string]string{
+		"GrainBrick BETA 2.0.sh":                 launcher,
+		"grainbrick-beta2/main.py":               "application, never executed",
+		"grainbrick-beta2/settings.json":         "default settings",
+		"grainbrick-beta2/tempo_settings.json":   "default tempo",
+		"grainbrick-beta2/sample_meta.json":      "default sample metadata",
+		"grainbrick-beta2/harmony_samples.json":  "default harmony",
+		"grainbrick-beta2/projects/AMBIENT.json": "demo project",
+		"grainbrick-beta2/samples/demo.wav":      "demo sample",
+	}
+	asset := zipBytes(t, files)
+	server := serveAsset(t, asset)
+	defer server.Close()
+	pkg.Release = testPackage(pkg.Release.URL, asset, pkg.Version).Release
+	detected := testPlatform()
+	detected.GLIBCVersion = "2.38"
+	detected.Dependencies = append(detected.Dependencies, "python3", "python3.12", "pygame", "libm")
+	root := filepath.Join(t.TempDir(), "root with spaces")
+	manager := Manager{Root: root, Client: rewriteClient(t, server)}.WithPlatform(detected)
+	base := "userdata/roms/ports/GrainBrick/"
+	writeRootFile(t, root, "userdata/roms/ports/grainbrick-beta2/main.py", "manual installation")
+	if _, err := manager.Apply(context.Background(), OpInstall, pkg); err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "python3"), []byte("#!/bin/sh\nprintf '%s\\n' \"$PWD\" \"$1\" \"$PYTHONPATH\"\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	command := exec.Command("sh", filepath.Join(root, base, "GrainBrick BETA 2.0.sh"))
+	command.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"), "PYTHONPATH=")
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("launcher failed: %s, %v", output, err)
+	}
+	appdir := filepath.Join(root, base, "grainbrick-beta2")
+	assertRootFile(t, root, base+"grainbrick-beta2/grainbrick.log", appdir+"\n"+appdir+"/main.py\n"+appdir+"/_vendor:"+appdir+"\n")
+	assertContains(t, root, "userdata/roms/ports/gamelist.xml", "./GrainBrick/GrainBrick BETA 2.0.sh")
+	for file := range files {
+		if file != "GrainBrick BETA 2.0.sh" && file != "grainbrick-beta2/main.py" {
+			writeRootFile(t, root, base+file, "user data: "+file)
+		}
+	}
+	writeRootFile(t, root, base+"grainbrick-beta2/recordings/session.wav", "my recording")
+	writeRootFile(t, root, base+"grainbrick-beta2/main.py", "damaged code")
+	if _, err := manager.Apply(context.Background(), OpRepair, pkg); err != nil {
+		t.Fatal(err)
+	}
+	assertRootFile(t, root, base+"grainbrick-beta2/main.py", files["grainbrick-beta2/main.py"])
+	status, err := manager.Status(pkg.ID)
+	if err != nil || !status.Healthy {
+		t.Fatalf("repaired app is not healthy: %#v, %v", status, err)
+	}
+	if _, err := manager.Uninstall(context.Background(), pkg.ID); err != nil {
+		t.Fatal(err)
+	}
+	for file := range files {
+		if file != "GrainBrick BETA 2.0.sh" && file != "grainbrick-beta2/main.py" {
+			assertRootFile(t, root, base+file, "user data: "+file)
+		} else {
+			assertMissing(t, root, base+file)
+		}
+	}
+	assertRootFile(t, root, base+"grainbrick-beta2/recordings/session.wav", "my recording")
+	assertRootFile(t, root, "userdata/roms/ports/grainbrick-beta2/main.py", "manual installation")
+	data, err := os.ReadFile(filepath.Join(root, "userdata/roms/ports/gamelist.xml"))
+	if err != nil || bytes.Contains(data, []byte("./GrainBrick/GrainBrick BETA 2.0.sh")) {
+		t.Fatalf("removed menu entry remains: %s, %v", data, err)
+	}
+}
+
 func TestZitchPrivateLauncherAndLifecycleKeepAccountsAndGames(t *testing.T) {
 	pkg, err := manifest.Load("../../catalogue/packages/io.github.itchio.zitch.json")
 	if err != nil {

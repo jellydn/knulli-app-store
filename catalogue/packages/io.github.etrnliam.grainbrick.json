@@ -1,0 +1,102 @@
+{
+  "schema": "org.knulli.app-store/package-manifest/v1",
+  "id": "io.github.etrnliam.grainbrick",
+  "name": "GrainBrick",
+  "version": "2.0.0-beta.2",
+  "type": "utility",
+  "summary": "Granular ambient sound instrument with live input, rhythm, resonator and oscillator engines.",
+  "repository": "https://github.com/ETRNLIAM/GrainBrick",
+  "review": {
+    "status": "experimental",
+    "notes": [
+      "Review on 2026-11-18 downloaded the Beta 2.0 prerelease asset GrainBrick_BETA_2_0.zip: 36433322 bytes, SHA-256 012cadcba4a02b4090cc4a874ba2f135c14eb1e96aefe0cdd59a23c8b7c7270f, matching the GitHub API asset digest. No separate publisher checksum exists, and GitHub does not mark the release immutable. No application Python or native code was executed.",
+      "The application code is proprietary freeware: the release notes and packaged README state it is free to download but not licensed as open source, and the repository has no license file. No SPDX identifier is invented. Bundled SoundTouch (LGPL-2.1-or-later, with corresponding source), Mutable Instruments Rings code (MIT) and NumPy 1.26.4 (BSD-3-Clause) retain their own notices; they do not license GrainBrick.",
+      "On 2026-11-18 the owner authorized upstream-managed experimental installation with license and checksum warnings. Direct publisher download only, no redistribution or invented SPDX identifier. Runtime writes and upstream changes are not sandboxed or approved by Store checks. Close GrainBrick before every Store operation; Repair restores pinned code, not runtime effects.",
+      "The ZIP has 437 regular files (72630782 bytes) and 4 directories: launcher 'GrainBrick BETA 2.0.sh', a README and grainbrick-beta2/. No links, absolute paths, traversal, duplicates or special entries. Six files lack Unix type bits and read as regular mode 0600. The launcher runs python3 main.py from the hard-coded /userdata/roms/ports/grainbrick-beta2 with vendored AArch64 CPython 3.12 NumPy; it needs the system Python 3.12 and pygame. Native AArch64 libraries need glibc up to 2.38 (libSoundTouch.so.1) plus libstdc++ and libgcc_s. Bluetooth MIDI optionally uses dbus, gi and BlueZ.",
+      "Upstream tested Beta 2.0 on the original TrimUI Brick and Anbernic RG40XXV with KNULLI. TrimUI Smart Pro and MagicX Zero 28 are not confirmed; no Store device result is claimed. System aplay/arecord and amixer support audio; optional Bluetooth MIDI uses BlueZ and may change pairing state. CPU STABLE mode can raise the minimum frequency through sysfs with a restoring watcher. No internet downloader or updater was identified in the reviewed Python source; this is not a runtime confinement claim.",
+      "Store writes stay in /userdata/roms/ports/GrainBrick and the Ports gamelist. An equal-length verified patch at launcher offset 64 changes only APPDIR to the adjacent grainbrick-beta2 directory. The launcher remains one directory below Ports for menu scanning, and no manual installation at /userdata/roms/ports/grainbrick-beta2 is claimed. No shared hook or service registration was identified; no cleanup script is executed.",
+      "Preserve packaged settings.json, tempo_settings.json, sample_meta.json, harmony_samples.json, projects and samples, plus runtime-created recordings, logs, MIDI/button mappings and engine state. Runtime-created files are not Store-owned. The launcher writes grainbrick.log; the audio worker writes audio_process.log. User settings, sample edits, recordings and projects remain after removal; a later installation requires Manage existing followed by Repair to restore missing code. Keep all bundled notices and corresponding-source archives.",
+      "Fixture validation on 2026-11-18 used the actual pinned ZIP through installer.Manager: install and health, damaged-code Repair, settings/sample metadata/project/sample preservation, removal retaining recordings, and Manage existing followed by Repair all passed. The temporary actual-archive probe was removed; the retained offline regression checks the exact launcher with a stub interpreter, private path resolution with spaces, preserved sound data, menu removal and an untouched separate manual install. No GrainBrick Python/native code or device runtime was executed."
+    ],
+    "evidence": [
+      {
+        "kind": "owner-authorization",
+        "url": "https://ampcode.com/threads/T-01a1ec8d-34c0-70b1-b0a5-13d45f0c4d82",
+        "note": "Owner explicitly authorized upstream-managed experimental installation with licence and checksum warnings on 2026-11-18. This is risk acceptance, not a device test or a redistribution license."
+      },
+      {
+        "kind": "release-integrity",
+        "url": "https://api.github.com/repos/ETRNLIAM/GrainBrick/releases/assets/760361003",
+        "note": "Independently downloaded bytes match API size 36433322 and SHA-256 012cadcba4a02b4090cc4a874ba2f135c14eb1e96aefe0cdd59a23c8b7c7270f. Tag v2.0.0-beta.2 resolves to 142bd3c0d70a5ae9eb8749eb21d3961dbc7182e8. GitHub account/API trust only; no publisher checksum."
+      },
+      {
+        "kind": "license-review",
+        "url": "https://github.com/ETRNLIAM/GrainBrick/releases/tag/v2.0.0-beta.2",
+        "note": "Release notes: original application code is not currently released under an open-source license. Repository license API returns 404. Third-party notices are in grainbrick-beta2/THIRD_PARTY_NOTICES.md and docs/orbix_resonator/THIRD_PARTY_NOTICES.md inside the ZIP."
+      },
+      {
+        "kind": "compatibility-claim",
+        "url": "https://github.com/ETRNLIAM/GrainBrick/releases/tag/v2.0.0-beta.2",
+        "note": "Publisher-tested on TrimUI Brick (original) and Anbernic RG40XXV with KNULLI; other handhelds unconfirmed. Upstream claim, not Store device-test evidence."
+      }
+    ]
+  },
+  "release": {
+    "url": "https://github.com/ETRNLIAM/GrainBrick/releases/download/v2.0.0-beta.2/GrainBrick_BETA_2_0.zip",
+    "sha256": "012cadcba4a02b4090cc4a874ba2f135c14eb1e96aefe0cdd59a23c8b7c7270f",
+    "size": 36433322,
+    "installed_size": 72630782,
+    "format": "zip",
+    "immutable": true
+  },
+  "compatibility": {
+    "firmware": "knulli",
+    "architectures": ["aarch64"],
+    "abis": ["linux-aarch64-glibc"],
+    "minimum_glibc": "2.38",
+    "dependencies": ["python3", "python3.12", "pygame", "libc", "libm"]
+  },
+  "install": {
+    "destination": "/userdata/roms/ports/GrainBrick",
+    "launcher": "GrainBrick BETA 2.0.sh",
+    "executables": ["GrainBrick BETA 2.0.sh"],
+    "upstream_managed": true,
+    "warning": "Experimental; application license unverified (proprietary freeware). Direct publisher download only; GitHub digest only, no publisher checksum. Needs Python 3.12, pygame, glibc 2.38+ and working ALSA audio tools/libraries. No Store device test; Smart Pro and MagicX Zero 28 unconfirmed. Runtime writes and upstream changes are NOT sandboxed or Store-verified; CPU STABLE mode changes sysfs frequency settings and Bluetooth MIDI may change pairing state. Close GrainBrick before update, Repair or removal. Repair restores pinned code; settings, projects, samples and recordings stay after removal. Back up your work.",
+    "preserve": [
+      "grainbrick-beta2/settings.json",
+      "grainbrick-beta2/tempo_settings.json",
+      "grainbrick-beta2/sample_meta.json",
+      "grainbrick-beta2/harmony_samples.json",
+      "grainbrick-beta2/projects",
+      "grainbrick-beta2/samples",
+      "grainbrick-beta2/recordings",
+      "grainbrick-beta2/logs",
+      "grainbrick-beta2/grainbrick.log",
+      "grainbrick-beta2/audio_process.log",
+      "grainbrick-beta2/ble_midi_devices.json",
+      "grainbrick-beta2/button_mapping.json",
+      "grainbrick-beta2/midi_learn.json",
+      "grainbrick-beta2/midi_settings.json",
+      "grainbrick-beta2/sound_state.json",
+      "grainbrick-beta2/orbix_resonator_state.json",
+      "grainbrick-beta2/rhythm_state.json"
+    ],
+    "menu": {
+      "gamelist": "/userdata/roms/ports/gamelist.xml",
+      "path": "./GrainBrick/GrainBrick BETA 2.0.sh",
+      "name": "GrainBrick BETA 2.0",
+      "description": "Experimental granular ambient sound instrument. Proprietary freeware; requires Python 3.12, pygame and glibc 2.38+. Back up projects, samples and recordings."
+    },
+    "network": false,
+    "allowed_write_paths": ["/userdata/roms/ports/GrainBrick", "/userdata/roms/ports/gamelist.xml"],
+    "binary_patches": [
+      {
+        "path": "GrainBrick BETA 2.0.sh",
+        "offset": 64,
+        "before_hex": "4150504449523d222f75736572646174612f726f6d732f706f7274732f677261696e627269636b2d626574613222",
+        "after_hex": "4150504449523d22247b30252f2a7d2f677261696e627269636b2d62657461322220202020202020202020202020",
+        "sha256": "33dde4e5ef3ca47bbd7b3f97c2240db68ac1786711ecaf4205b7bccf2ef0bb29"
+      }
+    ]
+  }
+}
