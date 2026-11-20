@@ -98,7 +98,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    container: golang:1.27.3-bookworm
+    container: golang:1.27.4-bookworm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # The same script the CI path uses, so a tag release cannot be built with
